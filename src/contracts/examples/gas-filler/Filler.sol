@@ -77,7 +77,6 @@ contract Filler is DAppControl {
                 delegateUser: true,
                 requirePreSolver: true,
                 requirePostSolver: true,
-                requirePostOps: false,
                 zeroSolvers: false,
                 reuseUserOp: false,
                 userAuctioneer: false,
@@ -88,15 +87,14 @@ contract Filler is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: false,
                 invertBidValue: true,
-                exPostBids: false,
-                allowAllocateValueFailure: false
+                exPostBids: false
             })
         )
     { }
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueCall(bool solved, address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // NOTE: gas value xferred to user in postSolverCall
         // Pay the solver (since auction is reversed)
         // Address Pointer = winning solver.

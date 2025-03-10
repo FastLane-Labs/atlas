@@ -41,7 +41,6 @@ contract SafetyBitsTest is Test {
             userOpHash: userOpHash,
             bundler: bundler,
             solverSuccessful: false,
-            paymentsSuccessful: false,
             solverIndex: callConfig.needsPreOpsCall() ? 0 : 1,
             solverCount: solverOpCount + 3,
             phase: uint8(ExecutionPhase.Uninitialized),
@@ -56,7 +55,6 @@ contract SafetyBitsTest is Test {
     function testInitializeEscrowLock() public pure {
         Context memory ctx = initializeContext(CallConfigIndex.RequirePreOps);
         assertTrue(ctx.solverSuccessful == false);
-        assertTrue(ctx.paymentsSuccessful == false);
         assertTrue(ctx.solverIndex == 0);
         assertTrue(ctx.solverCount == 4);
         assertTrue(ctx.phase == uint8(ExecutionPhase.Uninitialized));

@@ -130,9 +130,7 @@ contract Atlas is Escrow, Factory {
                 _settle(ctx, _gL, _gasMarker, gasRefundBeneficiary, _unreachedCalldataValuePaid);
 
             auctionWon = ctx.solverSuccessful;
-            emit MetacallResult(
-                msg.sender, userOp.from, auctionWon, ctx.paymentsSuccessful, _ethPaidToBundler, _netGasSurcharge
-            );
+            emit MetacallResult(msg.sender, userOp.from, auctionWon, _ethPaidToBundler, _netGasSurcharge);
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
             _handleErrors(revertData, _dConfig.callConfig);
@@ -145,7 +143,7 @@ contract Atlas is Escrow, Factory {
             if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
 
             // Emit event indicating the metacall failed in `execute()`
-            emit MetacallResult(msg.sender, userOp.from, false, false, 0, 0);
+            emit MetacallResult(msg.sender, userOp.from, false, 0, 0);
         }
 
         // The environment lock is explicitly released here to allow multiple metacalls in a single transaction.
@@ -190,14 +188,7 @@ contract Atlas is Escrow, Factory {
             : _bidKnownIteration(ctx, dConfig, userOp, solverOps, _returnData);
 
         // AllocateValue Call
-        if (ctx.solverSuccessful) {
-            _allocateValue(ctx, dConfig, _winningBidAmount, _returnData);
-        }
-
-        // PostOp Call
-        if (dConfig.callConfig.needsPostOpsCall()) {
-            _executePostOpsCall(ctx, ctx.solverSuccessful, _returnData);
-        }
+        _allocateValue(ctx, dConfig, _winningBidAmount, _returnData);
     }
 
     /// @notice Called above in `execute` if the DAppConfig requires ex post bids. Sorts solverOps by bid amount and
@@ -365,7 +356,7 @@ contract Atlas is Escrow, Factory {
                 revert SolverSimFail(_solverOutcomeResult);
             } else if (
                 _errorSwitch == PreOpsSimFail.selector || _errorSwitch == UserOpSimFail.selector
-                    || _errorSwitch == AllocateValueSimFail.selector || _errorSwitch == PostOpsSimFail.selector
+                    || _errorSwitch == AllocateValueSimFail.selector
             ) {
                 assembly {
                     mstore(0, _errorSwitch)

@@ -37,7 +37,6 @@ contract AtlasErrors {
     error UserOpSimFail();
     error SolverSimFail(uint256 solverOutcomeResult); // uint param is result returned in `verifySolverOp`
     error AllocateValueSimFail();
-    error PostOpsSimFail();
     error ValidCalls(ValidCallsResult);
     error InsufficientGasForMetacallSimulation(uint256 estimatedMetacallGas, uint256 suggestedSimGas);
 
@@ -49,8 +48,6 @@ contract AtlasErrors {
     error UserOpValueExceedsBalance();
     error UserWrapperDelegatecallFail();
     error UserWrapperCallFail();
-    error PostOpsDelegatecallFail();
-    error PostOpsDelegatecallReturnedFalse();
     error AllocateValueDelegatecallFail();
     error NotEnvironmentOwner();
     error ExecutionEnvironmentBalanceTooLow();
@@ -58,9 +55,7 @@ contract AtlasErrors {
     // Atlas
     error PreOpsFail();
     error UserOpFail();
-    // error SolverFail(); // Only sim version of err is used
     error AllocateValueFail();
-    error PostOpsFail();
     error InvalidAccess();
 
     // Escrow

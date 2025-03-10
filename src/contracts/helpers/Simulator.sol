@@ -177,8 +177,6 @@ contract Simulator is AtlasErrors, AtlasConstants {
                 additionalErrorCode = solverOutcomeResult;
             } else if (errorSwitch == AllocateValueSimFail.selector) {
                 result = Result.AllocateValueSimFail;
-            } else if (errorSwitch == PostOpsSimFail.selector) {
-                result = Result.PostOpsSimFail;
             } else if (errorSwitch == SimulationPassed.selector) {
                 result = Result.SimulationPassed;
             } else {

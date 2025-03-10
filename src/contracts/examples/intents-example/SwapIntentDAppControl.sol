@@ -53,7 +53,6 @@ contract SwapIntentDAppControl is DAppControl {
                 delegateUser: true,
                 requirePreSolver: true,
                 requirePostSolver: true,
-                requirePostOps: false,
                 zeroSolvers: false,
                 reuseUserOp: true,
                 userAuctioneer: false,
@@ -64,8 +63,7 @@ contract SwapIntentDAppControl is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: true,
                 invertBidValue: false,
-                exPostBids: false,
-                allowAllocateValueFailure: false
+                exPostBids: false
             })
         )
     { }
@@ -174,7 +172,7 @@ contract SwapIntentDAppControl is DAppControl {
     * @param _
     * @param _
     */
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueCall(bool solved, address bidToken, uint256 bidAmount, bytes calldata) internal override {
         if (bidToken == address(0)) {
             SafeTransferLib.safeTransferETH(_user(), bidAmount);
         } else {

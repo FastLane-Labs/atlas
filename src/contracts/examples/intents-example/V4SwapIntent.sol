@@ -48,7 +48,6 @@ contract V4SwapIntentControl is DAppControl {
                 delegateUser: true,
                 requirePreSolver: true,
                 requirePostSolver: true,
-                requirePostOps: false,
                 zeroSolvers: false,
                 reuseUserOp: true,
                 userAuctioneer: true,
@@ -59,8 +58,7 @@ contract V4SwapIntentControl is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: false,
-                allowAllocateValueFailure: false
+                exPostBids: false
             })
         )
     {
@@ -234,7 +232,7 @@ contract V4SwapIntentControl is DAppControl {
     * @param bidAmount The winning bid amount
     * @param _
     */
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueCall(bool solved, address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Atlas

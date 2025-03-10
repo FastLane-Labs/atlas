@@ -50,7 +50,6 @@ contract V2RewardDAppControl is DAppControl {
                 delegateUser: false,
                 requirePreSolver: false,
                 requirePostSolver: false,
-                requirePostOps: true,
                 zeroSolvers: true,
                 reuseUserOp: false,
                 userAuctioneer: true,
@@ -61,8 +60,7 @@ contract V2RewardDAppControl is DAppControl {
                 requireFulfillment: false,
                 trustedOpHash: true,
                 invertBidValue: false,
-                exPostBids: true,
-                allowAllocateValueFailure: false
+                exPostBids: true
             })
         )
     {
@@ -164,29 +162,29 @@ contract V2RewardDAppControl is DAppControl {
     * @param bidAmount The winning bid amount
     * @param _
     */
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
-        require(bidToken == REWARD_TOKEN, "V2RewardDAppControl: InvalidBidToken");
+    function _allocateValueCall(
+        bool solved,
+        address bidToken,
+        uint256 bidAmount,
+        bytes calldata data
+    )
+        internal
+        override
+    {
+        if (solved) {
+            require(bidToken == REWARD_TOKEN, "V2RewardDAppControl: InvalidBidToken");
 
-        address user = _user();
+            address user = _user();
 
-        if (bidToken == address(0)) {
-            SafeTransferLib.safeTransferETH(user, bidAmount);
-        } else {
-            SafeTransferLib.safeTransfer(REWARD_TOKEN, user, bidAmount);
+            if (bidToken == address(0)) {
+                SafeTransferLib.safeTransferETH(user, bidAmount);
+            } else {
+                SafeTransferLib.safeTransfer(REWARD_TOKEN, user, bidAmount);
+            }
+
+            emit TokensRewarded(user, REWARD_TOKEN, bidAmount);
         }
 
-        emit TokensRewarded(user, REWARD_TOKEN, bidAmount);
-    }
-
-    /*
-    * @notice This function is called as the last phase of a `metacall` transaction
-    * @dev This function is delegatecalled: msg.sender = Atlas, address(this) = ExecutionEnvironment
-    * @dev It refunds any leftover dust (ETH/ERC20) to the user (this can occur when the user is calling an exactOUT
-        function and the amount sold is less than the amountInMax)
-    * @param data The address of the ERC20 token the user is selling (or address(0) for ETH), that was returned by the
-        _preOpsCall hook
-    */
-    function _postOpsCall(bool, bytes calldata data) internal override {
         address tokenSold = abi.decode(data, (address));
         uint256 balance;
 

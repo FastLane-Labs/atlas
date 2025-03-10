@@ -11,8 +11,6 @@ interface IExecutionEnvironment {
 
     function userWrapper(UserOperation calldata userOp) external payable returns (bytes memory userReturnData);
 
-    function postOpsWrapper(bool solved, bytes calldata returnData) external;
-
     function solverPreTryCatch(
         uint256 bidAmount,
         SolverOperation calldata solverOp,
@@ -30,6 +28,7 @@ interface IExecutionEnvironment {
         returns (SolverTracker memory);
 
     function allocateValue(
+        bool solved,
         address bidToken,
         uint256 bidAmount,
         bytes memory returnData

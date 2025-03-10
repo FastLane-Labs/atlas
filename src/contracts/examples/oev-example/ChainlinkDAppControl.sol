@@ -66,7 +66,6 @@ contract ChainlinkDAppControl is DAppControl {
                 delegateUser: false,
                 requirePreSolver: false,
                 requirePostSolver: false,
-                requirePostOps: false,
                 zeroSolvers: false,
                 reuseUserOp: false,
                 userAuctioneer: true,
@@ -77,8 +76,7 @@ contract ChainlinkDAppControl is DAppControl {
                 requireFulfillment: false, // Update oracle even if all solvers fail
                 trustedOpHash: true,
                 invertBidValue: false,
-                exPostBids: false,
-                allowAllocateValueFailure: false
+                exPostBids: false
             })
         )
     { }
@@ -87,7 +85,16 @@ contract ChainlinkDAppControl is DAppControl {
     //                  Atlas Hook Overrides                //
     // ---------------------------------------------------- //
 
-    function _allocateValueCall(address, uint256 bidAmount, bytes calldata data) internal virtual override {
+    function _allocateValueCall(
+        bool solved,
+        address,
+        uint256 bidAmount,
+        bytes calldata data
+    )
+        internal
+        virtual
+        override
+    {
         address chainlinkWrapper = abi.decode(data, (address));
         if (!ChainlinkDAppControl(_control()).isChainlinkWrapper(chainlinkWrapper)) {
             revert InvalidChainlinkAtlasWrapper();

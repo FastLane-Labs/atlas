@@ -311,7 +311,6 @@ contract DummyDAppControlBuilder is DAppControl {
                 delegateUser: true,
                 requirePreSolver: false,
                 requirePostSolver: false,
-                requirePostOps: false,
                 zeroSolvers: false,
                 reuseUserOp: false,
                 userAuctioneer: true,
@@ -322,15 +321,14 @@ contract DummyDAppControlBuilder is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: false,
-                allowAllocateValueFailure: false
+                exPostBids: false
             })
         )
     {
         weth = _weth;
     }
 
-    function _allocateValueCall(address bidToken, uint256, bytes calldata) internal override {
+    function _allocateValueCall(bool solved, address bidToken, uint256, bytes calldata) internal override {
         if (bidToken != address(0)) {
             revert("not supported");
         }

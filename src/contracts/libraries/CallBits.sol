@@ -37,9 +37,6 @@ library CallBits {
         if (callConfig.requirePostSolver) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequirePostSolver);
         }
-        if (callConfig.requirePostOps) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequirePostOpsCall);
-        }
         if (callConfig.zeroSolvers) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ZeroSolvers);
         }
@@ -73,9 +70,6 @@ library CallBits {
         if (callConfig.exPostBids) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ExPostBids);
         }
-        if (callConfig.allowAllocateValueFailure) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.AllowAllocateValueFailure);
-        }
     }
 
     function decodeCallConfig(uint32 encodedCallConfig) internal pure returns (CallConfig memory callConfig) {
@@ -87,7 +81,6 @@ library CallBits {
         callConfig.delegateUser = needsDelegateUser(encodedCallConfig);
         callConfig.requirePreSolver = needsPreSolverCall(encodedCallConfig);
         callConfig.requirePostSolver = needsPostSolverCall(encodedCallConfig);
-        callConfig.requirePostOps = needsPostOpsCall(encodedCallConfig);
         callConfig.zeroSolvers = allowsZeroSolvers(encodedCallConfig);
         callConfig.reuseUserOp = allowsReuseUserOps(encodedCallConfig);
         callConfig.userAuctioneer = allowsUserAuctioneer(encodedCallConfig);
@@ -99,7 +92,6 @@ library CallBits {
         callConfig.trustedOpHash = allowsTrustedOpHash(encodedCallConfig);
         callConfig.invertBidValue = invertsBidValue(encodedCallConfig);
         callConfig.exPostBids = exPostBids(encodedCallConfig);
-        callConfig.allowAllocateValueFailure = allowAllocateValueFailure(encodedCallConfig);
     }
 
     function needsSequentialUserNonces(uint32 callConfig) internal pure returns (bool sequential) {
@@ -132,10 +124,6 @@ library CallBits {
 
     function needsPostSolverCall(uint32 callConfig) internal pure returns (bool needsPostSolver) {
         needsPostSolver = callConfig & (1 << uint32(CallConfigIndex.RequirePostSolver)) != 0;
-    }
-
-    function needsPostOpsCall(uint32 callConfig) internal pure returns (bool needsPostOps) {
-        needsPostOps = callConfig & (1 << uint32(CallConfigIndex.RequirePostOpsCall)) != 0;
     }
 
     function allowsZeroSolvers(uint32 callConfig) internal pure returns (bool zeroSolvers) {
@@ -180,9 +168,5 @@ library CallBits {
 
     function exPostBids(uint32 callConfig) internal pure returns (bool) {
         return callConfig & (1 << uint32(CallConfigIndex.ExPostBids)) != 0;
-    }
-
-    function allowAllocateValueFailure(uint32 callConfig) internal pure returns (bool) {
-        return callConfig & (1 << uint32(CallConfigIndex.AllowAllocateValueFailure)) != 0;
     }
 }

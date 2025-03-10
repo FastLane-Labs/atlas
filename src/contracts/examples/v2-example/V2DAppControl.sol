@@ -64,7 +64,6 @@ contract V2DAppControl is DAppControl {
                 delegateUser: false,
                 requirePreSolver: false,
                 requirePostSolver: false,
-                requirePostOps: false,
                 zeroSolvers: true,
                 reuseUserOp: false,
                 userAuctioneer: true,
@@ -75,8 +74,7 @@ contract V2DAppControl is DAppControl {
                 requireFulfillment: false,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: false,
-                allowAllocateValueFailure: false
+                exPostBids: false
             })
         )
     {
@@ -132,7 +130,7 @@ contract V2DAppControl is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(address, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueCall(bool solved, address, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow

@@ -75,7 +75,6 @@ abstract contract SafetyLocks is Storage {
             userOpHash: vars.userOpHash,
             bundler: vars.bundler,
             solverSuccessful: false,
-            paymentsSuccessful: false,
             solverIndex: 0,
             solverCount: solverOpCount,
             phase: uint8(ExecutionPhase.PreOps),

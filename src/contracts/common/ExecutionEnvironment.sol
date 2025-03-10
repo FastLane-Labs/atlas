@@ -86,20 +86,6 @@ contract ExecutionEnvironment is Base {
         }
     }
 
-    /// @notice The postOpsWrapper function may be called by Atlas as the last phase of a `metacall` transaction.
-    /// @dev This contract is called by the Atlas contract, and delegatecalls the DAppControl contract via the
-    /// corresponding `postOpsCall` function.
-    /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
-    /// @param returnData Data returned from the previous call phase.
-    function postOpsWrapper(bool solved, bytes calldata returnData) external onlyAtlasEnvironment {
-        bytes memory _data = _forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
-
-        bool _success;
-        (_success,) = _control().delegatecall(_data);
-
-        if (!_success) revert AtlasErrors.PostOpsDelegatecallFail();
-    }
-
     /// @notice The solverPreTryCatch function is called by Atlas to execute the preSolverCall part of each
     /// SolverOperation. A SolverTracker struct is also returned, containing bid info needed to handle the difference in
     /// logic between inverted and non-inverted bids.
@@ -226,29 +212,25 @@ contract ExecutionEnvironment is Base {
     /// @param bidToken The address of the token used for the winning SolverOperation's bid.
     /// @param bidAmount The winning bid amount.
     /// @param allocateData Data returned from the previous call phase.
-    /// @return allocateValueSucceeded Boolean indicating whether the allocateValue delegatecall succeeded (true) or
-    /// reverted (false). This is useful when allowAllocateValueFailure is set to true, the failure is caught here, but
-    /// we still need to communicate to Atlas that the hook did not succeed.
     function allocateValue(
+        bool solved,
         address bidToken,
         uint256 bidAmount,
         bytes memory allocateData
     )
         external
         onlyAtlasEnvironment
-        returns (bool allocateValueSucceeded)
     {
-        allocateData = _forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
+        allocateData =
+            _forward(abi.encodeCall(IDAppControl.allocateValueCall, (solved, bidToken, bidAmount, allocateData)));
 
         (bool _success,) = _control().delegatecall(allocateData);
-        if (!_success && !_config().allowAllocateValueFailure()) revert AtlasErrors.AllocateValueDelegatecallFail();
+        if (!_success) revert AtlasErrors.AllocateValueDelegatecallFail();
 
         uint256 _balance = address(this).balance;
         if (_balance > 0) {
             IAtlas(ATLAS).contribute{ value: _balance }();
         }
-
-        return _success;
     }
 
     ///////////////////////////////////////

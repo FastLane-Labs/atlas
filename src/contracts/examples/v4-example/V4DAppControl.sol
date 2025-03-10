@@ -61,7 +61,6 @@ contract V4DAppControl is DAppControl {
                 delegateUser: false,
                 requirePreSolver: false,
                 requirePostSolver: false,
-                requirePostOps: true,
                 zeroSolvers: true,
                 reuseUserOp: false,
                 userAuctioneer: true,
@@ -72,8 +71,7 @@ contract V4DAppControl is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: false,
-                allowAllocateValueFailure: false
+                exPostBids: false
             })
         )
     {
@@ -153,10 +151,20 @@ contract V4DAppControl is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueCall(
+        bool solved,
+        address bidToken,
+        uint256 bidAmount,
+        bytes calldata data
+    )
+        internal
+        override
+    {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
+
+        if (!solved) revert();
 
         bool initialized;
         assembly {
@@ -180,14 +188,8 @@ contract V4DAppControl is DAppControl {
         );
 
         sequenceLock[sequenceKey] = true;
-    }
 
-    function _postOpsCall(bool solved, bytes calldata data) internal override {
-        // This function is delegatecalled
-        // address(this) = ExecutionEnvironment
-        // msg.sender = Escrow
-
-        if (!solved) revert();
+        // NOTE: The code below was previously in the postOps hook
 
         (bytes memory returnData) = abi.decode(data, (bytes));
 
@@ -234,7 +236,7 @@ contract V4DAppControl is DAppControl {
         // and that DAppControl supplied a valid signature
         require(address(this) == hook, "ERR-H20 InvalidCallee");
         require(hook == _control(), "ERR-H21 InvalidCaller");
-        require(_phase() == uint8(ExecutionPhase.PostOps), "ERR-H22 InvalidLockStage");
+        require(_phase() == uint8(ExecutionPhase.AllocateValue), "ERR-H22 InvalidLockStage");
 
         bytes32 hashLock;
         assembly {

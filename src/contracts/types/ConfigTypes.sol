@@ -37,9 +37,6 @@ struct CallConfig {
     // requirePostSolver: The postSolver hook is executed after the solverOp is executed. If false, the postSolver hook
     // is skipped.
     bool requirePostSolver;
-    // requirePostOps: The postOps hook is executed as the last step of the metacall. If false, the postOps hook is
-    // skipped.
-    bool requirePostOps;
     // zeroSolvers: Allow the metacall to proceed even if there are no solverOps. The solverOps do not necessarily need
     // to be successful, but at least 1 must exist.
     bool zeroSolvers;
@@ -74,9 +71,6 @@ struct CallConfig {
     // exPostBids: Bids are found on-chain using `_getBidAmount` in Atlas, and solverOp.bidAmount is used as the max
     // bid. If solverOp.bidAmount is 0, then there is no max bid limit for that solver.
     bool exPostBids;
-    // allowAllocateValueFailure: If true, the metacall will proceed even if the value allocation fails. If false, the
-    // metacall will revert if the value allocation fails.
-    bool allowAllocateValueFailure;
 }
 
 enum CallConfigIndex {
@@ -88,7 +82,6 @@ enum CallConfigIndex {
     DelegateUser,
     RequirePreSolver,
     RequirePostSolver,
-    RequirePostOpsCall,
     ZeroSolvers,
     ReuseUserOp,
     UserAuctioneer,
@@ -100,6 +93,5 @@ enum CallConfigIndex {
     RequireFulfillment,
     TrustedOpHash,
     InvertBidValue,
-    ExPostBids,
-    AllowAllocateValueFailure
+    ExPostBids
 }
