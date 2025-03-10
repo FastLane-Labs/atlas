@@ -39,6 +39,7 @@ contract AtlasErrors {
     error AllocateValueSimFail();
     error PostOpsSimFail();
     error ValidCalls(ValidCallsResult);
+    error InsufficientGasForMetacallSimulation(uint256 estimatedMetacallGas, uint256 suggestedSimGas);
 
     // Execution Environment
     error InvalidUser();
@@ -61,7 +62,6 @@ contract AtlasErrors {
     error AllocateValueFail();
     error PostOpsFail();
     error InvalidAccess();
-    error GasLimitTooHigh();
 
     // Escrow
     error UncoveredResult();
@@ -87,19 +87,11 @@ contract AtlasErrors {
     error InvalidLockState();
 
     // GasAccounting
-    error LedgerFinalized(uint8 id);
-    error LedgerBalancing(uint8 id);
-    error MissingFunds(uint8 id);
-    error InsufficientFunds();
-    error NoUnfilledRequests();
-    error SolverMustReconcile();
-    error DoubleReconcile();
     error InvalidExecutionEnvironment(address correctEnvironment);
-    error InvalidSolverFrom(address solverFrom);
-    error InsufficientSolverBalance(uint256 actual, uint256 msgValue, uint256 holds, uint256 needed);
     error InsufficientAtlETHBalance(uint256 actual, uint256 needed);
     error InsufficientTotalBalance(uint256 shortfall);
-    error UnbalancedAccounting();
+    error BorrowsNotRepaid(uint256 borrows, uint256 repays);
+    error AssignDeficitTooLarge(uint256 deficit, uint256 bundlerRefund);
 
     // SafetyLocks
     error NotInitialized();

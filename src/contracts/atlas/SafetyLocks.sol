@@ -83,8 +83,7 @@ abstract contract SafetyLocks is Storage {
             bidFind: false,
             isSimulation: vars.isSimulation,
             callDepth: 0,
-            dappGasLeft: dappGasLimit,
-            allSolversGasLimit: uint32(vars.allSolversGasLimit)
+            dappGasLeft: dappGasLimit
         });
     }
 }

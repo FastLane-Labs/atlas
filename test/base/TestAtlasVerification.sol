@@ -7,18 +7,20 @@ import "../../src/contracts/atlas/AtlasVerification.sol";
 /// @author FastLane Labs
 /// @notice A test version of the AtlasVerification to expose internal functions.
 contract TestAtlasVerification is AtlasVerification {
-    constructor(address atlas) AtlasVerification(atlas) { }
+    constructor(address atlas, address l2GasCalculator) AtlasVerification(atlas, l2GasCalculator) { }
 
     // Public functions to expose internal transient helpers for testing
 
-    function getSolverOpsCalldataLength(
-        uint256 userOpDataLength,
-        uint256 msgDataLength
+    function getAndVerifyGasLimits(
+        SolverOperation[] calldata solverOps,
+        DAppConfig calldata dConfig,
+        uint256 userOpGas,
+        uint256 metacallGasLeft
     )
         public
-        pure
-        returns (uint256 solverOpsLength)
+        view
+        returns (ValidCallsResult validCallsResult, uint256 allSolversGasLimit, uint256 bidFindOverhead)
     {
-        return _getSolverOpsCalldataLength(userOpDataLength, msgDataLength);
+        return _getAndVerifyGasLimits(solverOps, dConfig, userOpGas, metacallGasLeft);
     }
 }

@@ -11,10 +11,22 @@ import "../types/ConfigTypes.sol";
 import "../types/ValidCalls.sol";
 import "../types/EscrowTypes.sol";
 import { AtlasErrors } from "../types/AtlasErrors.sol";
+import { AtlasConstants } from "../types/AtlasConstants.sol";
+import { AccountingMath } from "../libraries/AccountingMath.sol";
+import { GasAccLib } from "../libraries/GasAccLib.sol";
+import { CallBits } from "../libraries/CallBits.sol";
 import { Result } from "../interfaces/ISimulator.sol";
 import { IAtlas } from "../interfaces/IAtlas.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
-contract Simulator is AtlasErrors {
+import "forge-std/console.sol";
+
+contract Simulator is AtlasErrors, AtlasConstants {
+    using CallBits for uint32;
+
+    uint256 internal constant _SIM_GAS_SUGGESTED_BUFFER = 30_000; // TODO calc properly
+    uint256 internal constant _SIM_GAS_BEFORE_METACALL = 10_000; // TODO calc properly
+
     address public immutable deployer;
     address public atlas;
 
@@ -23,6 +35,36 @@ contract Simulator is AtlasErrors {
     constructor() {
         deployer = msg.sender;
     }
+
+    function estimateMetacallGasLimit(
+        UserOperation calldata userOp,
+        SolverOperation[] memory solverOps
+    )
+        public
+        view
+        returns (uint256)
+    {
+        // TODO refactor some of this into a shared lib with AtlasVerification - GasAccLib probably
+        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
+        uint256 metacallCalldataLength = msg.data.length + DAPP_OP_LENGTH + 28;
+        // Additional 28 length accounts for missing address param
+
+        uint256 metacallCalldataGas =
+            GasAccLib.metacallCalldataGas(metacallCalldataLength, IAtlas(atlas).L2_GAS_CALCULATOR());
+
+        uint256 metacallExecutionGas = _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOp.gas
+            + dConfig.dappGasLimit + solverOps.length * dConfig.solverGasLimit;
+
+        if (dConfig.callConfig.exPostBids()) {
+            metacallExecutionGas += solverOps.length * (_BID_FIND_OVERHEAD + dConfig.solverGasLimit);
+        }
+
+        return metacallCalldataGas + metacallExecutionGas;
+    }
+
+    // TODO consider returning estimatedGasLimit in the simUserOp, simSolverOps functions for convenience
+    // NOTE: If simulator sets gas lim for metacalls, make sure caller knows to set really high gas limit. Otherwise
+    // will form the ceiling and sim result will be inaccurate
 
     function simUserOperation(UserOperation calldata userOp)
         external
@@ -36,7 +78,9 @@ contract Simulator is AtlasErrors {
         dAppOp.to = atlas;
         dAppOp.control = userOp.control;
 
-        (Result result, uint256 validCallsResult) = _errorCatcher(userOp, solverOps, dAppOp);
+        uint256 estGasLim = estimateMetacallGasLimit(userOp, solverOps);
+
+        (Result result, uint256 validCallsResult) = _errorCatcher(userOp, solverOps, dAppOp, estGasLim);
         success = uint8(result) > uint8(Result.UserOpSimFail);
         if (success) validCallsResult = uint256(ValidCallsResult.Valid);
         if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
@@ -57,7 +101,9 @@ contract Simulator is AtlasErrors {
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         solverOps[0] = solverOp;
 
-        (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp);
+        uint256 estGasLim = estimateMetacallGasLimit(userOp, solverOps);
+
+        (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp, estGasLim);
         success = result == Result.SimulationPassed;
         if (success) solverOutcomeResult = 0; // discard additional error uint if solver stage was successful
         if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
@@ -79,7 +125,10 @@ contract Simulator is AtlasErrors {
             // Returns number out of usual range of SolverOutcome enum to indicate no solverOps
             return (false, Result.Unknown, uint256(type(SolverOutcome).max) + 1);
         }
-        (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp);
+
+        uint256 estGasLim = estimateMetacallGasLimit(userOp, solverOps);
+
+        (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp, estGasLim);
         success = result == Result.SimulationPassed;
         if (success) solverOutcomeResult = 0; // discard additional error uint if solver stage was successful
         if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
@@ -89,12 +138,17 @@ contract Simulator is AtlasErrors {
     function _errorCatcher(
         UserOperation memory userOp,
         SolverOperation[] memory solverOps,
-        DAppOperation memory dAppOp
+        DAppOperation memory dAppOp,
+        uint256 estGasLimit
     )
         internal
         returns (Result result, uint256 additionalErrorCode)
     {
-        try this.metacallSimulation{ value: userOp.value }(userOp, solverOps, dAppOp) {
+        if (gasleft() < estGasLimit + _SIM_GAS_BEFORE_METACALL) {
+            revert InsufficientGasForMetacallSimulation(estGasLimit, estGasLimit + _SIM_GAS_SUGGESTED_BUFFER);
+        }
+
+        try this.metacallSimulation{ value: userOp.value }(userOp, solverOps, dAppOp, estGasLimit) {
             revert Unreachable();
         } catch (bytes memory revertData) {
             bytes4 errorSwitch = bytes4(revertData);
@@ -138,13 +192,14 @@ contract Simulator is AtlasErrors {
     function metacallSimulation(
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
-        DAppOperation calldata dAppOp
+        DAppOperation calldata dAppOp,
+        uint256 estGasLimit
     )
         external
         payable
     {
         if (msg.sender != address(this)) revert InvalidEntryFunction();
-        if (!IAtlas(atlas).metacall{ value: msg.value }(userOp, solverOps, dAppOp, address(0))) {
+        if (!IAtlas(atlas).metacall{ value: msg.value, gas: estGasLimit }(userOp, solverOps, dAppOp, address(0))) {
             revert NoAuctionWinner(); // should be unreachable
         }
         revert SimulationPassed();

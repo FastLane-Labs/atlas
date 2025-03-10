@@ -30,8 +30,10 @@ contract AtlasConstants {
     // `msg.data.length / 2 * 16` because 2 hex chars per byte.
     uint256 internal constant _BASE_TX_GAS_USED = 21_000;
     uint256 internal constant _SOLVER_OP_BASE_CALLDATA = 608; // SolverOperation calldata length excluding solverOp.data
-    uint256 internal constant _SOLVER_BASE_GAS_USED = 5000; // Base gas charged to solver in `_handleSolverAccounting()`
+    uint256 internal constant _SOLVER_BASE_GAS_USED = 5000; // Base gas charged to solver in
+        // `_handleSolverFailAccounting()`
     uint256 internal constant _BUNDLER_GAS_PENALTY_BUFFER = 500_000;
+    uint256 internal constant _EXECUTION_GAS_BUFFER = 150_000; // TODO measure, should be gas used + buffer
 
     // First 160 bits of _solverLock are the address of the current solver.
     // The 161st bit represents whether the solver has called back via `reconcile`.
@@ -56,4 +58,10 @@ contract AtlasConstants {
         // solverOp in `_bidFindingIteration()`
     uint256 internal constant _EXTRA_METACALL_CALLDATA_LENGTH = 36; // The length of the extra static metacall calldata
         // besides the core UserOp, DAppOp, and SolverOps components.
+
+    // Params below are used to calculate the tolerated max diff between actual gasleft and expected gasleft, in the
+    // `_getAndVerifyGasLimits()` function. This tolerance is mostly for calldata gas cost differences.
+    uint256 internal constant _UPPER_BASE_EXEC_GAS_TOLERANCE = 20_000;
+    uint256 internal constant _LOWER_BASE_EXEC_GAS_TOLERANCE = 60_000;
+    uint256 internal constant _TOLERANCE_PER_SOLVER = 33_000;
 }

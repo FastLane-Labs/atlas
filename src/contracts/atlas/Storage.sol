@@ -34,17 +34,11 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 internal transient t_solverLock; 
     address internal transient t_solverTo; // current solverOp.solver contract address
 
-    // solverSurcharge = total surcharge collected from failed solverOps due to solver fault.
-    uint256 internal transient t_solverSurcharge;
-    uint256 internal transient t_claims;
-    uint256 internal transient t_fees;
-    uint256 internal transient t_writeoffs;
-    uint256 internal transient t_deposits; // TODO use for gas repayments for now. Will be removed in gas acc refactor
-    uint256 internal transient t_maxApprovedGasSpend; // Solver's max gas spend set when calling reconcile()
+    // Tracks gas accounting vars - see GasAccLib.sol for more details
+    uint256 internal transient t_gasLedger;
 
-    // Tracks native token value of all borrows and repayments
-    uint256 internal transient t_borrows;
-    uint256 internal transient t_repays;
+    // Tracks borrows and repayments of native token - see GasAccLib.sol for more details
+    uint256 internal transient t_borrowsLedger;
 
     // AtlETH storage
     uint256 internal S_totalSupply;
@@ -174,6 +168,11 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         uint256 _bothRates = S_surchargeRates;
         atlasRate = _bothRates >> 128;
         bundlerRate = _bothRates & ((1 << 128) - 1);
+    }
+
+    function _totalSurchargeRate() internal view returns(uint256 totalSurchargeRate) {
+        (uint256 atlasRate, uint256 bundlerRate) = _surchargeRates();
+        totalSurchargeRate = atlasRate + bundlerRate;
     }
 
     // ---------------------------------------------------- //

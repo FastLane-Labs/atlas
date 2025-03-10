@@ -23,15 +23,15 @@ contract BaseGasCalculator is IL2GasCalculator, Ownable {
         calldataLengthOffset = calldataLenOffset;
     }
 
-    /// @notice Calculate the cost of calldata in ETH on a L2 with a different fee structure than mainnet
+    /// @notice Calculate the calldata cost in gas units on a L2 with a different fee structure than mainnet
     /// @param calldataLength The length of the calldata in bytes
-    /// @return calldataCost The cost of the calldata in ETH
-    function getCalldataCost(uint256 calldataLength) external view override returns (uint256 calldataCost) {
+    /// @return calldataGas The gas of the calldata in ETH
+    function getCalldataGas(uint256 calldataLength) external view override returns (uint256 calldataGas) {
         // `getL1FeeUpperBound` returns the upper bound of the L1 fee in wei. It expects an unsigned transaction size in
         // bytes, *not calldata length only*, which makes this function a rough estimate.
 
-        // Base execution cost.
-        calldataCost = calldataLength * _CALLDATA_LENGTH_PREMIUM_HALVED * tx.gasprice;
+        // Base execution gas.
+        calldataGas = calldataLength * _CALLDATA_LENGTH_PREMIUM_HALVED;
 
         // L1 data cost.
         // `getL1FeeUpperBound` adds 68 to the size because it expects an unsigned transaction size.
@@ -45,17 +45,20 @@ contract BaseGasCalculator is IL2GasCalculator, Ownable {
         int256 _calldataLenOffset = calldataLengthOffset;
 
         if (_calldataLenOffset < 0 && calldataLength < uint256(-_calldataLenOffset)) {
-            return calldataCost;
+            return calldataGas;
         }
 
         calldataLength += uint256(_calldataLenOffset);
-        calldataCost += IGasPriceOracle(GAS_PRICE_ORACLE).getL1FeeUpperBound(calldataLength);
+
+        // GasPriceOracle returns the upper bound of the L1 fee in wei, so we divide by the gas price to get the gas.
+        uint256 extraGas = IGasPriceOracle(GAS_PRICE_ORACLE).getL1FeeUpperBound(calldataLength) / tx.gasprice;
+        calldataGas += extraGas;
     }
 
     /// @notice Gets the cost of initial gas used for a transaction with a different calldata fee than mainnet
     /// @param calldataLength The length of the calldata in bytes
     function initialGasUsed(uint256 calldataLength) external pure override returns (uint256 gasUsed) {
-        return _BASE_TX_GAS_USED + (calldataLength * _CALLDATA_LENGTH_PREMIUM_HALVED);
+        return calldataLength * _CALLDATA_LENGTH_PREMIUM_HALVED;
     }
 
     /// @notice Sets the calldata length offset

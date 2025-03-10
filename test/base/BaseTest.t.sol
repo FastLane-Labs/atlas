@@ -90,7 +90,23 @@ contract BaseTest is Test {
         address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
         address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
-        FactoryLib factoryLib = new FactoryLib(address(execEnvTemplate));
+
+        // Deploy FactoryLib using precompile from Atlas v1.3 - avoids adjusting Mimic assembly.
+        // The conditional logic below handles local Atlas repo, and another repo importing Atlas as a lib.
+        FactoryLib factoryLib;
+        string memory pathInAtlasRepo = "src/contracts/precompiles/FactoryLib.sol/FactoryLib.json";
+        // TODO change 'atlas-certora' to 'atlas' once merged back to original Atlas repo
+        string memory pathInImporterRepo = "lib/atlas-certora/src/contracts/precompiles/FactoryLib.sol/FactoryLib.json";
+        if (vm.exists(pathInImporterRepo) && vm.isFile(pathInImporterRepo)) {
+            console.log("Context seems to be importer repo");
+            factoryLib = FactoryLib(
+                deployCode(pathInImporterRepo, abi.encode(address(execEnvTemplate)))
+            );
+        } else {
+            factoryLib = FactoryLib(
+                deployCode(pathInAtlasRepo, abi.encode(address(execEnvTemplate)))
+            );
+        }
 
         atlas = new TestAtlas({
             escrowDuration: DEFAULT_ESCROW_DURATION,
@@ -102,7 +118,10 @@ contract BaseTest is Test {
             initialSurchargeRecipient: deployer,
             l2GasCalculator: address(0)
         });
-        atlasVerification = new AtlasVerification(address(atlas));
+        atlasVerification = new AtlasVerification({
+            atlas: expectedAtlasAddr,
+            l2GasCalculator: address(0)
+        });
         simulator.setAtlas(address(atlas));
         sorter = new Sorter(address(atlas));
         govBurner = new GovernanceBurner();
@@ -133,57 +152,18 @@ contract BaseTest is Test {
     //              Metacall Gas Limit Helpers              //
     // ---------------------------------------------------- //
 
-    // NOTE: Calldata cost not deducted when top level call is directly to Atlas, but is deducted when calling the
-    // Simulator which calls Atlas. Hence the different helper functions.
-
-    // For simUserOperation calls
-    function _gasLimSim(UserOperation memory userOp) internal view returns (uint256) {
-        DAppOperation memory dAppOp;
-        return _gasLimSim(userOp, new SolverOperation[](0), dAppOp);
+    function _gasLim(UserOperation memory userOp) internal view returns (uint256) {
+        return _gasLim(userOp, new SolverOperation[](0));
     }
 
-    // For simSolverCall calls
-    function _gasLimSim(
-        UserOperation memory userOp,
-        SolverOperation[] memory solverOps,
-        DAppOperation memory dAppOp
-    )
-        internal
-        view
-        returns (uint256)
-    {
-        // 16 gas per byte. 8 gas per hex char.
-        uint256 _calldataHexCharCost = 8;
-
-        // Add calldata cost for Simulator call gas limits.
-        uint256 _gasLimit = abi.encode(userOp, dAppOp, solverOps, address(0)).length * _calldataHexCharCost;
-        return _gasLimit + _gasLim(userOp, solverOps, dAppOp);
-    }
-
-    // For direct Atlas metacalls
     function _gasLim(
         UserOperation memory userOp,
-        SolverOperation[] memory solverOps,
-        DAppOperation memory /* dAppOp */
+        SolverOperation[] memory solverOps
     )
         internal
         view
         returns (uint256)
     {
-        uint256 _bidFindOverhead = 5000;
-        uint256 _baseTxGasUsed = 21_000;
-        uint256 _fixedGasOffset = 120_000;
-        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
-
-        // Calculate execution gas cost
-        uint256 _gasLimit = userOp.gas + dConfig.dappGasLimit + (solverOps.length * dConfig.solverGasLimit);
-
-        // Adjust to 2x solverOp gas limit + buffer for ex-post bids
-        if (dConfig.callConfig.exPostBids()) {
-            _gasLimit += (dConfig.solverGasLimit + _bidFindOverhead) * solverOps.length;
-        }
-
-        // Add buffer constants
-        return _gasLimit + _baseTxGasUsed + _fixedGasOffset;
+        return simulator.estimateMetacallGasLimit(userOp, solverOps);
     }
 }

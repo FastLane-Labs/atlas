@@ -35,13 +35,6 @@ contract TestAtlas is Atlas {
         _setLock(address(0), 0, 0);
         t_solverLock = 0;
         t_solverTo = address(0);
-        t_claims = 0;
-        t_fees = 0;
-        t_writeoffs = 0;
-        t_borrows = 0;
-        t_repays = 0;
-        t_deposits = 0;
-        t_solverSurcharge = 0;
     }
 
     function setLock(address activeEnvironment, uint32 callConfig, uint8 phase) public {
@@ -58,55 +51,5 @@ contract TestAtlas is Atlas {
 
     function setSolverTo(address newSolverTo) public {
         t_solverTo = newSolverTo;
-    }
-
-    function setClaims(uint256 newClaims) public {
-        t_claims = newClaims;
-    }
-
-    function setFees(uint256 newFees) public {
-        t_fees = newFees;
-    }
-
-    function setWriteoffs(uint256 newWriteoffs) public {
-        t_writeoffs = newWriteoffs;
-    }
-
-    function setBorrows(uint256 newBorrows) public {
-        t_borrows = newBorrows;
-    }
-
-    function setRepays(uint256 newRepays) public {
-        t_repays = newRepays;
-    }
-
-    function setDeposits(uint256 newDeposits) public {
-        t_deposits = newDeposits;
-    }
-
-    // Transient Var View Functions
-
-    function claims() external view returns (uint256) {
-        return t_claims;
-    }
-
-    function fees() external view returns (uint256) {
-        return t_fees;
-    }
-
-    function writeoffs() external view returns (uint256) {
-        return t_writeoffs;
-    }
-
-    function borrows() external view returns (uint256) {
-        return t_borrows;
-    }
-
-    function repays() external view returns (uint256) {
-        return t_repays;
-    }
-
-    function deposits() external view returns (uint256) {
-        return t_deposits;
     }
 }

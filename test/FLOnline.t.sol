@@ -442,7 +442,9 @@ contract FastLaneOnlineTest is BaseTest {
         _setUpSolver(solverTwoEOA, solverTwoPK, goodSolverBidDAI + 1e17);
         address winningSolver = _setUpSolver(solverThreeEOA, solverThreePK, goodSolverBidDAI + 2e17);
 
-        // solverOne does not get included in the sovlerOps array
+        // NOTE: solverThree is executed first, because sorted to front in FLOnline. Then wins.
+
+        // solverOne does not get included in the solverOps array
         attempted.solverOne = false;
         // solverTwo has a lower bid than winner (solverThree) so is not attempted
         attempted.solverTwo = false;
@@ -471,7 +473,7 @@ contract FastLaneOnlineTest is BaseTest {
         _setUpSolver(solverTwoEOA, solverTwoPK, goodSolverBidETH + 1e17);
         address winningSolver = _setUpSolver(solverThreeEOA, solverThreePK, goodSolverBidETH + 2e17);
 
-        // solverOne does not get included in the sovlerOps array
+        // solverOne does not get included in the solverOps array
         attempted.solverOne = false;
         // solverTwo has a lower bid than winner (solverThree) so is not attempted
         attempted.solverTwo = false;
@@ -1257,10 +1259,12 @@ contract FastLaneOnlineTest is BaseTest {
 
         uint256 expectedBaselineAmountOut = _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: true });
 
+        args.gas = _gasLim(args.userOp) + 2_000_000; // 1 solverOp to accommodate for with gas
+
         vm.startPrank(userEOA);
         vm.expectEmit(false, false, false, true, address(executionEnvironment));
         emit FastLaneOnlineInner.BaselineEstablished(defaultSwapIntent.minAmountUserBuys, expectedBaselineAmountOut);
-        (bool result,) = address(flOnline).call{ gas: args.gas + 1000, value: args.msgValue }(
+        (bool result,) = address(flOnline).call{ gas: args.gas, value: args.msgValue }(
             abi.encodeCall(flOnline.fastOnlineSwap, (args.userOp))
         );
         assertTrue(result, "fastOnlineSwap should have succeeded");
@@ -1291,14 +1295,15 @@ contract FastLaneOnlineTest is BaseTest {
         beforeVars.solverTwoRep = flOnline.solverReputation(solverTwoEOA);
         beforeVars.solverThreeRep = flOnline.solverReputation(solverThreeEOA);
 
-        args.gas = _gasLimSim(args.userOp); // Dont have solverOps or dAppOp here
+        // Extra 2 mil gas added in call below is for up to 3 solvers included
+        args.gas = _gasLim(args.userOp); // Dont have solverOps or dAppOp here
 
         uint256 txGasUsed;
         uint256 estAtlasGasSurcharge = gasleft(); // Reused below during calculations
 
         // Do the actual fastOnlineSwap call
         vm.prank(userEOA);
-        (bool result,) = address(flOnline).call{ gas: args.gas + 1000, value: args.msgValue }(
+        (bool result,) = address(flOnline).call{ gas: args.gas + 2_000_000, value: args.msgValue }(
             abi.encodeCall(flOnline.fastOnlineSwap, (args.userOp))
         );
 
@@ -1342,7 +1347,7 @@ contract FastLaneOnlineTest is BaseTest {
             "User did not recieve enough tokenOut"
         );
 
-        if (nativeTokenIn && solverWon) {
+        if (nativeTokenIn) {
             // Allow for small error margin due to gas refund from winning solver
             uint256 buffer = 1e17; // 0.1 ETH buffer as base for error margin comparison
             uint256 expectedBalanceAfter = beforeVars.userTokenInBalance - args.swapIntent.amountUserSells;
@@ -1591,7 +1596,7 @@ contract FastLaneOnlineTest is BaseTest {
 
         // Register solverOp in FLOnline in frontrunning tx
         if (addSolverOpError != bytes4(0)) vm.expectRevert(addSolverOpError);
-        flOnline.addSolverOp{ value: congestionBuyIn }({ userOp: args.userOp, solverOp: solverOp });
+        flOnline.addSolverOp{ value: congestionBuyIn, gas: 10_000_000 }({ userOp: args.userOp, solverOp: solverOp });
 
         // Return early if addSolverOp expected to revert
         if (addSolverOpError != bytes4(0)) return (address(0), solverOp);

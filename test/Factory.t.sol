@@ -90,7 +90,10 @@ contract FactoryTest is Test {
         });
         assertEq(address(atlas), expectedAtlasAddr, "Atlas address mismatch");
 
-        atlasVerification = new AtlasVerification(address(atlas));
+        atlasVerification = new AtlasVerification({
+            atlas: expectedAtlasAddr,
+            l2GasCalculator: address(0)
+        });
         assertEq(address(atlasVerification), expectedAtlasVerificationAddr, "AtlasVerification address mismatch");
 
         mockFactory = new MockFactory({ factoryLib: address(factoryLib) });

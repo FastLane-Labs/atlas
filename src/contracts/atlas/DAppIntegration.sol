@@ -14,6 +14,7 @@ contract DAppIntegration {
     using CallBits for uint32;
 
     address public immutable ATLAS;
+    address public immutable L2_GAS_CALCULATOR;
 
     // map for tracking which accounts are approved for a given dApp
     // keccak256(governance, signor)  => enabled
@@ -23,8 +24,9 @@ contract DAppIntegration {
     // DAppControl => signatories
     mapping(address => address[]) internal S_dAppSignatories;
 
-    constructor(address atlas) {
+    constructor(address atlas, address l2GasCalculator) {
         ATLAS = atlas;
+        L2_GAS_CALCULATOR = l2GasCalculator;
     }
 
     // ---------------------------------------------------- //

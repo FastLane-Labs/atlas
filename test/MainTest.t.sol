@@ -132,7 +132,7 @@ contract MainTest is BaseTest {
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
 
-        uint256 gasLim = _gasLim(userOp, solverOps, dAppOp);
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
 
         vm.startPrank(userEOA);
@@ -398,7 +398,7 @@ contract MainTest is BaseTest {
         DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
-        uint256 gasLim = _gasLim(userOp, solverOps, dAppOp);
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
         // Execution environment should not exist yet
         (,, bool exists) = atlas.getExecutionEnvironment(userEOA, address(v2DAppControl));
@@ -422,19 +422,18 @@ contract MainTest is BaseTest {
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         (v, r, s) = vm.sign(userPK, atlasVerification.getUserOperationPayload(userOp));
         userOp.signature = abi.encodePacked(r, s, v);
-        uint256 gasLim = _gasLimSim(userOp);
 
         vm.startPrank(userEOA);
         atlas.createExecutionEnvironment(userEOA, userOp.control);
 
         // Failure case, user hasn't approved Atlas for TOKEN_ONE, operation must fail
-        (bool simResult,,) = simulator.simUserOperation{gas: gasLim}(userOp);
+        (bool simResult,,) = simulator.simUserOperation(userOp);
         assertFalse(simResult, "metasimUserOperationcall tested true");
 
         // Success case
         IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
 
-        (simResult,,) = simulator.simUserOperation{gas: gasLim}(userOp);
+        (simResult,,) = simulator.simUserOperation(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false");
 
         vm.stopPrank();
@@ -468,13 +467,12 @@ contract MainTest is BaseTest {
         DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
-        uint256 gasLim = _gasLimSim(userOp, solverOps, dAppOp);
 
 
         vm.startPrank(userEOA);
         atlas.createExecutionEnvironment(userEOA, userOp.control);
         IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
-        (bool success, bytes memory data) = address(simulator).call{gas: gasLim}(
+        (bool success, bytes memory data) = address(simulator).call(
             abi.encodeWithSelector(simulator.simSolverCalls.selector, userOp, solverOps, dAppOp)
         );
 
@@ -493,7 +491,7 @@ contract MainTest is BaseTest {
         dAppOp.signature = abi.encodePacked(r, s, v);
 
         vm.startPrank(userEOA);
-        (success, data) = address(simulator).call{gas: gasLim}(
+        (success, data) = address(simulator).call(
             abi.encodeWithSelector(simulator.simSolverCalls.selector, userOp, solverOps, dAppOp)
         );
 
@@ -524,7 +522,7 @@ contract MainTest is BaseTest {
         DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
-        uint256 gasLim = _gasLim(userOp, solverOps, dAppOp);
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
         uint256 bondedBalanceBefore = atlas.balanceOfBonded(beneficiary);
 
@@ -548,48 +546,55 @@ contract MainTest is BaseTest {
         assertEq(bondedBalanceAfter, 0, "Beneficiary's AtlETH bonded balance should still be 0");
     }
 
-    function testGasRefundBeneficiarySolverFails() public {
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
 
-        address beneficiary = makeAddr("beneficiary");
 
-        vm.prank(solverOneEOA);
-        atlas.bond(1 ether);
+    // NOTE: In the old system, when there was no winning solver, the partial refund to bundler/beneficiary was credited in bonded form, and refund only sent in ETH if winning solver.
+    // In new system, all refunds are in ETH form (as the bonded period skip has been patched).
+    // TODO: Any reason refunds in no winning solver metacalls should be diverted to bonded form?
 
-        UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
-        // User does not sign their own operation when bundling
 
-        SolverOperation[] memory solverOps = new SolverOperation[](1);
-        bytes memory solverOpData = helper.buildV2SolverOperationData(POOL_ONE, POOL_ONE); // will fail
-        solverOps[0] = helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), 2e17, 0);
-        (v, r, s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
-        solverOps[0].signature = abi.encodePacked(r, s, v);
+    // function testGasRefundBeneficiarySolverFailsPartialRefund() public {
+    //     uint8 v;
+    //     bytes32 r;
+    //     bytes32 s;
 
-        DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
-        (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
-        dAppOp.signature = abi.encodePacked(r, s, v);
-        uint256 gasLim = _gasLim(userOp, solverOps, dAppOp);
+    //     address beneficiary = makeAddr("beneficiary");
 
-        uint256 bondedBalanceBefore = atlas.balanceOfBonded(beneficiary);
+    //     vm.prank(solverOneEOA);
+    //     atlas.bond(1 ether);
 
-        console.log("Beneficiary's balance before metacall", beneficiary.balance);
-        console.log("Beneficiary's AtlETH bonded balance before metacall", bondedBalanceBefore);
+    //     UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
+    //     // User does not sign their own operation when bundling
 
-        assertEq(beneficiary.balance, 0, "Beneficiary should start with 0 balance");
-        assertEq(bondedBalanceBefore, 0, "Beneficiary's AtlETH bonded balance should start with 0");
+    //     SolverOperation[] memory solverOps = new SolverOperation[](1);
+    //     bytes memory solverOpData = helper.buildV2SolverOperationData(POOL_ONE, POOL_ONE); // will fail
+    //     solverOps[0] = helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), 2e17, 0);
+    //     (v, r, s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
+    //     solverOps[0].signature = abi.encodePacked(r, s, v);
 
-        vm.startPrank(userEOA);
-        IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
-        atlas.metacall{gas: gasLim}(userOp, solverOps, dAppOp, beneficiary);
-        vm.stopPrank();
+    //     DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
+    //     (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
+    //     dAppOp.signature = abi.encodePacked(r, s, v);
+    //     uint256 gasLim = _gasLim(userOp, solverOps);
 
-        uint256 bondedBalanceAfter = atlas.balanceOfBonded(beneficiary);
-        console.log("Beneficiary's balance after metacall", beneficiary.balance);
-        console.log("Beneficiary's AtlETH bonded balance after metacall", bondedBalanceAfter);
+    //     uint256 bondedBalanceBefore = atlas.balanceOfBonded(beneficiary);
 
-        assertEq(beneficiary.balance, 0, "Beneficiary should still have 0 balance");
-        assertGt(bondedBalanceAfter, 0, "Beneficiary's AtlETH bonded balance should be greater than 0");
-    }
+    //     console.log("Beneficiary's balance before metacall", beneficiary.balance);
+    //     console.log("Beneficiary's AtlETH bonded balance before metacall", bondedBalanceBefore);
+
+    //     assertEq(beneficiary.balance, 0, "Beneficiary should start with 0 balance");
+    //     assertEq(bondedBalanceBefore, 0, "Beneficiary's AtlETH bonded balance should start with 0");
+
+    //     vm.startPrank(userEOA);
+    //     IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
+    //     atlas.metacall{gas: gasLim}(userOp, solverOps, dAppOp, beneficiary);
+    //     vm.stopPrank();
+
+    //     uint256 bondedBalanceAfter = atlas.balanceOfBonded(beneficiary);
+    //     console.log("Beneficiary's balance after metacall", beneficiary.balance);
+    //     console.log("Beneficiary's AtlETH bonded balance after metacall", bondedBalanceAfter);
+
+    //     assertEq(beneficiary.balance, 0, "Beneficiary should still have 0 balance");
+    //     assertGt(bondedBalanceAfter, 0, "Beneficiary's AtlETH bonded balance should be greater than 0");
+    // }
 }

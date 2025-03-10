@@ -60,16 +60,9 @@ contract SolverBaseInvertBid is ISolverContract {
 
         _;
 
-        uint256 shortfall = IAtlas(_atlas).shortfall();
-
-        if (shortfall < msg.value) shortfall = 0;
-        else shortfall -= msg.value;
-
-        if (msg.value > address(this).balance) {
-            IWETH9(WETH_ADDRESS).withdraw(msg.value - address(this).balance);
-        }
-
-        IAtlas(_atlas).reconcile{ value: msg.value }(shortfall);
+        (uint256 gasLiability, uint256 borrowLiability) = IAtlas(_atlas).shortfall();
+        uint256 nativeRepayment = borrowLiability < msg.value ? borrowLiability : msg.value;
+        IAtlas(_atlas).reconcile{ value: nativeRepayment }(gasLiability);
     }
 
     modifier receiveBids(address executionEnvironment, address bidToken, uint256 bidAmount) {

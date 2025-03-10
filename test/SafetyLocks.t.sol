@@ -55,56 +55,6 @@ contract MockSafetyLocks is SafetyLocks {
         t_solverTo = newSolverTo;
     }
 
-    function setClaims(uint256 newClaims) public {
-        t_claims = newClaims;
-    }
-
-    function setFees(uint256 newFees) public {
-        t_fees = newFees;
-    }
-
-    function setWriteoffs(uint256 newWriteoffs) public {
-        t_writeoffs = newWriteoffs;
-    }
-
-    function setBorrows(uint256 newBorrows) public {
-        t_borrows = newBorrows;
-    }
-
-    function setRepays(uint256 newRepays) public {
-        t_repays = newRepays;
-    }
-
-    function setDeposits(uint256 newDeposits) public {
-        t_deposits = newDeposits;
-    }
-
-    // Transient Var View Functions
-
-    function claims() external view returns (uint256) {
-        return t_claims;
-    }
-
-    function fees() external view returns (uint256) {
-        return t_fees;
-    }
-
-    function writeoffs() external view returns (uint256) {
-        return t_writeoffs;
-    }
-
-    function borrows() external view returns (uint256) {
-        return t_borrows;
-    }
-
-    function repays() external view returns (uint256) {
-        return t_repays;
-    }
-
-    function deposits() external view returns (uint256) {
-        return t_deposits;
-    }
-
     function solverTo() external view returns (address) {
         return t_solverTo;
     }
@@ -140,7 +90,6 @@ contract SafetyLocksTest is Test {
     function test_buildContext() public {
         safetyLocks.initializeLock(executionEnvironment, 0, 0);
         StackVars memory vars = StackVars({
-            allSolversGasLimit: 0,
             userOpHash: bytes32(uint256(1)),
             executionEnvironment: executionEnvironment,
             bundler: address(2),
@@ -164,71 +113,6 @@ contract SafetyLocksTest is Test {
         assertEq(phase, newPhase);
     }
 
-    function test_setClaims() public {
-        uint256 newClaims = 5e10;
-
-        safetyLocks.setClaims(newClaims);
-
-        uint256 claims = safetyLocks.claims();
-        assertEq(claims, newClaims);
-    }
-
-
-    // TODO fix after gas acc refactor
-    // function test_setWithdrawals() public {
-    //     uint256 newWithdrawals = 5e10;
-
-    //     safetyLocks.setWithdrawals(newWithdrawals);
-
-    //     uint256 withdrawals = safetyLocks.withdrawals();
-    //     assertEq(withdrawals, newWithdrawals);
-    // }
-
-    function test_setDeposits() public {
-        uint256 newDeposits = 5e10;
-
-        safetyLocks.setDeposits(newDeposits);
-
-        uint256 deposits = safetyLocks.deposits();
-        assertEq(deposits, newDeposits);
-    }
-
-    function test_setFees() public {
-        uint256 newFees = 5e10;
-
-        safetyLocks.setFees(newFees);
-
-        uint256 fees = safetyLocks.fees();
-        assertEq(fees, newFees);
-    }
-
-    function test_setWriteoffs() public {
-        uint256 newWriteoffs = 5e10;
-
-        safetyLocks.setWriteoffs(newWriteoffs);
-
-        uint256 writeoffs = safetyLocks.writeoffs();
-        assertEq(writeoffs, newWriteoffs);
-    }
-
-    function test_setSolverLock() public {
-        uint256 newSolverLock = 98_234_723_414_317_349_817_948_719;
-
-        safetyLocks.setSolverLock(newSolverLock);
-
-        (address currentSolver, bool calledBack, bool fulfilled) = safetyLocks.solverLockData();
-        assertEq(currentSolver, address(uint160(newSolverLock)));
-    }
-
-    function test_setSolverTo() public {
-        address newSolverTo = address(0x123);
-
-        safetyLocks.setSolverTo(newSolverTo);
-
-        address solverTo = safetyLocks.solverTo();
-        assertEq(solverTo, newSolverTo);
-    }
-
     function test_isUnlocked() public {
         safetyLocks.setLock(address(2));
         assertEq(safetyLocks.isUnlocked(), false);
@@ -249,31 +133,16 @@ contract SafetyLocksTest is Test {
         safetyLocks.releaseLock();
         assertEq(safetyLocks.isUnlocked(), true);
         safetyLocks.initializeLock{ value: msgValue }(ee, gasMarker, userOpValue);
-        safetyLocks.setClaims(1000);
-        // safetyLocks.setWithdrawals(500);
-        safetyLocks.setDeposits(2000);
-        safetyLocks.setFees(888);
-        safetyLocks.setWriteoffs(666);
         safetyLocks.setLockPhase(uint8(ExecutionPhase.SolverOperation));
         safetyLocks.setSolverLock(0x456);
 
         (address activeEnv, uint32 callConfig, uint8 phase) = safetyLocks.lock();
-        uint256 claims = safetyLocks.claims();
-        uint256 borrows = safetyLocks.borrows();
-        uint256 deposits = safetyLocks.deposits();
-        uint256 fees = safetyLocks.fees();
-        uint256 writeoffs = safetyLocks.writeoffs();
         (address solverTo,,) = safetyLocks.solverLockData();
 
         assertEq(safetyLocks.isUnlocked(), false);
         assertEq(activeEnv, ee);
         assertEq(phase, uint8(ExecutionPhase.SolverOperation));
         assertEq(callConfig, uint32(0));
-        assertEq(claims, 1000);
-        assertEq(borrows, 500);
-        assertEq(deposits, 2000);
-        assertEq(fees, 888);
-        assertEq(writeoffs, 666);
         assertEq(solverTo, address(0x456));
     }
 }

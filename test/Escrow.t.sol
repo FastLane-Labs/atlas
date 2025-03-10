@@ -208,7 +208,7 @@ contract EscrowTest is BaseTest {
             .withData(abi.encode(1))
             .signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-        uint256 gasLim = _gasLim(userOp, solverOps, dappOp);
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
         vm.prank(userEOA);
         bool auctionWon = atlas.metacall{gas: gasLim}(userOp, solverOps, dappOp, address(0));
@@ -323,7 +323,7 @@ contract EscrowTest is BaseTest {
         ).signAndBuild(address(atlasVerification), solverOnePK);
 
         dappOp = validDAppOperation(userOp, solverOps).build();
-        uint256 gasLim = _gasLim(userOp, solverOps, dappOp);
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
         if (revertExpected) {
             vm.expectRevert(expectedError);
@@ -385,13 +385,6 @@ contract EscrowTest is BaseTest {
             .withBidAmount(defaultBidAmount)
             .signAndBuild(address(atlasVerification), solverOnePK);
         executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.CallValueTooHigh), false);
-    }
-
-    function test_executeSolverOperation_validateSolverOperation_userOutOfGas_SkipCoverage() public {
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
-        this.executeSolverOperationCase{gas: _VALIDATION_GAS_LIMIT + _SOLVER_GAS_LIMIT + 1_000_000}(
-            userOp, solverOps, false, false, 1 << uint256(SolverOutcome.UserOutOfGas), false
-        );
     }
 
     function test_executeSolverOperation_solverOpWrapper_BidNotPaid_SkipCoverage() public {
@@ -553,7 +546,7 @@ contract EscrowTest is BaseTest {
             defaultBidAmount
         ).signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-        uint256 gasLim = _gasLim(userOp, solverOps, dappOp);
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
         vm.prank(userEOA);
         (bool success,) =
@@ -654,7 +647,7 @@ contract EscrowTest is BaseTest {
         public
     {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-        uint256 gasLim = _gasLim(userOp, solverOps, dappOp);
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
         vm.expectEmit(false, false, false, true, address(atlas));
         emit AtlasEvents.SolverTxResult(
@@ -705,20 +698,21 @@ contract DummySolver {
         if (address(this).balance >= bidAmount) {
             SafeTransferLib.safeTransferETH(executionEnvironment, bidAmount);
         }
+
+        (uint256 gasLiability, uint256 borrowLiability) = IAtlas(_atlas).shortfall();
         
         if (bidAmount == noGasPayBack) {
             // Don't pay gas
             return;
         } else if (bidAmount == partialGasPayBack) {
             // Only pay half of shortfall owed - expect postSolverCall hook in DAppControl to pay the rest
-            uint256 _shortfall = IAtlas(_atlas).shortfall();
-            IAtlas(_atlas).reconcile(_shortfall / 2);
+            IAtlas(_atlas).reconcile(gasLiability / 2);
             return;
         }
         
         // Default: Pay gas
-        uint256 shortfall = IAtlas(_atlas).shortfall();
-        IAtlas(_atlas).reconcile(shortfall);
+        uint256 nativeRepayment = borrowLiability < msg.value ? borrowLiability : msg.value;
+        IAtlas(_atlas).reconcile{ value: nativeRepayment }(gasLiability);
         return;
     }
 }
@@ -750,8 +744,9 @@ contract DummySolverContributor {
         }
 
         // Pay borrowed ETH + gas used
-        uint256 shortfall = IAtlas(ATLAS).shortfall();
-        IAtlas(ATLAS).reconcile{value: shortfall}(0);
+        (uint256 gasLiability, uint256 borrowLiability) = IAtlas(ATLAS).shortfall();
+        uint256 nativeRepayment = borrowLiability < msg.value ? borrowLiability : msg.value;
+        IAtlas(ATLAS).reconcile{ value: nativeRepayment }(gasLiability);
 
         return;
     }

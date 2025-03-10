@@ -16,15 +16,18 @@ import "../types/ValidCalls.sol";
 
 import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
+import { GasAccLib, GasLedger } from "../libraries/GasAccLib.sol";
 import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
-/// @title Atlas V1.4
+/// @title Atlas V1.5
 /// @author FastLane Labs
 /// @notice The Execution Abstraction protocol.
 contract Atlas is Escrow, Factory {
     using CallBits for uint32;
     using SafetyBits for Context;
+    using GasAccLib for uint256; // To load GasLedger from a transient uint265 var
+    using GasAccLib for GasLedger;
 
     constructor(
         uint256 escrowDuration,
@@ -68,15 +71,13 @@ contract Atlas is Escrow, Factory {
     {
         // _gasMarker calculated as (Execution gas cost) + (Calldata gas cost). Any gas left at the end of the metacall
         // is deducted from this _gasMarker, resulting in actual execution gas used + calldata gas costs + buffer.
-        uint256 _gasMarker = (gasleft() + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET)
-            + (
-                L2_GAS_CALCULATOR == address(0)
-                    ? msg.data.length * _CALLDATA_LENGTH_PREMIUM_HALVED
-                    : IL2GasCalculator(L2_GAS_CALCULATOR).initialGasUsed(msg.data.length)
-            );
+        // The calldata component is added below after validateCalls().
+        uint256 _gasLeft = gasleft();
+        uint256 _gasMarker = _gasLeft + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET
+            + GasAccLib.metacallCalldataGas(msg.data.length, L2_GAS_CALCULATOR);
 
         DAppConfig memory _dConfig;
-        StackVars memory _vars;
+        StackVars memory _vars; // TODO dont need this now, no more stack too deep
         {
             bool _isSimulation = msg.sender == SIMULATOR;
             address _executionEnvironment;
@@ -84,17 +85,14 @@ contract Atlas is Escrow, Factory {
 
             _vars = StackVars({
                 userOpHash: dAppOp.userOpHash,
-                allSolversGasLimit: 0, // calculated in validateCalls, set below
                 bundler: _isSimulation ? dAppOp.bundler : msg.sender,
                 isSimulation: _isSimulation,
                 executionEnvironment: _executionEnvironment
             });
         }
         {
-            (uint256 _gasLimitSum, uint256 _allSolversGasLimit, ValidCallsResult _validCallsResult) = VERIFICATION
-                .validateCalls(
-                _dConfig, userOp, solverOps, dAppOp, msg.value, msg.data.length, _vars.bundler, _vars.isSimulation
-            );
+            (uint256 _allSolversGasLimit, uint256 _bidFindOverhead, ValidCallsResult _validCallsResult) = VERIFICATION
+                .validateCalls(_dConfig, userOp, solverOps, dAppOp, _gasLeft, msg.value, _vars.bundler, _vars.isSimulation);
 
             // First handle the ValidCallsResult
             if (_validCallsResult != ValidCallsResult.Valid) {
@@ -110,17 +108,11 @@ contract Atlas is Escrow, Factory {
                 revert ValidCalls(_validCallsResult);
             }
 
-            // Then check if gas limit was set too high, based on gas left for execution, and a conservative buffer
-            // added to the expected execution gas limit. Revert if unexpectedly high gas limit.
-            if (gasleft() > _gasLimitSum + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET) revert GasLimitTooHigh();
-
-            // allSolversGasLimit used in calculation of sufficient bonded balance check before solverOp execution
-            _vars.allSolversGasLimit = _allSolversGasLimit;
+            // Initialize the environment lock and accounting values
+            _setEnvironmentLock(_dConfig, _vars.executionEnvironment);
+            _initializeAccountingValues(_gasMarker - _bidFindOverhead, _allSolversGasLimit);
+            // _gasMarker - _bidFindOverhead = estimated winning solver gas liability for (not charged for bid-find gas)
         }
-
-        // Initialize the environment lock and accounting values
-        _setEnvironmentLock(_dConfig, _vars.executionEnvironment);
-        _initializeAccountingValues(_gasMarker);
 
         // Calculate `execute` gas limit such that it can fail due to an OOG error caused by any of the hook calls, and
         // the metacall will still have enough gas to gracefully finish and return, storing any nonces required.
@@ -130,9 +122,12 @@ contract Atlas is Escrow, Factory {
         // than re-calculate it, we can simply take it from the dAppOp here. It's worth noting that this will
         // be either a TRUSTED or DEFAULT hash, depending on the allowsTrustedOpHash setting.
         try this.execute{ gas: _gasLimit }(_dConfig, userOp, solverOps, _vars) returns (Context memory ctx) {
+            GasLedger memory _gL = t_gasLedger.toGasLedger(); // Final load, no need to persist changes after this
+            uint256 _unreachedCalldataValuePaid = _chargeUnreachedSolversForCalldata(solverOps, _gL, ctx.solverIndex);
+
             // Gas Refund to sender only if execution is successful
             (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) =
-                _settle(ctx, gasRefundBeneficiary);
+                _settle(ctx, _gL, _gasMarker, gasRefundBeneficiary, _unreachedCalldataValuePaid);
 
             auctionWon = ctx.solverSuccessful;
             emit MetacallResult(
@@ -161,7 +156,7 @@ contract Atlas is Escrow, Factory {
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
-    /// @param vars StackVars struct containing allSolversGasLimit and inputs for `_buildContext()`.
+    /// @param vars StackVars struct containing inputs for `_buildContext()`.
     /// @return ctx Context struct containing relevant context information for the Atlas auction.
     function execute(
         DAppConfig memory dConfig,
@@ -239,6 +234,9 @@ contract Atlas is Escrow, Factory {
         uint256 _bidsAndIndicesLastIndex = solverOpsLength - 1; // Start from the last index
         uint256 _gasWaterMark = gasleft();
 
+        // Get a snapshot of the GasLedger from transient storage, to reset to after bid-finding below
+        uint256 _gasLedgerSnapshot = t_gasLedger;
+
         // First, get all bid amounts. Bids of zero are ignored by only storing non-zero bids in the array, from right
         // to left. If there are any zero bids they will end up on the left as uint(0) values - in their sorted
         // position. This reduces operations needed later when sorting the array in ascending order.
@@ -268,6 +266,9 @@ contract Atlas is Escrow, Factory {
             }
         }
 
+        // Reset transient GasLedger to its state before the bid-finding loop above
+        t_gasLedger = _gasLedgerSnapshot;
+
         // Reinitialize _bidsAndIndicesLastIndex to iterate through the sorted array in descending order
         _bidsAndIndicesLastIndex = solverOpsLength - 1;
 
@@ -278,7 +279,7 @@ contract Atlas is Escrow, Factory {
 
         // Write off the gas cost involved in on-chain bid-finding execution of all solverOps, as these costs should be
         // paid by the bundler.
-        _writeOffBidFindGasCost(_gasWaterMark - gasleft());
+        _writeOffBidFindGas(_gasWaterMark - gasleft());
 
         // Finally, iterate through sorted bidsAndIndices array in descending order of bidAmount.
         for (uint256 i = _bidsAndIndicesLastIndex;; /* breaks when 0 */ --i) {
@@ -332,8 +333,8 @@ contract Atlas is Escrow, Factory {
     {
         uint256 _bidAmount;
 
-        uint8 i = uint8(solverOps.length);
-        for (; ctx.solverIndex < i; ctx.solverIndex++) {
+        uint8 solverOpsLen = uint8(solverOps.length);
+        for (; ctx.solverIndex < solverOpsLen; ctx.solverIndex++) {
             SolverOperation calldata solverOp = solverOps[ctx.solverIndex];
 
             _bidAmount = _executeSolverOperation(ctx, dConfig, userOp, solverOp, solverOp.bidAmount, false, returnData);
