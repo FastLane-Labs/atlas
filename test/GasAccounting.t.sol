@@ -940,7 +940,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         (, lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
         (uint112 bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
 
-        assertEq(lastAccessedBlock, uint32(block.number));
+        assertEq(lastAccessedBlock, 0, "lastAccessedBlock should not change on bonded increase");
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore + creditedAmount);
         assertEq(bondedAfter, bondedBefore + uint112(creditedAmount));
         assertEq(mockGasAccounting.withdrawals(), withdrawalsBefore + creditedAmount);

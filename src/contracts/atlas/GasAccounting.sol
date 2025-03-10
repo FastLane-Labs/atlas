@@ -260,7 +260,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         // Update analytics (auctionWins, auctionFails, totalGasValueUsed) and lastAccessedBlock
         _updateAnalytics(_aData, solverWon && deficit == 0, gasValueUsed);
-        _aData.lastAccessedBlock = uint32(block.number);
+        _aData.lastAccessedBlock = uint32(block.number); // update lastAccessedBlock since balance is decreasing
 
         // Persist changes in the _aData memory struct back to storage
         S_accessData[owner] = _aData;
@@ -276,7 +276,6 @@ abstract contract GasAccounting is SafetyLocks {
     function _credit(address owner, uint256 amount, uint256 gasValueUsed) internal {
         EscrowAccountAccessData memory _aData = S_accessData[owner];
 
-        _aData.lastAccessedBlock = uint32(block.number);
         _aData.bonded += SafeCast.toUint112(amount);
 
         S_bondedTotalSupply += amount;
