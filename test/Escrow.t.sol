@@ -39,7 +39,6 @@ contract EscrowTest is BaseTest {
     uint256 private constant _SOLVER_GAS_LIMIT = 1_000_000;
     uint256 private constant _VALIDATION_GAS_LIMIT = 500_000;
     uint256 private constant _SOLVER_GAS_BUFFER = 5; // out of 100
-    uint256 private constant _FASTLANE_GAS_BUFFER = 125_000; // integer amount
 
     function defaultCallConfig() public returns (CallConfigBuilder) {
         return new CallConfigBuilder();
@@ -64,6 +63,7 @@ contract EscrowTest is BaseTest {
             .withDapp(_control)
             .withControl(_control)
             .withCallConfig(IDAppControl(_control).CALL_CONFIG())
+            .withDAppGasLimit(IDAppControl(_control).getDAppGasLimit())
             .withSessionKey(address(0))
             .withData("")
             .sign(address(atlasVerification), userPK);
@@ -208,9 +208,10 @@ contract EscrowTest is BaseTest {
             .withData(abi.encode(1))
             .signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+        uint256 gasLim = _gasLim(userOp, solverOps, dappOp);
 
         vm.prank(userEOA);
-        bool auctionWon = atlas.metacall(userOp, solverOps, dappOp, address(0));
+        bool auctionWon = atlas.metacall{gas: gasLim}(userOp, solverOps, dappOp, address(0));
         
         assertLe(dAppControl.userOpGasLeft(), userGasLim, "userOpGasLeft should be <= userGasLim");
         assertTrue(auctionWon, "2nd auction should have been won");
@@ -303,37 +304,34 @@ contract EscrowTest is BaseTest {
         assertEq(expectedInput, dAppControl.allocateValueInputData(), "allocateValueInputData should match expectedInput");
     }
 
-    function executeHookCase(uint256 expectedHookReturnValue, bytes4 expectedError) public returns(
-        UserOperation memory userOp,
-        SolverOperation[] memory solverOps,
-        DAppOperation memory dappOp
-    ) {
+    function executeHookCase(
+        uint256 expectedHookReturnValue,
+        bytes4 expectedError
+    )
+        public
+        returns (UserOperation memory userOp, SolverOperation[] memory solverOps, DAppOperation memory dappOp)
+    {
         bool revertExpected = expectedError != noError;
 
-        userOp = validUserOperation(address(dAppControl))
-            .withData(
-                abi.encodeWithSelector(
-                    dAppControl.userOperationCall.selector,
-                    expectedHookReturnValue
-                )
-            )
-            .signAndBuild(address(atlasVerification), userPK);
+        userOp = validUserOperation(address(dAppControl)).withData(
+            abi.encodeWithSelector(dAppControl.userOperationCall.selector, expectedHookReturnValue)
+        ).signAndBuild(address(atlasVerification), userPK);
 
         solverOps = new SolverOperation[](1);
-        solverOps[0] = validSolverOperation(userOp)
-            .withBidAmount(defaultBidAmount)
-            .withData(abi.encode(expectedHookReturnValue))
-            .signAndBuild(address(atlasVerification), solverOnePK);
+        solverOps[0] = validSolverOperation(userOp).withBidAmount(defaultBidAmount).withData(
+            abi.encode(expectedHookReturnValue)
+        ).signAndBuild(address(atlasVerification), solverOnePK);
 
         dappOp = validDAppOperation(userOp, solverOps).build();
+        uint256 gasLim = _gasLim(userOp, solverOps, dappOp);
 
         if (revertExpected) {
             vm.expectRevert(expectedError);
         }
 
         vm.prank(userEOA);
-        bool auctionWon = atlas.metacall(userOp, solverOps, dappOp, address(0));
-        
+        bool auctionWon = atlas.metacall{ gas: gasLim }(userOp, solverOps, dappOp, address(0));
+
         if (!revertExpected) {
             assertTrue(auctionWon, "auction should have been won");
         }
@@ -546,19 +544,20 @@ contract EscrowTest is BaseTest {
 
         uint256 solverOpValue = address(atlas).balance;
         assertTrue(solverOpValue > 0, "solverOpValue must be greater than 0");
-        
+
         deal(address(solver), 10e18); // plenty of ETH to repay what solver owes
 
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
-        solverOps[0] = validSolverOperation(userOp)
-            .withSolver(address(solver))
-            .withValue(solverOpValue)
-            .withBidAmount(defaultBidAmount)
-            .signAndBuild(address(atlasVerification), solverOnePK);
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) =
+            executeSolverOperationInit(defaultCallConfig().build());
+        solverOps[0] = validSolverOperation(userOp).withSolver(address(solver)).withValue(solverOpValue).withBidAmount(
+            defaultBidAmount
+        ).signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+        uint256 gasLim = _gasLim(userOp, solverOps, dappOp);
 
         vm.prank(userEOA);
-        (bool success,) = address(atlas).call(abi.encodeCall(atlas.metacall, (userOp, solverOps, dappOp, address(0))));
+        (bool success,) =
+            address(atlas).call{ gas: gasLim }(abi.encodeCall(atlas.metacall, (userOp, solverOps, dappOp, address(0))));
         assertTrue(success, "metacall should have succeeded");
     }
 
@@ -655,6 +654,7 @@ contract EscrowTest is BaseTest {
         public
     {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+        uint256 gasLim = _gasLim(userOp, solverOps, dappOp);
 
         vm.expectEmit(false, false, false, true, address(atlas));
         emit AtlasEvents.SolverTxResult(
@@ -669,8 +669,9 @@ contract EscrowTest is BaseTest {
         );
 
         vm.prank(userEOA);
-        if (metacallShouldRevert) vm.expectRevert(); // Metacall should revert, the reason isn't important, we're only checking the event
-        atlas.metacall(userOp, solverOps, dappOp, address(0));
+        if (metacallShouldRevert) vm.expectRevert(); // Metacall should revert, the reason isn't important, we're only
+            // checking the event
+        atlas.metacall{ gas: gasLim }(userOp, solverOps, dappOp, address(0));
     }
 }
 

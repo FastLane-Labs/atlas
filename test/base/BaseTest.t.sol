@@ -13,7 +13,17 @@ import { Sorter } from "../../src/contracts/helpers/Sorter.sol";
 import { Simulator } from "../../src/contracts/helpers/Simulator.sol";
 import { GovernanceBurner } from "../../src/contracts/helpers/GovernanceBurner.sol";
 
+import { UserOperation } from "../../src/contracts/types/UserOperation.sol";
+import { SolverOperation } from "../../src/contracts/types/SolverOperation.sol";
+import { DAppOperation } from "../../src/contracts/types/DAppOperation.sol";
+import { DAppConfig } from "../../src/contracts/types/ConfigTypes.sol";
+import { AtlasConstants } from "../../src/contracts/types/AtlasConstants.sol";
+import { IDAppControl } from "../../src/contracts/interfaces/IDAppControl.sol";
+import { CallBits } from "../../src/contracts/libraries/CallBits.sol";
+
 contract BaseTest is Test {
+    using CallBits for uint32;
+
     struct Sig {
         uint8 v;
         bytes32 r;
@@ -117,5 +127,63 @@ contract BaseTest is Test {
         atlas.deposit{ value: 1e18 }();
         hoax(solverFourEOA, 100e18);
         atlas.deposit{ value: 1e18 }();
+    }
+
+    // ---------------------------------------------------- //
+    //              Metacall Gas Limit Helpers              //
+    // ---------------------------------------------------- //
+
+    // NOTE: Calldata cost not deducted when top level call is directly to Atlas, but is deducted when calling the
+    // Simulator which calls Atlas. Hence the different helper functions.
+
+    // For simUserOperation calls
+    function _gasLimSim(UserOperation memory userOp) internal view returns (uint256) {
+        DAppOperation memory dAppOp;
+        return _gasLimSim(userOp, new SolverOperation[](0), dAppOp);
+    }
+
+    // For simSolverCall calls
+    function _gasLimSim(
+        UserOperation memory userOp,
+        SolverOperation[] memory solverOps,
+        DAppOperation memory dAppOp
+    )
+        internal
+        view
+        returns (uint256)
+    {
+        // 16 gas per byte. 8 gas per hex char.
+        uint256 _calldataHexCharCost = 8;
+
+        // Add calldata cost for Simulator call gas limits.
+        uint256 _gasLimit = abi.encode(userOp, dAppOp, solverOps, address(0)).length * _calldataHexCharCost;
+        return _gasLimit + _gasLim(userOp, solverOps, dAppOp);
+    }
+
+    // For direct Atlas metacalls
+    function _gasLim(
+        UserOperation memory userOp,
+        SolverOperation[] memory solverOps,
+        DAppOperation memory /* dAppOp */
+    )
+        internal
+        view
+        returns (uint256)
+    {
+        uint256 _bidFindOverhead = 5000;
+        uint256 _baseTxGasUsed = 21_000;
+        uint256 _fixedGasOffset = 120_000;
+        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
+
+        // Calculate execution gas cost
+        uint256 _gasLimit = userOp.gas + dConfig.dappGasLimit + (solverOps.length * dConfig.solverGasLimit);
+
+        // Adjust to 2x solverOp gas limit + buffer for ex-post bids
+        if (dConfig.callConfig.exPostBids()) {
+            _gasLimit += (dConfig.solverGasLimit + _bidFindOverhead) * solverOps.length;
+        }
+
+        // Add buffer constants
+        return _gasLimit + _baseTxGasUsed + _fixedGasOffset;
     }
 }

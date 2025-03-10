@@ -11,33 +11,24 @@ import "../src/contracts/types/ConfigTypes.sol";
 import "../src/contracts/types/LockTypes.sol";
 
 contract MockSafetyLocks is SafetyLocks {
-    constructor() SafetyLocks(0, 1000000, 1000000, address(0), address(0), address(0), address(0)) { }
+    constructor() SafetyLocks(0, 1_000_000, 1_000_000, address(0), address(0), address(0), address(0)) { }
 
-    function initializeLock(
-        address executionEnvironment,
-        uint256 gasMarker,
-        uint256 userOpValue
-    )
-        external
-        payable
-    {
+    function initializeLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) external payable {
         DAppConfig memory dConfig;
         _setEnvironmentLock(dConfig, executionEnvironment);
         // _initializeAccountingValues(gasMarker);
     }
 
-    function buildEscrowLock(
-        address executionEnvironment,
-        bytes32 userOpHash,
-        address bundler,
-        uint8 solverOpCount,
-        bool isSimulation
+    function buildContext(
+        StackVars memory vars,
+        uint32 dappGasLimit,
+        uint8 solverOpCount
     )
         external
         pure
         returns (Context memory ctx)
     {
-        return _buildContext(executionEnvironment, userOpHash, bundler, solverOpCount, isSimulation);
+        return _buildContext(vars, dappGasLimit, solverOpCount);
     }
 
     function setLock(address _activeEnvironment) external {
@@ -140,8 +131,20 @@ contract SafetyLocksTest is Test {
 
     function test_buildContext() public {
         safetyLocks.initializeLock(executionEnvironment, 0, 0);
-        Context memory ctx = safetyLocks.buildEscrowLock(executionEnvironment, bytes32(0), address(0), 0, false);
+        StackVars memory vars = StackVars({
+            allSolversGasLimit: 0,
+            userOpHash: bytes32(uint256(1)),
+            executionEnvironment: executionEnvironment,
+            bundler: address(2),
+            isSimulation: true
+        });
+        Context memory ctx = safetyLocks.buildContext({ vars: vars, dappGasLimit: 3, solverOpCount: 4 });
         assertEq(executionEnvironment, ctx.executionEnvironment);
+        assertEq(bytes32(uint256(1)), ctx.userOpHash);
+        assertEq(address(2), ctx.bundler);
+        assertEq(3, ctx.dappGasLeft);
+        assertEq(4, ctx.solverCount);
+        assertEq(true, ctx.isSimulation);
     }
 
     function test_setLockPhase() public {
@@ -149,7 +152,7 @@ contract SafetyLocksTest is Test {
 
         safetyLocks.setLockPhase(newPhase);
 
-        (, , uint8 phase) = safetyLocks.lock();
+        (,, uint8 phase) = safetyLocks.lock();
         assertEq(phase, newPhase);
     }
 
@@ -199,7 +202,7 @@ contract SafetyLocksTest is Test {
     }
 
     function test_setSolverLock() public {
-        uint256 newSolverLock = 98234723414317349817948719;
+        uint256 newSolverLock = 98_234_723_414_317_349_817_948_719;
 
         safetyLocks.setSolverLock(newSolverLock);
 
@@ -218,7 +221,7 @@ contract SafetyLocksTest is Test {
 
     function test_isUnlocked() public {
         safetyLocks.setLock(address(2));
-        assertEq(safetyLocks.isUnlocked(), false);        
+        assertEq(safetyLocks.isUnlocked(), false);
         safetyLocks.releaseLock();
         assertEq(safetyLocks.isUnlocked(), true);
     }

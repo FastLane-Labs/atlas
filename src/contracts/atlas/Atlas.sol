@@ -19,7 +19,7 @@ import { SafetyBits } from "../libraries/SafetyBits.sol";
 import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
-/// @title Atlas V1.1
+/// @title Atlas V1.4
 /// @author FastLane Labs
 /// @notice The Execution Abstraction protocol.
 contract Atlas is Escrow, Factory {
@@ -66,19 +66,39 @@ contract Atlas is Escrow, Factory {
         payable
         returns (bool auctionWon)
     {
-        uint256 _gasMarker = L2_GAS_CALCULATOR == address(0)
-            ? gasleft() + _BASE_TRANSACTION_GAS_USED + (msg.data.length * _CALLDATA_LENGTH_PREMIUM_HALVED)
-            : gasleft() + IL2GasCalculator(L2_GAS_CALCULATOR).initialGasUsed(msg.data.length);
+        // _gasMarker calculated as (Execution gas cost) + (Calldata gas cost). Any gas left at the end of the metacall
+        // is deducted from this _gasMarker, resulting in actual execution gas used + calldata gas costs + buffer.
+        uint256 _gasMarker = (gasleft() + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET)
+            + (
+                L2_GAS_CALCULATOR == address(0)
+                    ? msg.data.length * _CALLDATA_LENGTH_PREMIUM_HALVED
+                    : IL2GasCalculator(L2_GAS_CALCULATOR).initialGasUsed(msg.data.length)
+            );
 
-        bool _isSimulation = msg.sender == SIMULATOR;
-        address _bundler = _isSimulation ? dAppOp.bundler : msg.sender;
-        (address _executionEnvironment, DAppConfig memory _dConfig) = _getOrCreateExecutionEnvironment(userOp);
-
+        DAppConfig memory _dConfig;
+        StackVars memory _vars;
         {
-            ValidCallsResult _validCallsResult =
-                VERIFICATION.validateCalls(_dConfig, userOp, solverOps, dAppOp, msg.value, _bundler, _isSimulation);
+            bool _isSimulation = msg.sender == SIMULATOR;
+            address _executionEnvironment;
+            (_executionEnvironment, _dConfig) = _getOrCreateExecutionEnvironment(userOp);
+
+            _vars = StackVars({
+                userOpHash: dAppOp.userOpHash,
+                allSolversGasLimit: 0, // calculated in validateCalls, set below
+                bundler: _isSimulation ? dAppOp.bundler : msg.sender,
+                isSimulation: _isSimulation,
+                executionEnvironment: _executionEnvironment
+            });
+        }
+        {
+            (uint256 _gasLimitSum, uint256 _allSolversGasLimit, ValidCallsResult _validCallsResult) = VERIFICATION
+                .validateCalls(
+                _dConfig, userOp, solverOps, dAppOp, msg.value, msg.data.length, _vars.bundler, _vars.isSimulation
+            );
+
+            // First handle the ValidCallsResult
             if (_validCallsResult != ValidCallsResult.Valid) {
-                if (_isSimulation) revert VerificationSimFail(_validCallsResult);
+                if (_vars.isSimulation) revert VerificationSimFail(_validCallsResult);
 
                 // Gracefully return for results that need nonces to be stored and prevent replay attacks
                 if (uint8(_validCallsResult) >= _GRACEFUL_RETURN_THRESHOLD && !_dConfig.callConfig.allowsReuseUserOps())
@@ -89,17 +109,27 @@ contract Atlas is Escrow, Factory {
                 // Revert for all other results
                 revert ValidCalls(_validCallsResult);
             }
+
+            // Then check if gas limit was set too high, based on gas left for execution, and a conservative buffer
+            // added to the expected execution gas limit. Revert if unexpectedly high gas limit.
+            if (gasleft() > _gasLimitSum + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET) revert GasLimitTooHigh();
+
+            // allSolversGasLimit used in calculation of sufficient bonded balance check before solverOp execution
+            _vars.allSolversGasLimit = _allSolversGasLimit;
         }
 
         // Initialize the environment lock and accounting values
-        _setEnvironmentLock(_dConfig, _executionEnvironment);
+        _setEnvironmentLock(_dConfig, _vars.executionEnvironment);
         _initializeAccountingValues(_gasMarker);
+
+        // Calculate `execute` gas limit such that it can fail due to an OOG error caused by any of the hook calls, and
+        // the metacall will still have enough gas to gracefully finish and return, storing any nonces required.
+        uint256 _gasLimit = gasleft() * 63 / 64 - _GRACEFUL_RETURN_GAS_OFFSET;
 
         // userOpHash has already been calculated and verified in validateCalls at this point, so rather
         // than re-calculate it, we can simply take it from the dAppOp here. It's worth noting that this will
         // be either a TRUSTED or DEFAULT hash, depending on the allowsTrustedOpHash setting.
-        try this.execute(_dConfig, userOp, solverOps, _executionEnvironment, _bundler, dAppOp.userOpHash, _isSimulation)
-        returns (Context memory ctx) {
+        try this.execute{ gas: _gasLimit }(_dConfig, userOp, solverOps, _vars) returns (Context memory ctx) {
             // Gas Refund to sender only if execution is successful
             (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) =
                 _settle(ctx, _dConfig.solverGasLimit, gasRefundBeneficiary);
@@ -131,18 +161,13 @@ contract Atlas is Escrow, Factory {
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
-    /// @param executionEnvironment Address of the execution environment contract of the current metacall tx.
-    /// @param bundler Address of the bundler of the current metacall tx.
-    /// @param userOpHash Hash of the userOp struct of the current metacall tx.
+    /// @param vars StackVars struct containing allSolversGasLimit and inputs for `_buildContext()`.
     /// @return ctx Context struct containing relevant context information for the Atlas auction.
     function execute(
         DAppConfig memory dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
-        address executionEnvironment,
-        address bundler,
-        bytes32 userOpHash,
-        bool isSimulation
+        StackVars memory vars
     )
         external
         payable
@@ -152,7 +177,7 @@ contract Atlas is Escrow, Factory {
         if (msg.sender != address(this)) revert InvalidAccess();
 
         // Build the context object
-        ctx = _buildContext(executionEnvironment, userOpHash, bundler, uint8(solverOps.length), isSimulation);
+        ctx = _buildContext(vars, dConfig.dappGasLimit, uint8(solverOps.length));
 
         bytes memory _returnData;
 

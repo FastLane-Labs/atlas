@@ -98,6 +98,11 @@ contract UserOperationBuilder is Test {
         return this;
     }
 
+    function withDAppGasLimit(uint32 dappGasLimit) public returns (UserOperationBuilder) {
+        userOperation.dappGasLimit = dappGasLimit;
+        return this;
+    }
+
     function withSessionKey(address sessionKey) public returns (UserOperationBuilder) {
         userOperation.sessionKey = sessionKey;
         return this;

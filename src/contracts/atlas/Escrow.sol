@@ -28,6 +28,7 @@ abstract contract Escrow is AtlETH {
     using CallBits for uint32;
     using SafetyBits for Context;
     using SafeCall for address;
+    using AccountingMath for uint256;
 
     constructor(
         uint256 escrowDuration,
@@ -65,11 +66,15 @@ abstract contract Escrow is AtlETH {
         withLockPhase(ExecutionPhase.PreOps)
         returns (bytes memory)
     {
-        (bool _success, bytes memory _data) = ctx.executionEnvironment.call(
+        uint256 _dappGasWaterMark = gasleft();
+
+        (bool _success, bytes memory _data) = ctx.executionEnvironment.call{ gas: ctx.dappGasLeft }(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.preOpsWrapper, userOp), ctx.setAndPack(ExecutionPhase.PreOps)
             )
         );
+
+        _updateDAppGasLeft(ctx, _dappGasWaterMark);
 
         if (_success) {
             if (dConfig.callConfig.needsPreOpsReturnData()) {
@@ -102,16 +107,11 @@ abstract contract Escrow is AtlETH {
         bool _success;
         bytes memory _data;
 
-        // Calculate gas limit ceiling, including gas to return gracefully even if userOp call is OOG.
-        uint256 _gasLimit = gasleft() * 63 / 64 - _GRACEFUL_RETURN_GAS_OFFSET;
-        // Use the smaller of userOp.gas and the gas limit ceiling
-        _gasLimit = userOp.gas < _gasLimit ? userOp.gas : _gasLimit;
-
         if (!_borrow(userOp.value)) {
             revert InsufficientEscrow();
         }
 
-        (_success, _data) = ctx.executionEnvironment.call{ value: userOp.value, gas: _gasLimit }(
+        (_success, _data) = ctx.executionEnvironment.call{ value: userOp.value, gas: userOp.gas }(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.userWrapper, userOp), ctx.setAndPack(ExecutionPhase.UserOperation)
             )
@@ -191,7 +191,8 @@ abstract contract Escrow is AtlETH {
         if (_result.canExecute()) {
             uint256 _gasLimit;
             // Verify gasLimit again
-            (_result, _gasLimit) = _validateSolverOpGasAndValue(dConfig, solverOp, _gasWaterMark, _result);
+            (_result, _gasLimit) =
+                _validateSolverOpGasAndValue(dConfig, solverOp, ctx.allSolversGasLimit, _gasWaterMark, _result);
             _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
             // Check for trusted operation hash
@@ -256,12 +257,16 @@ abstract contract Escrow is AtlETH {
         internal
         withLockPhase(ExecutionPhase.AllocateValue)
     {
-        (bool _success, bytes memory _returnData) = ctx.executionEnvironment.call(
+        uint256 _dappGasWaterMark = gasleft();
+
+        (bool _success, bytes memory _returnData) = ctx.executionEnvironment.call{ gas: ctx.dappGasLeft }(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.allocateValue, (dConfig.bidToken, bidAmount, returnData)),
                 ctx.setAndPack(ExecutionPhase.AllocateValue)
             )
         );
+
+        _updateDAppGasLeft(ctx, _dappGasWaterMark);
 
         // If the call from Atlas to EE succeeded, decode the return data to check if the allocateValue delegatecall
         // from EE to DAppControl succeeded.
@@ -292,12 +297,16 @@ abstract contract Escrow is AtlETH {
         internal
         withLockPhase(ExecutionPhase.PostOps)
     {
-        (bool _success,) = ctx.executionEnvironment.call(
+        uint256 _dappGasWaterMark = gasleft();
+
+        (bool _success,) = ctx.executionEnvironment.call{ gas: ctx.dappGasLeft }(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.postOpsWrapper, (solved, returnData)),
                 ctx.setAndPack(ExecutionPhase.PostOps)
             )
         );
+
+        _updateDAppGasLeft(ctx, _dappGasWaterMark);
 
         if (!_success) {
             if (ctx.isSimulation) revert PostOpsSimFail();
@@ -321,6 +330,7 @@ abstract contract Escrow is AtlETH {
     function _validateSolverOpGasAndValue(
         DAppConfig memory dConfig,
         SolverOperation calldata solverOp,
+        uint256 allSolversGasLimit,
         uint256 gasWaterMark,
         uint256 result
     )
@@ -334,9 +344,7 @@ abstract contract Escrow is AtlETH {
             return (result, gasLimit); // gasLimit = 0
         }
 
-        gasLimit = AccountingMath.solverGasLimitScaledDown(solverOp.gas, dConfig.solverGasLimit) + _FASTLANE_GAS_BUFFER;
-
-        uint256 _gasCost = (tx.gasprice * gasLimit) + _getCalldataCost(solverOp.data.length);
+        gasLimit = AccountingMath.solverGasLimitScaledDown(solverOp.gas, dConfig.solverGasLimit);
 
         // Verify that we can lend the solver their tx value
         if (solverOp.value > address(this).balance) {
@@ -344,13 +352,27 @@ abstract contract Escrow is AtlETH {
             return (result, gasLimit);
         }
 
-        // subtract out the gas buffer since the solver's metaTx won't use it
-        gasLimit -= _FASTLANE_GAS_BUFFER;
-
         uint256 _solverBalance = S_accessData[solverOp.from].bonded;
+        uint256 _maxGasValue;
 
-        // see if solver's escrow can afford tx gascost
-        if (_gasCost > _solverBalance) {
+        {
+            (uint256 _atlasSurchargeRate, uint256 _bundlerSurchargeRate) = _surchargeRates();
+            uint256 _solverOpCalldataGas = (solverOp.data.length + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED;
+
+            // Max gas value payable by solver calculated as:
+            // = max metacall gas cost (execution + calldata) (incl surcharges) 
+            // - (all solvers' gas limits - current solver's gas limit) * tx.gasprice * (base + surcharges)
+
+            _maxGasValue = (t_claims + t_fees)
+            - ((allSolversGasLimit - (gasLimit + _solverOpCalldataGas)) * tx.gasprice)
+                .withSurcharges(_atlasSurchargeRate, _bundlerSurchargeRate);
+        }
+
+        // Claims + Fees represents the base gas cost + the Atlas surcharge + the Bundler surcharge, if the full gas
+        // limit of the tx is used. This is the maximum a solver would need to pay in gas charges from their bonded
+        // AtlETH, should they win the auction. If they lose, or win with less than the full gas limit used, the amount
+        // charged will be lower.
+        if (_maxGasValue > _solverBalance) {
             // charge solver for calldata so that we can avoid vampire attacks from solver onto user
             result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
         }
@@ -425,7 +447,8 @@ abstract contract Escrow is AtlETH {
         );
 
         _result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, _result);
-        (_result, _gasLimit) = _validateSolverOpGasAndValue(dConfig, solverOp, _gasWaterMark, _result);
+        (_result, _gasLimit) =
+            _validateSolverOpGasAndValue(dConfig, solverOp, ctx.allSolversGasLimit, _gasWaterMark, _result);
         _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
         // Verify the transaction.
@@ -683,6 +706,20 @@ abstract contract Escrow is AtlETH {
         // If the flag is set, revert with `BidFindSuccessful` and include the solver's bid amount in `solverTracker`.
         // This indicates that the bid search process has completed successfully.
         if (ctx.bidFind) revert BidFindSuccessful(solverTracker.bidAmount);
+    }
+
+    /// Updates ctx.dappGasLeft based on the gas used in the DApp hook call just performed.
+    /// @dev Measure the gasWaterMarkBefore using `gasleft()` just before performing the DApp hook call.
+    /// @dev Will revert if the gas used exceeds the remaining dappGasLeft.
+    /// @param ctx Memory pointer to the metacalls' Context object.
+    /// @param gasWaterMarkBefore The gasleft() value just before the DApp hook call.
+    function _updateDAppGasLeft(Context memory ctx, uint256 gasWaterMarkBefore) internal view {
+        uint256 _gasUsed = gasWaterMarkBefore - gasleft();
+
+        if (_gasUsed > ctx.dappGasLeft) revert DAppGasLimitReached();
+
+        // No need to SafeCast - will revert above if too large for uint32
+        ctx.dappGasLeft -= uint32(_gasUsed);
     }
 
     receive() external payable { }

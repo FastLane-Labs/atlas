@@ -20,6 +20,12 @@ interface IDAppControl {
 
     function getCallConfig() external view returns (CallConfig memory callConfig);
 
+    function CALL_CONFIG() external view returns (uint32);
+
+    function getSolverGasLimit() external view returns (uint32);
+
+    function getDAppGasLimit() external view returns (uint32);
+
     function getBidFormat(UserOperation calldata userOp) external view returns (address bidToken);
 
     function getBidValue(SolverOperation calldata solverOp) external view returns (uint256);
@@ -30,15 +36,7 @@ interface IDAppControl {
 
     function requireSequentialDAppNonces() external view returns (bool isSequential);
 
-    function preOpsDelegated() external view returns (bool delegated);
-
     function userDelegated() external view returns (bool delegated);
-
-    function allocatingDelegated() external view returns (bool delegated);
-
-    function verificationDelegated() external view returns (bool delegated);
-
-    function CALL_CONFIG() external view returns (uint32);
 
     function transferGovernance(address newGovernance) external;
 

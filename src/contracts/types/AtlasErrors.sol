@@ -61,10 +61,12 @@ contract AtlasErrors {
     error AllocateValueFail();
     error PostOpsFail();
     error InvalidAccess();
+    error GasLimitTooHigh();
 
     // Escrow
     error UncoveredResult();
     error InvalidEscrowDuration();
+    error DAppGasLimitReached();
 
     // AtlETH
     error EscrowLockActive();

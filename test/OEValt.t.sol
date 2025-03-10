@@ -153,6 +153,7 @@ contract OEVTest is BaseTest {
         dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+        uint256 gasLim = _gasLim(userOp, solverOps, dAppOp);
 
         assertEq(mockLiquidatable.canLiquidate(), false);
         assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) !=  targetOracleAnswer, "Wrapper answer should not be target yet");
@@ -164,7 +165,7 @@ contract OEVTest is BaseTest {
 
         // Should Succeed
         vm.prank(transmitter);
-        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
+        atlas.metacall{gas: gasLim}({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
 
         assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), targetOracleAnswer, "Wrapper did not update as expected");
         assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) != uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()), "Wrapper and base feed should report different answers");

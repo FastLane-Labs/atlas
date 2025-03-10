@@ -8,6 +8,7 @@ import { AtlasErrors } from "../types/AtlasErrors.sol";
 
 abstract contract DAppControlTemplate {
     uint32 internal constant DEFAULT_SOLVER_GAS_LIMIT = 1_000_000;
+    uint32 internal constant DEFAULT_DAPP_GAS_LIMIT = 2_000_000;
 
     constructor() { }
 
@@ -161,5 +162,9 @@ abstract contract DAppControlTemplate {
 
     function getSolverGasLimit() public view virtual returns (uint32) {
         return DEFAULT_SOLVER_GAS_LIMIT;
+    }
+
+    function getDAppGasLimit() public view virtual returns (uint32) {
+        return DEFAULT_DAPP_GAS_LIMIT;
     }
 }

@@ -115,7 +115,7 @@ contract SwapIntentTest is BaseTest {
         userOp.sessionKey = governanceEOA;
 
         // User signs the userOp
-        // user doees NOT sign the userOp for when they are bundling
+        // user does NOT sign the userOp for when they are bundling
         // (sig.v, sig.r, sig.s) = vm.sign(userPK, atlas.getUserOperationPayload(userOp));
         // userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
@@ -153,6 +153,8 @@ contract SwapIntentTest is BaseTest {
 
         assertTrue(userWethBalanceBefore >= swapIntent.amountUserSells, "Not enough starting WETH");
 
+        uint256 gasLim = _gasLimSim(userOp);
+
         console.log("\nBEFORE METACALL");
         console.log("User WETH balance", WETH.balanceOf(userEOA));
         console.log("User DAI balance", DAI.balanceOf(userEOA));
@@ -161,17 +163,18 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        (bool simResult,,) = simulator.simUserOperation(userOp);
+        (bool simResult,,) = simulator.simUserOperation{ gas: gasLim }(userOp);
         assertFalse(simResult, "metasimUserOperationcall tested true a");
 
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        (simResult,,) = simulator.simUserOperation(userOp);
+        (simResult,,) = simulator.simUserOperation{ gas: gasLim }(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false c");
 
+        gasLim = _gasLim(userOp, solverOps, dAppOp);
         uint256 gasLeftBefore = gasleft();
 
-        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
+        atlas.metacall{ gas: gasLim }({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
 
         console.log("Metacall Gas Cost:", gasLeftBefore - gasleft());
         vm.stopPrank();
@@ -278,6 +281,7 @@ contract SwapIntentTest is BaseTest {
         userWethBalanceBefore = WETH.balanceOf(userEOA);
 
         assertTrue(userWethBalanceBefore >= swapIntent.amountUserSells, "Not enough starting WETH");
+        uint256 gasLim = _gasLimSim(userOp);
 
         console.log("\nBEFORE METACALL");
         console.log("User WETH balance", WETH.balanceOf(userEOA));
@@ -287,19 +291,21 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        (bool simResult,,) = simulator.simUserOperation(userOp);
+        (bool simResult,,) = simulator.simUserOperation{gas: gasLim}(userOp);
         assertFalse(simResult, "metasimUserOperationcall tested true a");
 
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        (simResult,,) = simulator.simUserOperation(userOp);
+        (simResult,,) = simulator.simUserOperation{gas: gasLim}(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false c");
 
         // Check solver does NOT have DAI - it must use Uniswap to get it during metacall
         assertEq(DAI.balanceOf(address(uniswapSolver)), 0, "Solver has DAI before metacall");
 
+        gasLim = _gasLim(userOp, solverOps, dAppOp);
+
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
-        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
+        atlas.metacall{gas: gasLim}({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
         vm.stopPrank();
 
         console.log("\nAFTER METACALL");

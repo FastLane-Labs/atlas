@@ -1291,6 +1291,8 @@ contract FastLaneOnlineTest is BaseTest {
         beforeVars.solverTwoRep = flOnline.solverReputation(solverTwoEOA);
         beforeVars.solverThreeRep = flOnline.solverReputation(solverThreeEOA);
 
+        args.gas = _gasLimSim(args.userOp); // Dont have solverOps or dAppOp here
+
         uint256 txGasUsed;
         uint256 estAtlasGasSurcharge = gasleft(); // Reused below during calculations
 

@@ -61,9 +61,10 @@ contract AccountingTest is BaseTest {
         vm.stopPrank();
 
         SolverOperation[] memory solverOps = _setupBorrowRepayTestUsingBasicSwapIntent(address(honestSolver));
+        uint256 gasLim = _gasLim(userOp, solverOps, dAppOp);
 
         vm.startPrank(userEOA);
-        atlas.metacall{ value: 0 }({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
+        atlas.metacall{ value: 0, gas: gasLim }({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
         vm.stopPrank();
 
         // console.log("\nAFTER METACALL");
@@ -88,9 +89,10 @@ contract AccountingTest is BaseTest {
         vm.stopPrank();
 
         SolverOperation[] memory solverOps = _setupBorrowRepayTestUsingBasicSwapIntent(address(evilSolver));
+        uint256 gasLim = _gasLim(userOp, solverOps, dAppOp);
 
         vm.startPrank(userEOA);
-        atlas.metacall{ value: 0 }({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
+        atlas.metacall{ value: 0, gas: gasLim }({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
         vm.stopPrank();
     }
 

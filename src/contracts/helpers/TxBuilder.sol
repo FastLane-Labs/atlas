@@ -76,6 +76,7 @@ contract TxBuilder {
             dapp: to,
             control: control,
             callConfig: IDAppControl(control).CALL_CONFIG(),
+            dappGasLimit: IDAppControl(control).getDAppGasLimit(),
             sessionKey: address(0),
             data: data,
             signature: new bytes(0)
