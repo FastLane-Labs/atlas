@@ -195,16 +195,16 @@ contract ExecutionBase is Base {
     /// @notice Deposits local funds from this Execution Environment, to the transient Atlas balance. These funds go
     /// towards the bundler, with any surplus going to the Solver.
     /// @param amt The amount of funds to deposit.
-    function _contribute(uint256 amt) internal {
+    function _contributeToAtlas(uint256 amt) internal {
         if (amt > address(this).balance) revert AtlasErrors.InsufficientLocalFunds();
 
         IAtlas(ATLAS).contribute{ value: amt }();
     }
 
     /// @notice Borrows funds from the transient Atlas balance that will be repaid by the Solver or this Execution
-    /// Environment via `_contribute()`
+    /// Environment via `_contributeToAtlas()`
     /// @param amt The amount of funds to borrow.
-    function _borrow(uint256 amt) internal {
+    function _borrowFromAtlas(uint256 amt) internal {
         IAtlas(ATLAS).borrow(amt);
     }
 
