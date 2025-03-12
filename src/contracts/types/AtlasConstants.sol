@@ -3,6 +3,8 @@ pragma solidity 0.8.28;
 
 import "./ValidCalls.sol";
 
+import { GasAccLib } from "../libraries/GasAccLib.sol";
+
 // NOTE: Internal constants that are defined but not used in the logic of a smart contract, will NOT be included in the
 // bytecode of the smart contract when compiled. However, public constants will be included in every inheriting contract
 // as they are part of the ABI. As such, only internal constants are defined in this shared contract.
@@ -25,11 +27,12 @@ contract AtlasConstants {
     uint256 internal constant _GRACEFUL_RETURN_GAS_OFFSET = 40_000;
 
     // Gas Accounting constants
-    uint256 internal constant _CALLDATA_LENGTH_PREMIUM_HALVED = 8;
+    uint256 internal constant _CALLDATA_LENGTH_PREMIUM_HALVED = GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED;
     // Half of the upper gas cost per byte of calldata (16 gas). Multiplied by msg.data.length. Equivalent to
     // `msg.data.length / 2 * 16` because 2 hex chars per byte.
     uint256 internal constant _BASE_TX_GAS_USED = 21_000;
-    uint256 internal constant _SOLVER_OP_BASE_CALLDATA = 608; // SolverOperation calldata length excluding solverOp.data
+    uint256 internal constant _SOLVER_OP_BASE_CALLDATA = GasAccLib._SOLVER_OP_BASE_CALLDATA; // SolverOperation calldata
+        // length excluding solverOp.data
     uint256 internal constant _SOLVER_BASE_GAS_USED = 5000; // Base gas charged to solver in
         // `_handleSolverFailAccounting()`
     uint256 internal constant _BUNDLER_GAS_PENALTY_BUFFER = 500_000;

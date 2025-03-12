@@ -32,7 +32,6 @@ library GasAccLib {
     using AccountingMath for uint256;
     using SafeCast for uint256;
 
-    // TODO refactor AtlasConstants to a lib and import here
     uint256 internal constant _SOLVER_OP_BASE_CALLDATA = 608;
     uint256 internal constant _CALLDATA_LENGTH_PREMIUM_HALVED = 8;
 
