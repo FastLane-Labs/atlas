@@ -7,8 +7,6 @@ import { AccountingMath } from "./AccountingMath.sol";
 import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 import { SolverOperation } from "../types/SolverOperation.sol";
 
-// TODO check all of these functions are used before finalizing
-
 // All GasLedger vars are measured in units of gas.
 // All GasLedger vars also include calldata and execution gas components.
 // remainingMaxGas and unreachedSolverGas measure max gas limits (C + E).
@@ -21,8 +19,7 @@ struct GasLedger {
     uint48 solverFaultFailureGas; // Gas used by solverOps that failed due to solver fault
     uint48 unreachedSolverGas; // Sum of gas limits of solverOps not yet reached in the current metacall
     uint48 maxApprovedGasSpend; // Max gas units approved by current solver to be spent from their bonded atlETH
-        // NOTE: 16 bits unused. Could hold totalSurchargeRate if SCALE = 10_000 (max surcharge = 6.5x then)
-        // NOTE: could even do 6 accounts x 40 bits each, + 16 bits for total surcharge rate
+        // NOTE: 16 bits unused. Could hold totalSurchargeRate if SCALE = 10_000 in future
 }
 
 // All BorrowsLedger vars are measured in units of native token (wei).
