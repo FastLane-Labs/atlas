@@ -19,8 +19,6 @@ import { Result } from "../interfaces/ISimulator.sol";
 import { IAtlas } from "../interfaces/IAtlas.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
-import "forge-std/console.sol";
-
 contract Simulator is AtlasErrors, AtlasConstants {
     using CallBits for uint32;
 

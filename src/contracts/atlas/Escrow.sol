@@ -278,7 +278,7 @@ abstract contract Escrow is AtlETH {
 
         _updateDAppGasLeft(ctx, _dappGasWaterMark);
 
-        // Revert if allocateValue failed at any point, unless the call config allows allocate value failure.
+        // Revert if allocateValue failed at any point.
         if (!_success) {
             if (ctx.isSimulation) revert AllocateValueSimFail();
             revert AllocateValueFail();
