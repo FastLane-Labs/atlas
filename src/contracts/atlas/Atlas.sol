@@ -77,26 +77,27 @@ contract Atlas is Escrow, Factory {
             + GasAccLib.metacallCalldataGas(msg.data.length, L2_GAS_CALCULATOR);
 
         DAppConfig memory _dConfig;
-        StackVars memory _vars; // TODO dont need this now, no more stack too deep
-        {
-            bool _isSimulation = msg.sender == SIMULATOR;
-            address _executionEnvironment;
-            (_executionEnvironment, _dConfig) = _getOrCreateExecutionEnvironment(userOp);
+        bool _isSimulation = msg.sender == SIMULATOR;
+        address _executionEnvironment;
+        address _bundler = _isSimulation ? dAppOp.bundler : msg.sender;
+        (_executionEnvironment, _dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
-            _vars = StackVars({
-                userOpHash: dAppOp.userOpHash,
-                bundler: _isSimulation ? dAppOp.bundler : msg.sender,
-                isSimulation: _isSimulation,
-                executionEnvironment: _executionEnvironment
-            });
-        }
         {
             (uint256 _allSolversGasLimit, uint256 _bidFindOverhead, ValidCallsResult _validCallsResult) = VERIFICATION
-                .validateCalls(_dConfig, userOp, solverOps, dAppOp, _gasLeft, msg.value, _vars.bundler, _vars.isSimulation);
+                .validateCalls({
+                dConfig: _dConfig,
+                userOp: userOp,
+                solverOps: solverOps,
+                dAppOp: dAppOp,
+                metacallGasLeft: _gasLeft,
+                msgValue: msg.value,
+                msgSender: _bundler,
+                isSimulation: _isSimulation
+            });
 
             // First handle the ValidCallsResult
             if (_validCallsResult != ValidCallsResult.Valid) {
-                if (_vars.isSimulation) revert VerificationSimFail(_validCallsResult);
+                if (_isSimulation) revert VerificationSimFail(_validCallsResult);
 
                 // Gracefully return for results that need nonces to be stored and prevent replay attacks
                 if (uint8(_validCallsResult) >= _GRACEFUL_RETURN_THRESHOLD && !_dConfig.callConfig.allowsReuseUserOps())
@@ -109,7 +110,7 @@ contract Atlas is Escrow, Factory {
             }
 
             // Initialize the environment lock and accounting values
-            _setEnvironmentLock(_dConfig, _vars.executionEnvironment);
+            _setEnvironmentLock(_dConfig, _executionEnvironment);
             _initializeAccountingValues(_gasMarker - _bidFindOverhead, _allSolversGasLimit);
             // _gasMarker - _bidFindOverhead = estimated winning solver gas liability for (not charged for bid-find gas)
         }
@@ -121,7 +122,9 @@ contract Atlas is Escrow, Factory {
         // userOpHash has already been calculated and verified in validateCalls at this point, so rather
         // than re-calculate it, we can simply take it from the dAppOp here. It's worth noting that this will
         // be either a TRUSTED or DEFAULT hash, depending on the allowsTrustedOpHash setting.
-        try this.execute{ gas: _gasLimit }(_dConfig, userOp, solverOps, _vars) returns (Context memory ctx) {
+        try this.execute{ gas: _gasLimit }(
+            _dConfig, userOp, solverOps, dAppOp.userOpHash, _executionEnvironment, _bundler, _isSimulation
+        ) returns (Context memory ctx) {
             GasLedger memory _gL = t_gasLedger.toGasLedger(); // Final load, no need to persist changes after this
             uint256 _unreachedCalldataValuePaid = _chargeUnreachedSolversForCalldata(solverOps, _gL, ctx.solverIndex);
 
@@ -154,13 +157,19 @@ contract Atlas is Escrow, Factory {
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
-    /// @param vars StackVars struct containing inputs for `_buildContext()`.
+    /// @param userOpHash The hash of the UserOperation.
+    /// @param executionEnvironment The address of the execution environment.
+    /// @param bundler The address of the bundler.
+    /// @param isSimulation Whether the current execution is a simulation.
     /// @return ctx Context struct containing relevant context information for the Atlas auction.
     function execute(
         DAppConfig memory dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
-        StackVars memory vars
+        bytes32 userOpHash,
+        address executionEnvironment,
+        address bundler,
+        bool isSimulation
     )
         external
         payable
@@ -170,7 +179,9 @@ contract Atlas is Escrow, Factory {
         if (msg.sender != address(this)) revert InvalidAccess();
 
         // Build the context object
-        ctx = _buildContext(vars, dConfig.dappGasLimit, uint8(solverOps.length));
+        ctx = _buildContext(
+            userOpHash, executionEnvironment, bundler, dConfig.dappGasLimit, uint8(solverOps.length), isSimulation
+        );
 
         bytes memory _returnData;
 

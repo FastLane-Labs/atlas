@@ -81,4 +81,15 @@ contract GasAccLibTest is Test {
         assertEq(gL.solverGasLiability(totalSurchargeRate), expected, "solverGasLiability unexpected");
     }
 
+    function test_solverGasLiability() public {
+        // TODO
+    }
+
+    function test_sumSolverOpsCalldataGas() public {
+        // TODO
+    }
+
+    function test_metacallCalldataGas() public {
+        // TODO
+    }
 }
