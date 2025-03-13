@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 // Default UserOperation typehash
 bytes32 constant USER_TYPEHASH_DEFAULT = keccak256(
-    "UserOperation(address from,address to,uint256 value,uint256 gas,uint256 maxFeePerGas,uint256 nonce,uint256 deadline,address dapp,address control,uint32 callConfig,address sessionKey,bytes data)"
+    "UserOperation(address from,address to,uint256 value,uint256 gas,uint256 maxFeePerGas,uint256 nonce,uint256 deadline,address dapp,address control,uint32 callConfig,uint32 dappGasLimit,address sessionKey,bytes data)"
 );
 
 // Trusted UserOperation typehash
@@ -12,7 +12,7 @@ bytes32 constant USER_TYPEHASH_DEFAULT = keccak256(
 // prior to seeing the UserOperation or its hash. In this scenario, the Solvers should trust the signer of the
 // UserOperation.
 bytes32 constant USER_TYPEHASH_TRUSTED = keccak256(
-    "UserOperation(address from,address to,address dapp,address control,uint32 callConfig,address sessionKey)"
+    "UserOperation(address from,address to,address dapp,address control,uint32 callConfig,uint32 dappGasLimit,address sessionKey)"
 );
 
 // Length of UserOperation in hex chars, assuming empty signature field, excluding the dynamic userOp.data field.
