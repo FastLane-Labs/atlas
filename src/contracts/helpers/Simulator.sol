@@ -21,6 +21,7 @@ import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
 contract Simulator is AtlasErrors, AtlasConstants {
     using CallBits for uint32;
+    using AccountingMath for uint256;
 
     uint256 internal constant _SIM_GAS_SUGGESTED_BUFFER = 30_000; // TODO calc properly
     uint256 internal constant _SIM_GAS_BEFORE_METACALL = 10_000; // TODO calc properly
@@ -34,6 +35,11 @@ contract Simulator is AtlasErrors, AtlasConstants {
         deployer = msg.sender;
     }
 
+    /// @notice Returns an estimation of the gas limit for a metacall, given the supplied UserOperation and array of
+    /// SolverOperations. This is the gas limit that the bundler should use when executing the metacall.
+    /// @param userOp The UserOperation of the metacall.
+    /// @param solverOps The array of SolverOperations of the metacall.
+    /// @return The estimated gas limit for the metacall.
     function estimateMetacallGasLimit(
         UserOperation calldata userOp,
         SolverOperation[] memory solverOps
@@ -42,10 +48,9 @@ contract Simulator is AtlasErrors, AtlasConstants {
         view
         returns (uint256)
     {
-        // TODO refactor some of this into a shared lib with AtlasVerification - GasAccLib probably
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
         uint256 metacallCalldataLength = msg.data.length + DAPP_OP_LENGTH + 28;
-        // Additional 28 length accounts for missing address param
+        // Additional 28 length accounts for the missing address param
 
         uint256 metacallCalldataGas =
             GasAccLib.metacallCalldataGas(metacallCalldataLength, IAtlas(atlas).L2_GAS_CALCULATOR());
@@ -60,9 +65,36 @@ contract Simulator is AtlasErrors, AtlasConstants {
         return metacallCalldataGas + metacallExecutionGas;
     }
 
-    // TODO consider returning estimatedGasLimit in the simUserOp, simSolverOps functions for convenience
-    // NOTE: If simulator sets gas lim for metacalls, make sure caller knows to set really high gas limit. Otherwise
-    // will form the ceiling and sim result will be inaccurate
+    /// @notice Returns an estimation of the max amount (in native token) a winning solver could be charged, given the
+    /// supplied UserOperation and SolverOperation, assuming the Atlas and Bundler surcharge rates do not change, and
+    /// assuming the supplied solverOp wins.
+    /// @param userOp The UserOperation of the metacall.
+    /// @param solverOp The SolverOperation of the solver whose charge is being estimated.
+    /// @return The estimated max gas charge in native token units.
+    function estimateMaxSolverWinGasCharge(
+        UserOperation calldata userOp,
+        SolverOperation calldata solverOp
+    )
+        external
+        view
+        returns (uint256)
+    {
+        uint256 bundlerSurchargeRate = IAtlas(atlas).bundlerSurchargeRate();
+        uint256 atlasSurchargeRate = IAtlas(atlas).atlasSurchargeRate();
+
+        uint256 metacallCalldataLength = msg.data.length + DAPP_OP_LENGTH + 28;
+        uint256 metacallCalldataGas =
+            GasAccLib.metacallCalldataGas(metacallCalldataLength, IAtlas(atlas).L2_GAS_CALCULATOR());
+
+        uint256 metacallExecutionGas =
+            _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOp.gas + userOp.dappGasLimit + solverOp.gas;
+
+        // NOTE: In exPostBids mode, the bid-finding solverOp execution gas is written off. So no need to add here.
+
+        return ((metacallCalldataGas + metacallExecutionGas) * solverOp.maxFeePerGas).withSurcharge(
+            bundlerSurchargeRate + atlasSurchargeRate
+        );
+    }
 
     function simUserOperation(UserOperation calldata userOp)
         external
