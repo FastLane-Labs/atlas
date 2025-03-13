@@ -97,12 +97,11 @@ contract MockGasAccounting is TestAtlas, BaseTest {
         SolverOperation calldata solverOp,
         uint256 dConfigSolverGasLimit,
         uint256 gasWaterMark,
-        uint256 result,
-        bool includeCalldata
+        uint256 result
     )
         external
     {
-        _handleSolverFailAccounting(solverOp, dConfigSolverGasLimit, gasWaterMark, result, includeCalldata);
+        _handleSolverFailAccounting(solverOp, dConfigSolverGasLimit, gasWaterMark, result);
     }
 
     function settle(

@@ -271,28 +271,19 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param solverOp The current SolverOperation for which to account.
     /// @param gasWaterMark The `gasleft()` watermark taken at the start of executing the SolverOperation.
     /// @param result The result bitmap of the SolverOperation execution.
-    /// @param includeCalldata Whether to include calldata cost in the gas calculation.
     function _handleSolverFailAccounting(
         SolverOperation calldata solverOp,
         uint256 dConfigSolverGasLimit,
         uint256 gasWaterMark,
-        uint256 result,
-        bool includeCalldata
+        uint256 result
     )
         internal
     {
         GasLedger memory _gL = t_gasLedger.toGasLedger();
         uint256 _bothSurchargeRates = _totalSurchargeRate();
         uint256 _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR);
-        uint256 _gasUsed = gasWaterMark + _SOLVER_BASE_GAS_USED - gasleft();
+        uint256 _gasUsed = _calldataGas + (gasWaterMark + _SOLVER_BASE_GAS_USED - gasleft());
         // TODO ^ need to add SOLVER_BASE_GAS_USED to total calcs in AtlasVerification
-
-        // TODO If we don't charge failed solvers for calldata in exPostBids, winner should not pay for that - breaks
-        // property where solver can predict upfront the max liability of entering a metacall. Instead need to write
-        // off, so bundler pays.
-        if (includeCalldata) {
-            _gasUsed += _calldataGas;
-        }
 
         // Deduct solver's max (C + E) gas from remainingMaxGas, for future solver gas liability calculations
         _gL.remainingMaxGas -= uint48(dConfigSolverGasLimit + _calldataGas);
@@ -369,8 +360,6 @@ abstract contract GasAccounting is SafetyLocks {
 
             // No surcharges added to calldata cost for unreached solvers
             _deficit = _assign(_solverData, solverOps[i].from, _calldataGasCost);
-
-            // TODO decide if we should track analytics for unreached solvers - cost but also win/loss?
 
             unreachedCalldataValuePaid += _calldataGasCost - _deficit;
         }
