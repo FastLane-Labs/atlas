@@ -664,6 +664,26 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         ), ValidCallsResult.InvalidBundler);
     }
 
+    // This error isn't triggered by a userOpHash mismatch, as its caught before that point.
+    function test_validCalls_trustedOpHash_dappGasLimitChanged_DAppGasLimitMismatch() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withTrustedOpHash(true).build());
+
+        UserOperation memory userOp = validUserOperation().withSessionKey(governanceEOA).sign(address(atlasVerification), userPK).build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+
+        userOp.dappGasLimit = 10_000_000; // increase dappGasLimit to price out solver
+
+        // User signs userOp again
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPK, atlasVerification.getUserOperationPayload(userOp));
+        userOp.signature = abi.encodePacked(r, s, v);
+
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.DAppGasLimitMismatch);
+    }
+
     // Valid cases
 
     // 
@@ -1628,6 +1648,27 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.TxValueLowerThanCallValue);
+    }
+
+    // DAppGasLimitMismatch cases
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    //     where the userOp.dappGasLimit does not match the value returned by getDAppGasLimit in the dapp control
+    // when validCalls is called from the userEOA
+    // then it should return DAppGasLimitMismatch
+    //
+    function test_validCalls_DAppGasLimitMismatch() public {
+        defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation().withDAppGasLimit(1).signAndBuild(address(atlasVerification), userPK);
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.DAppGasLimitMismatch);
     }
 
     // Prune invalid solverOps cases
