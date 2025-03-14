@@ -35,6 +35,8 @@ contract TestAtlas is Atlas {
         _setLock(address(0), 0, 0);
         t_solverLock = 0;
         t_solverTo = address(0);
+        t_gasLedger = 0;
+        t_borrowsLedger = 0;
     }
 
     function setLock(address activeEnvironment, uint32 callConfig, uint8 phase) public {
@@ -51,5 +53,13 @@ contract TestAtlas is Atlas {
 
     function setSolverTo(address newSolverTo) public {
         t_solverTo = newSolverTo;
+    }
+
+    function setGasLedger(uint256 newGasLedger) public {
+        t_gasLedger = newGasLedger;
+    }
+
+    function setBorrowsLedger(uint256 newBorrowsLedger) public {
+        t_borrowsLedger = newBorrowsLedger;
     }
 }
