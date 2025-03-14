@@ -76,7 +76,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @notice Borrows ETH from the contract, transferring the specified amount to the caller if available.
     /// @dev Borrowing is only available until the end of the SolverOperation phase, for solver protection.
     /// @param amount The amount of ETH to borrow.
-    function borrow(uint256 amount) external payable {
+    function borrow(uint256 amount) external {
         if (amount == 0) return;
 
         // borrow() can only be called by the Execution Environment (by delegatecalling a DAppControl hook), and only
