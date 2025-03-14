@@ -16,14 +16,6 @@ struct Context {
     uint32 dappGasLeft; // Gas used on preOps, allocateValue, and postOps hooks
 }
 
-// TODO double check we even need this struct after via-IR
-struct StackVars {
-    bytes32 userOpHash;
-    address executionEnvironment;
-    address bundler;
-    bool isSimulation;
-}
-
 enum ExecutionPhase {
     Uninitialized,
     PreOps,

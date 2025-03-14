@@ -3,6 +3,8 @@ pragma solidity 0.8.28;
 
 import "./ValidCalls.sol";
 
+import { GasAccLib } from "../libraries/GasAccLib.sol";
+
 // NOTE: Internal constants that are defined but not used in the logic of a smart contract, will NOT be included in the
 // bytecode of the smart contract when compiled. However, public constants will be included in every inheriting contract
 // as they are part of the ABI. As such, only internal constants are defined in this shared contract.
@@ -25,15 +27,14 @@ contract AtlasConstants {
     uint256 internal constant _GRACEFUL_RETURN_GAS_OFFSET = 40_000;
 
     // Gas Accounting constants
-    uint256 internal constant _CALLDATA_LENGTH_PREMIUM_HALVED = 8;
+    uint256 internal constant _CALLDATA_LENGTH_PREMIUM_HALVED = GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED;
     // Half of the upper gas cost per byte of calldata (16 gas). Multiplied by msg.data.length. Equivalent to
     // `msg.data.length / 2 * 16` because 2 hex chars per byte.
     uint256 internal constant _BASE_TX_GAS_USED = 21_000;
-    uint256 internal constant _SOLVER_OP_BASE_CALLDATA = 608; // SolverOperation calldata length excluding solverOp.data
+    uint256 internal constant _SOLVER_OP_BASE_CALLDATA = GasAccLib._SOLVER_OP_BASE_CALLDATA; // SolverOperation calldata
+        // length excluding solverOp.data
     uint256 internal constant _SOLVER_BASE_GAS_USED = 5000; // Base gas charged to solver in
         // `_handleSolverFailAccounting()`
-    uint256 internal constant _BUNDLER_GAS_PENALTY_BUFFER = 500_000;
-    uint256 internal constant _EXECUTION_GAS_BUFFER = 150_000; // TODO measure, should be gas used + buffer
 
     // First 160 bits of _solverLock are the address of the current solver.
     // The 161st bit represents whether the solver has called back via `reconcile`.
@@ -56,8 +57,6 @@ contract AtlasConstants {
     uint8 internal constant _MAX_SOLVERS = type(uint8).max - 1;
     uint256 internal constant _BID_FIND_OVERHEAD = 5000; // Overhead gas for the logic required to execute and sort each
         // solverOp in `_bidFindingIteration()`
-    uint256 internal constant _EXTRA_METACALL_CALLDATA_LENGTH = 36; // The length of the extra static metacall calldata
-        // besides the core UserOp, DAppOp, and SolverOps components.
 
     // Params below are used to calculate the tolerated max diff between actual gasleft and expected gasleft, in the
     // `_getAndVerifyGasLimits()` function. This tolerance is mostly for calldata gas cost differences.

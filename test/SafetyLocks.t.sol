@@ -20,15 +20,18 @@ contract MockSafetyLocks is SafetyLocks {
     }
 
     function buildContext(
-        StackVars memory vars,
+        bytes32 userOpHash,
+        address executionEnvironment,
+        address bundler,
         uint32 dappGasLimit,
-        uint8 solverOpCount
+        uint8 solverOpCount,
+        bool isSimulation
     )
         external
         pure
         returns (Context memory ctx)
     {
-        return _buildContext(vars, dappGasLimit, solverOpCount);
+        return _buildContext(userOpHash, executionEnvironment, bundler, dappGasLimit, solverOpCount, isSimulation);
     }
 
     function setLock(address _activeEnvironment) external {
@@ -89,13 +92,14 @@ contract SafetyLocksTest is Test {
 
     function test_buildContext() public {
         safetyLocks.initializeLock(executionEnvironment, 0, 0);
-        StackVars memory vars = StackVars({
+        Context memory ctx = safetyLocks.buildContext({ 
             userOpHash: bytes32(uint256(1)),
             executionEnvironment: executionEnvironment,
             bundler: address(2),
+            dappGasLimit: 3,
+            solverOpCount: 4,
             isSimulation: true
         });
-        Context memory ctx = safetyLocks.buildContext({ vars: vars, dappGasLimit: 3, solverOpCount: 4 });
         assertEq(executionEnvironment, ctx.executionEnvironment);
         assertEq(bytes32(uint256(1)), ctx.userOpHash);
         assertEq(address(2), ctx.bundler);
