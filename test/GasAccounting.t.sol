@@ -13,7 +13,7 @@ import { AtlasConstants } from "../src/contracts/types/AtlasConstants.sol";
 import { EscrowBits } from "../src/contracts/libraries/EscrowBits.sol";
 import { IL2GasCalculator } from "../src/contracts/interfaces/IL2GasCalculator.sol";
 
-import { GasLedger } from "../src/contracts/libraries/GasAccLib.sol";
+import { GasAccLib, GasLedger, BorrowsLedger } from "../src/contracts/libraries/GasAccLib.sol";
 import "../src/contracts/libraries/AccountingMath.sol";
 import "../src/contracts/types/EscrowTypes.sol";
 import "../src/contracts/types/LockTypes.sol";
@@ -30,7 +30,7 @@ import { BaseTest } from "./base/BaseTest.t.sol";
 contract GasAccountingTest is AtlasConstants, BaseTest {
     uint256 public constant ONE_GWEI = 1e9;
 
-    TestAtlasGasAcc public testAtlasGasAcc;
+    TestAtlasGasAcc public tAtlas;
 
     function setUp() public override {
         // Run the base setup
@@ -41,7 +41,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
 
         // Initialize MockGasAccounting
-        testAtlasGasAcc = new TestAtlasGasAcc(
+        tAtlas = new TestAtlasGasAcc(
             DEFAULT_ESCROW_DURATION,
             DEFAULT_ATLAS_SURCHARGE_RATE,
             DEFAULT_BUNDLER_SURCHARGE_RATE,
@@ -51,6 +51,26 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             address(0),
             address(execEnvTemplate)
         );
+    }
+
+
+    function test_GasAccounting_initializeAccountingValues() public {
+        uint256 gasMarker = 123;
+        uint256 allSolverOpsGas = 456;
+        uint256 valueSent = 789;
+
+        tAtlas.initializeAccountingValues{value: valueSent}(gasMarker, allSolverOpsGas);
+
+        GasLedger memory gL = tAtlas.getGasLedger();
+        BorrowsLedger memory bL = tAtlas.getBorrowsLedger();
+
+        assertEq(gL.remainingMaxGas, gasMarker, "remainingMaxGas not set correctly");
+        assertEq(gL.writeoffsGas, 0, "writeoffsGas should be 0");
+        assertEq(gL.solverFaultFailureGas, 0, "solverFaultFailureGas should be 0");
+        assertEq(gL.unreachedSolverGas, allSolverOpsGas, "unreachedSolverGas not set correctly");
+        assertEq(gL.maxApprovedGasSpend, 0, "maxApprovedGasSpend should be 0");
+        assertEq(bL.borrows, 0, "borrows should be 0");
+        assertEq(bL.repays, 789, "repays not set correctly");
     }
 
 
@@ -74,7 +94,7 @@ contract TestAtlasGasAcc is TestAtlas {
         TestAtlas(_escrowDuration, _atlasSurchargeRate, _bundlerSurchargeRate, _verification, _simulator, _surchargeRecipient, _l2GasCalculator, _executionTemplate)
     { }
 
-    function initializeAccountingValues(uint256 gasMarker, uint256 allSolverOpsGas) public {
+    function initializeAccountingValues(uint256 gasMarker, uint256 allSolverOpsGas) public payable {
         _initializeAccountingValues(gasMarker, allSolverOpsGas);
     }
 
