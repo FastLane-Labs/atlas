@@ -57,9 +57,9 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
     function test_GasAccounting_initializeAccountingValues() public {
         uint256 gasMarker = 123;
         uint256 allSolverOpsGas = 456;
-        uint256 valueSent = 789;
+        uint256 msgValue = 789;
 
-        tAtlas.initializeAccountingValues{value: valueSent}(gasMarker, allSolverOpsGas);
+        tAtlas.initializeAccountingValues{value: msgValue}(gasMarker, allSolverOpsGas);
 
         GasLedger memory gL = tAtlas.getGasLedger();
         BorrowsLedger memory bL = tAtlas.getBorrowsLedger();
@@ -70,9 +70,38 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(gL.unreachedSolverGas, allSolverOpsGas, "unreachedSolverGas not set correctly");
         assertEq(gL.maxApprovedGasSpend, 0, "maxApprovedGasSpend should be 0");
         assertEq(bL.borrows, 0, "borrows should be 0");
-        assertEq(bL.repays, 789, "repays not set correctly");
+        assertEq(bL.repays, msgValue, "repays not set correctly");
     }
 
+    function test_GasAccounting_contribute() public {
+        // Testing the external contribute() function:
+        uint256 msgValue = 123;
+
+        hoax(userEOA, msgValue);
+        vm.expectRevert(abi.encodeWithSelector(AtlasErrors.InvalidExecutionEnvironment.selector, address(0)));
+        tAtlas.contribute{value: msgValue}();
+
+        // Directly testing the internal _contribute() function:
+        tAtlas.contribute_internal{value: msgValue}();
+
+        BorrowsLedger memory bL = tAtlas.getBorrowsLedger();
+        assertEq(bL.repays, msgValue, "repays should be msgValue");
+
+        // If msg.value is 0, nothing should change
+        tAtlas.contribute_internal{value: 0}();
+
+        bL = tAtlas.getBorrowsLedger();
+        assertEq(bL.repays, msgValue, "repays should still be msgValue");
+
+        // Calling contribute_internal() again should increase repays again
+        tAtlas.contribute_internal{value: msgValue}();
+        bL = tAtlas.getBorrowsLedger();
+        assertEq(bL.repays, msgValue * 2, "repays should be 2 * msgValue");
+    }
+
+    function test_GasAccounting_borrow() public {
+        // TODO
+    }
 
 }
 
