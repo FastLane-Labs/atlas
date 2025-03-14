@@ -22,14 +22,14 @@ import "../src/contracts/types/ConfigTypes.sol";
 
 import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironment.sol";
 
+import { MockL2GasCalculator } from "./base/MockL2GasCalculator.sol";
 import { TestAtlas } from "./base/TestAtlas.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 
-// TODO Honestly just rewrite all of this once refactor is done
-
-contract MockGasAccounting is TestAtlas, BaseTest {
-    uint256 public constant MOCK_SOLVER_GAS_LIMIT = 500_000;
-    
+/// @title TestAtlasGasAcc
+/// @author FastLane Labs
+/// @notice A test version of the Atlas contract that just exposes internal GasAccounting functions for testing.
+contract TestAtlasGasAcc is TestAtlas {
     constructor(
         uint256 _escrowDuration,
         uint256 _atlasSurchargeRate,
@@ -43,187 +43,8 @@ contract MockGasAccounting is TestAtlas, BaseTest {
         TestAtlas(_escrowDuration, _atlasSurchargeRate, _bundlerSurchargeRate, _verification, _simulator, _surchargeRecipient, _l2GasCalculator, _executionTemplate)
     { }
 
-    /////////////////////////////////////////////////////////
-    //  Expose access to internal functions for testing    //
-    /////////////////////////////////////////////////////////
+    // TODO expose internal functions
 
-
-    function assign(
-        EscrowAccountAccessData memory accountData,
-        address account,
-        uint256 amount
-    ) external returns (uint256) {
-        uint256 deficit = _assign(accountData, account, amount);
-
-        // Persists memory changes to storage for testing - THIS IS NOT DONE IN THE REAL _assign() func
-        S_accessData[account] = accountData;
-
-        return deficit;
-    }
-
-    // Standard args: accountData, amount
-    // Additional arg for tests: account (to store in correct mapping slot)
-    function credit(EscrowAccountAccessData memory accountData,uint256 amount, address account) external {
-        _credit(accountData, amount);
-
-        // Persists memory changes to storage for testing - THIS IS NOT DONE IN THE REAL _credit() func
-        S_accessData[account] = accountData;
-    }
-
-    // Standard args: accountData, auctionWon, gasValueUsed
-    // Additional arg for tests: account (to store in correct mapping slot)
-    function updateAnalytics(
-        EscrowAccountAccessData memory aData,
-        bool auctionWon,
-        uint256 gasValueUsed,
-        address account
-    ) external {
-        _updateAnalytics(aData, auctionWon, gasValueUsed);
-
-        // Persists memory changes to storage for testing - THIS IS NOT DONE IN THE REAL _updateAnalytics() func
-        S_accessData[account] = aData;
-    }
-
-    // This reads an account's EscrowAccountAccessData to memory to test credit() / assign() behaviour
-    function getAccountData(address account) external view returns (EscrowAccountAccessData memory) {
-        return S_accessData[account];
-    }
-
-    function persistAccountData(EscrowAccountAccessData memory accountData, address account) external {
-        S_accessData[account] = accountData;
-    }
-
-    function handleSolverFailAccounting(
-        SolverOperation calldata solverOp,
-        uint256 dConfigSolverGasLimit,
-        uint256 gasWaterMark,
-        uint256 result,
-        bool includeCalldata
-    )
-        external
-    {
-        _handleSolverFailAccounting(solverOp, dConfigSolverGasLimit, gasWaterMark, result, includeCalldata);
-    }
-
-    function settle(
-        Context memory ctx,
-        GasLedger memory gL,
-        uint256 gasMarker,
-        address gasRefundBeneficiary,
-        uint256 unreachedCalldataValuePaid
-    ) external returns (uint256, uint256) {
-        return _settle(
-            ctx,
-            gL,
-            gasMarker,
-            gasRefundBeneficiary,
-            unreachedCalldataValuePaid
-        );
-    }
-
-    /////////////////////////////////////////////////////////
-    //                 SETTERS & HELPERS                   //
-    /////////////////////////////////////////////////////////
-
-    function buildContext(
-        address bundler,
-        bool solverSuccessful,
-        uint256 winningSolverIndex,
-        uint256 solverCount
-    )
-        public
-        view
-        returns (Context memory ctx)
-    {
-        ctx = Context({
-            executionEnvironment: _activeEnvironment(),
-            userOpHash: bytes32(0),
-            bundler: bundler,
-            solverSuccessful: solverSuccessful,
-            solverIndex: uint8(winningSolverIndex),
-            solverCount: uint8(solverCount),
-            phase: uint8(ExecutionPhase.AllocateValue),
-            solverOutcome: 0,
-            bidFind: false,
-            isSimulation: false,
-            callDepth: 0,
-            dappGasLeft: 0
-        });
-    }
-
-    function setPhase(ExecutionPhase _phase) external {
-        _setLockPhase(uint8(_phase));
-    }
-
-    function setSolverLock(address _solverFrom) external {
-        t_solverLock = (uint256(uint160(_solverFrom)));
-    }
-
-    function _balanceOf(address account) external view returns (uint112, uint112) {
-        return (s_balanceOf[account].balance, s_balanceOf[account].unbonding);
-    }
-
-    function initializeLock(address executionEnvironment, uint256 gasMarker, uint256 allSolverOpsGas) external payable {
-        DAppConfig memory dConfig;
-        _setEnvironmentLock(dConfig, executionEnvironment);
-        _initializeAccountingValues(gasMarker, allSolverOpsGas);
-    }
-
-    function increaseBondedBalance(address account, uint256 amount) external {
-        deal(address(this), amount);
-        S_accessData[account].bonded += uint112(amount);
-        S_bondedTotalSupply += amount;
-    }
-
-    function increaseUnbondingBalance(address account, uint256 amount) external {
-        deal(address(this), amount);
-        s_balanceOf[account].unbonding += uint112(amount);
-        S_bondedTotalSupply += amount;
-    }
-
-    function initializeAccountingValues(uint256 gasMarker, uint256 allSolversGasLimit) external {
-        _initializeAccountingValues(gasMarker, allSolversGasLimit);
-    }
-
-    // View functions
-    function getSolverBaseGasUsed() external pure returns (uint256) {
-        return _SOLVER_BASE_GAS_USED;
-    }
-
-    function getSolverOpBaseCalldata() external pure returns (uint256) {
-        return _SOLVER_OP_BASE_CALLDATA;
-    }
-
-    function getActiveEnvironment() public view returns (address) {
-        return _activeEnvironment();
-    }
-
-    function getCalldataLengthPremiumHalved() external pure returns (uint256) {
-        return _CALLDATA_LENGTH_PREMIUM_HALVED;
-    }
-
-    function getContractGasPrice() external view returns (uint256) {
-        return tx.gasprice;
-    }
-
-    function getFixedGasOffset() external pure returns (uint256) {
-        return AccountingMath._FIXED_GAS_OFFSET;
-    }
-
-    function totalShortfall() external view returns (uint256) {
-        (uint256 gasLiability, uint256 borrowLiability) = this.shortfall();
-        return gasLiability + borrowLiability;
-    }
-}
-
-contract MockGasCalculator is IL2GasCalculator, Test {
-    function getCalldataGas(uint256 length) external pure returns (uint256 calldataCostETH) {
-        calldataCostETH = length * 16;
-    }
-
-    function initialGasUsed(uint256 calldataLength) external pure returns (uint256 gasUsed) {
-        gasUsed = calldataLength * 16;
-    }
 }
 
 contract GasAccountingTest is AtlasConstants, BaseTest {

@@ -6,6 +6,8 @@ import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.s
 import { GasAccLib, GasLedger, BorrowsLedger } from "../src/contracts/libraries/GasAccLib.sol";
 import { AccountingMath } from "../src/contracts/libraries/AccountingMath.sol";
 import { SolverOperation } from "../src/contracts/types/SolverOperation.sol";
+
+import { MockL2GasCalculator } from "./base/MockL2GasCalculator.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 
 contract GasAccLibTest is Test {
@@ -131,17 +133,6 @@ contract GasAccLibTest is Test {
         uint256 expectedMockGas = 5 * expectedDefaultGas;
 
         assertEq(GasAccLib.metacallCalldataGas(msgDataLength, address(mockL2GasCalc)), expectedMockGas, "metacallCalldataGas (5x mock) unexpected");
-    }
-}
-
-contract MockL2GasCalculator {
-    // Should return 5x the default calldata gas
-    function getCalldataGas(uint256 calldataLength) external view returns (uint256 calldataGas) {
-        return calldataLength * GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED * 5;
-    }
-
-    function initialGasUsed(uint256 calldataLength) external view returns (uint256 gasUsed) {
-        return calldataLength * GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED * 5;
     }
 }
 
