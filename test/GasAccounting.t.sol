@@ -31,6 +31,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
     uint256 public constant ONE_GWEI = 1e9;
 
     TestAtlasGasAcc public tAtlas;
+    address public executionEnvironment;
 
     function setUp() public override {
         // Run the base setup
@@ -51,6 +52,9 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             address(0),
             address(execEnvTemplate)
         );
+
+        // Create a mock execution environment - the expected caller in many GasAcc functions
+        executionEnvironment = makeAddr("ExecutionEnvironment");
     }
 
 
@@ -100,7 +104,54 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
     }
 
     function test_GasAccounting_borrow() public {
-        // TODO
+        uint256 atlasStartBalance = 10e18;
+        uint256 borrowedAmount = 5e18;
+        vm.deal(address(tAtlas), atlasStartBalance);
+
+        // Testing the external borrow() function:
+
+        // Case 1: Borrowing 0 should return without any state changes or value transfers
+        vm.prank(executionEnvironment);
+        tAtlas.borrow(0);
+        assertEq(address(tAtlas).balance, atlasStartBalance, "Atlas balance should not change");
+
+        // Case 2: Only currently active ExecutionEnvironment should be able to borrow
+        vm.prank(userEOA);
+        vm.expectRevert(abi.encodeWithSelector(AtlasErrors.InvalidExecutionEnvironment.selector, address(0)));
+        tAtlas.borrow(borrowedAmount);
+
+        // Case 3: The active EE can only borrow in an allowed phase (SolverOperation phase or before)
+        tAtlas.setLock(executionEnvironment, uint32(0), uint8(ExecutionPhase.AllocateValue));
+        vm.prank(executionEnvironment);
+        vm.expectRevert(AtlasErrors.WrongPhase.selector);
+        tAtlas.borrow(borrowedAmount);
+
+        // Case 4: Should revert if solver has already called back to Atlas via reconcile()
+        tAtlas.setLock(executionEnvironment, uint32(0), uint8(ExecutionPhase.SolverOperation));
+        tAtlas.setSolverLock(_SOLVER_CALLED_BACK_MASK);
+        vm.prank(executionEnvironment);
+        vm.expectRevert(AtlasErrors.WrongPhase.selector);
+        tAtlas.borrow(borrowedAmount);
+
+        // Testing both the external borrow() function and the internal _borrow() function:
+
+        // Case 5: Should revert if Atlas does not have enough ETH
+        tAtlas.setSolverLock(0); // removing the `calledBack` flag to unblock
+        vm.prank(executionEnvironment);
+        vm.expectRevert(abi.encodeWithSelector(AtlasErrors.InsufficientAtlETHBalance.selector, atlasStartBalance, atlasStartBalance + 1));
+        tAtlas.borrow(atlasStartBalance + 1);
+
+        // Case 6: Successful borrow sends ETH to the caller and increases borrows in BorrowLedger
+        uint256 execEnvBalanceBefore = address(executionEnvironment).balance;
+        BorrowsLedger memory bLBefore = tAtlas.getBorrowsLedger();
+
+        vm.prank(executionEnvironment);
+        tAtlas.borrow(borrowedAmount);
+
+        BorrowsLedger memory bLAfter = tAtlas.getBorrowsLedger();
+        assertEq(address(executionEnvironment).balance, execEnvBalanceBefore + borrowedAmount, "EE balance should increase by borrowedAmount");
+        assertEq(address(tAtlas).balance, atlasStartBalance - borrowedAmount, "Atlas balance should decrease by borrowedAmount");
+        assertEq(bLAfter.borrows, bLBefore.borrows + borrowedAmount, "Borrows should increase by borrowedAmount");
     }
 
 }
