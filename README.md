@@ -1,122 +1,116 @@
 # Atlas
 
-### Concept:
+## Concept
 
-Atlas is a permissionless and modular smart contract framework for Execution Abstraction. It provides apps and frontends with an auction system in which Solvers compete to provide optimal solutions for user intents or MEV redistribution.  A User Operation is collected by the app's frontend via the Atlas SDK and sent to an app-designated bundler, which combines it with Solver Operations into a single transaction. 
+Atlas is a permissionless and modular smart contract framework for Execution Abstraction. It provides applications and frontends with an auction system where Solvers compete to provide optimal solutions for user intents or MEV redistribution. A User Operation is collected by the app's frontend via the Atlas SDK and sent to an app-designated bundler, which combines it with Solver Operations into a single transaction.
 
-### DApp Integration
+## DApp Integration
 
-A frontend or API wishing to participate can integrate with Atlas by completing three steps:
+A frontend or API wishing to integrate with Atlas must complete four steps:
 
-1. Embed the Atlas SDK into their frontend or API to generate userOps.
+1. Embed the Atlas SDK into their frontend or API to generate User Operations (userOps).
 2. Choose an Operations Relay to facilitate communication between users and solvers.
-3. Create and publish a DAppControl contract that contains the logic specific to your application.
+3. Create and publish a DAppControl contract containing logic specific to the application.
 4. Interact with the Atlas contract to initialize the DAppControl contract and link it to the Atlas SDK on their frontend or API.
 
-### Network Overview
+## Network Overview
 
-Atlas is infrastructure-agnostic; each app may choose how the User Operations and Solver Operations are aggregated by their choice of Operations Relay. Examples include:
-1. **BloXroute**: When Atlas is launched, BloXroute's BDN will support the low latency aggregation of User and Solver Operations. 
-2. **SUAVE**: Once live, Operations can be sent to the SUAVE network, aggregated into a transaction by the SUAVE Atlas implementation, and then made available for use by bundlers.
-3. **On Chain**: When gas costs and throughput are not an issue, Solver Operations may be sent on-chain, and then aggregated by any party, including a smart contract. 
-4. **On Another Chain**:  Solver Operations may be posted and aggregated on another chain, and the output can be used to settle the atlas transaction on the settlement chain.
+Atlas is infrastructure-agnostic, allowing each app to choose how User and Solver Operations are aggregated via its preferred Operations Relay. Examples include:
 
-### Auctioneer Overview
+1. **BloXroute**: When Atlas launches, BloXroute's BDN will support the low-latency aggregation of User and Solver Operations.
+2. **SUAVE**: Once live, operations can be sent to the SUAVE network, aggregated into a transaction by the SUAVE Atlas implementation, and then made available for use by bundlers.
+3. **On-Chain**: If gas costs and throughput are not concerns, Solver Operations may be sent on-chain and aggregated by any party, including a smart contract.
+4. **Cross-Chain**: Solver Operations may be posted and aggregated on another chain, with the output used to settle the Atlas transaction on the settlement chain.
 
-Each frontend may choose a party to act as the auctioneer.  **It is strongly recommended to select the auction beneficiary act as the auctioneer.**  This is the most trust-minimized solution because the beneficiary can always trust themselves.  We expect most -but not all- frontends to select the user as the auctioneer and to handle the auctioneer duties without user input through the Atlas SDK in the frontend/API, as the user also explicity trusts the frontent/API.
+## Auctioneer Overview
 
-The auctioneer is tasked with signing a **DAppOperation** that includes a **CallChainHash**.  This hash guarantees that the bundler cannot tamper with the execution order of the **SolverOperation**s.  Any party can easily generate this hash by making a view call to the *getCallChainHash(SolverOperations[])* function. Note that infrastructure networks with programmable guarantees such as SUAVE will not require this as it can be handled trustlessly in-network. 
+Each frontend may choose a party to act as the auctioneer. **It is strongly recommended that the auction beneficiary also act as the auctioneer**, as this is the most trust-minimized solution. Most frontends are expected to select the user as the auctioneer and handle auctioneer duties automatically through the Atlas SDK in the frontend/API. Since the user explicitly trusts the frontend/API, this simplifies the process.
 
-***Auctioneer Example***:
-*Featuring BloXroute as the Operations Relay*
-1. User connects to a frontend and receives a session key.
-2. User signs their UserOperation, which is propagated over the bloXroute BDN to solvers.
-3. The frontend receives SolverOperations back via the BDN.
-4. The frontend calls the *getCallChainHash()* view function via the User's wallet's RPC.
-5. The frontend then uses the session key from step 1 to sign the **DAppOperation**, which includes the **CallChainHash**.
-6. The frontend then propagates the DAppOperation over the BDN to a designated bundler, if the user themselves is not the bundler.
+The auctioneer is responsible for signing a **DAppOperation** that includes a **CallChainHash**, ensuring the bundler cannot tamper with the execution order of **SolverOperations**. This hash can be generated using the *getCallChainHash(SolverOperations[])* function. Infrastructure networks with programmable guarantees, such as SUAVE, may not require this step, as it can be handled trustlessly within the network.
 
-Note that any bundler who tampers with the order of the SolverOperations will cause the transaction to revert, thereby blocking any gas reimbursement from Atlas.
+### Auctioneer Example (Using BloXroute as the Operations Relay)
 
-Note that input from the User is only required for step 2; all other steps have no impact on UX. 
+1. The user connects to a frontend and receives a session key.
+2. The user signs their UserOperation, which is propagated over the BloXroute BDN to solvers.
+3. The frontend receives SolverOperations via the BDN.
+4. The frontend calls *getCallChainHash()* via the user’s wallet’s RPC.
+5. The frontend uses the session key from step 1 to sign the **DAppOperation**, which includes the **CallChainHash**.
+6. The frontend propagates the DAppOperation over the BDN to a designated bundler, assuming the user is not the bundler.
 
+Any bundler that tampers with the order of SolverOperations will cause the transaction to revert, blocking any gas reimbursement from Atlas. User input is required only for step 2; all other steps occur in the background, ensuring a seamless user experience.
 
-### Atlas Transaction Structure
+## Atlas Transaction Structure
 
-![AtlasTransaction](./AtlasTransactionOverview.jpg)
+### DAppControl
 
-#### DAppControl
+The **DAppControl** contract defines functions executed at specific stages during an Atlas transaction. It also contains app-specific settings, such as permitted bundler addresses and whether asynchronous processing of user nonces is allowed. These functions and settings allow the Atlas smart contract to create a trustless environment that integrates seamlessly with a DApp’s existing smart contracts—without requiring upgrades or redeployments.
 
-The DAppControl contract is where frontends and APIs define functions that will execute at specific stages during the Atlas transaction.  The contract also contains app-specific settings, such as the address of permitted bundlers, or if  the asynchronous processing of User nonces is permitted.  These functions and settings are referenced by the Atlas smart contract during execution to create a trustless environment that is maximally composable with the DApp's existing smart contracts - no upgrades or redeployments are required.  
+The **DAppControl** contract can define which entities are permitted to act as the Bundler:
 
-The DAppControl contract may define which entities are permitted to act as the Bundler.  The frontend can designate one or more of the following:
-1. **DAppProxy**: A specific address (or addresses) is permitted to bundle operations.
-2. **User**: The User is permitted to bundle operations.
-3. **Builder**: The builder ("block.coinbase") is permitted to bundle operations.
-4. **Solver**: The top-bidding Solver is permitted to bundle the User Operation and their own Solver Operation, but may not include the Operations of other Solvers. 
-5. **Conditional**: A specific function handles complex Bundler designation logic.
-6. **Time Limit**: For On Chain auctions, any party may trigger the On Chain Bundler to execute the finalized transaction, pursuant to the passing of a minimum auction duration (as specified by the DApp.) 
+1. **DAppProxy** – A specific address (or addresses) is permitted to bundle operations.
+2. **User** – The user can bundle operations.
+3. **Builder** – The builder (*block.coinbase*) is permitted to bundle operations.
+4. **Solver** – The top-bidding solver can bundle the User Operation with their Solver Operation but cannot include other solvers’ operations.
+5. **Conditional** – A specific function determines complex bundler designation logic.
+6. **Time Limit** – For on-chain auctions, any party may trigger execution once a specified minimum auction duration has passed.
 
-The DAppControl contract *must* define the following functions:
-1. **BidFormat**: This function defines the base currency (or currencies) of the auction. 
-2. **BidValue**: This function defines how to rank bids so that they may be sorted by the auctioneer.
-3. **AllocateValue***: After a Solver's operation is executed successfully, this function is called to allocate any value that has accrued to the Execution Environment. 
+The **DAppControl** contract must define the following functions:
 
-The DAppControl contract has the option to define functions that execute at the following stages:	
-1. **PreOps***: This function is executed before the User's operation
-2. **PreSolver***: This function is executed after the User's operation but before a Solver's operation. It occurs inside of a try/catch; if it reverts, the current Solver's solution will fail and the next Solver's solution will begin. If the Solver's operation or the PostSolver function reverts, anything accomplished by the PreSolver function will also be reverted. 
-3. **PostSolver***: This function is executed after the User's operation and after a Solver's operation. It occurs inside of a try/catch; if it reverts, the PreSolver function, and the current Solver's operation will also be reverted and the next Solver's solution will begin.
-4. **PostOps***: This function is executed after the successful execution of a Solver's operation and the allocation of their solution's value. If this function reverts, the User's operation will also be reverted. 
+1. **BidFormat** – Defines the base currency (or currencies) for the auction.
+2. **BidValue** – Determines how bids are ranked for sorting by the auctioneer.
+3. **AllocateValue** – Allocates any accrued value to the Execution Environment after a solver’s operation executes successfully.
 
-*These functions are executed by the Execution Environment via "delegatecall."
+Additionally, it may define functions that execute at various stages:
 
-#### Ex-Post Bids
-When bid amounts are known ahead of time by solvers the _bidKnownIteration() function is called and bids are sorted by bid amount, and executed until one is successful. If bid amounts are not known beforehand, such as when they are doing blind on-chain solving, the _bidFindingIteration() function is called to calculate the bid amounts on-chain. This is done by calling the same _executeSolverOperation() used in the _bidKnownIteration() for each solverOp, and checking the balance of the contract before and after to calculate the bid amounts for each solverOp.
+- **PreOps** – Runs before the user’s operation.
+- **PreSolver** – Runs after the user’s operation but before a solver’s operation.
+- **PostSolver** – Runs after the user’s operation and solver’s operation.
+- **PostOps** – Runs after a solver’s operation and value allocation.
 
-#### Permit69
-A user must have an Execution Environment (EE) instance for each DApp they would like to use, and the user address is used as a salt for the create2 deterministic deployment of it. If one is not already available, EEs can be deployed during execution of a user order since their address is known beforehand, this gas cost is covered by the solver so UX is never impacted. The EE performs ops via delegateCalls, so it needs to be able to initiate token transfers from the user. Users only have to approve the Atlas contract once because Permit69 allows Atlas to transfer funds from the user if the request is from a valid EE for that user (checked by verifying that the user address is one of the salts used for the EE address). Permit69 is also used by DApps, but instead transfers tokens that have accumulated in the DAppControl contract, this function performs the same verification of the EE. 
+These functions execute via *delegatecall* within the Execution Environment.
 
-#### ExecutionBase
-_availableFundsERC20() is used to check the approved balance of users and dapps to atlas that can be withdrawn via Permit69.
+### Ex-Post Bids
 
-_transferDAppERC20() and _transferUserERC20() are functions that can be implemented by Atlas module developers in DappControl to access the user or dapp funds referenced in _availableFundsERC20().
+When bid amounts are known in advance, the `_bidKnownIteration()` function sorts bids by amount and executes them until one succeeds. When bid amounts are unknown (e.g., in blind on-chain solving), `_bidFindingIteration()` calculates bid amounts by calling `_executeSolverOperation()`, measuring the contract’s balance before and after execution.
 
-Module developers can access useful information about the atlas transaction by initializing an ctx struct in their DappControl and accessing these fields: bundler, solverSuccessful, paymentsSuccessful, solverIndex, solverCount, phase, solverOutcome, bidFind, isSimulation.
+### Permit69
 
-The _contribute() function allows actors to sponsor the gas of the transaction by donating ETH to the Atlas Escrow balance. This contribution to the balance is available first to bundlers, with the surplus going to solvers.
+Each user requires an Execution Environment (EE) instance for each DApp they interact with. Since EE addresses are known beforehand, they can be deployed during order execution, with solvers covering gas costs to avoid impacting UX. The EE initiates token transfers via *delegateCall* and uses **Permit69** to allow Atlas to transfer funds on the user’s behalf. **Permit69** also enables DApps to transfer accumulated tokens in their DAppControl contract.
 
-The _borrow() function makes flash loans available from the Atlas Escrow balance. The balance must be repaid by the end of the Atlas transaction by the solver or the borrower.
+### ExecutionBase
+
+- `_availableFundsERC20()` – Checks user and DApp-approved balances available for withdrawal via Permit69.
+- `_transferDAppERC20()` & `_transferUserERC20()` – Allow module developers to access funds.
+- `_contribute()` – Allows actors to sponsor transaction gas by donating ETH to the Atlas escrow balance.
+- `_borrow()` – Enables flash loans from the Atlas escrow balance, requiring repayment within the same Atlas transaction.
 
 ### Atlas Frontend / Infrastructure Flow
 
 ![AtlasFlow](./AtlasFlow.jpeg)
 
-### Advantages:
-- Atlas Solvers have first access to any value created by the User Operation.  This exclusive access supercedes that of any wallets, RPCs, relays, builders, validators, and sequencers.  
+## Advantages
 
-- By acting as the Auctioneer for the Solvers and the beneficiary of any surplus value, Governance bypasses the "trusted auctioneer" problem by virtue of being able to trust itself. 
+- Atlas Solvers have **exclusive first access** to value created by the User Operation before wallets, RPCs, relays, builders, validators, and sequencers.
+- By acting as the auctioneer and beneficiary, Governance avoids the "trusted auctioneer" problem.
+- MEV allocation is **modular and customizable**, allowing DApps to refund gas, support liquidity providers, or buy governance tokens for users.
+- The **Execution Environment** provides extra protection against allowance-based exploits.
+- Successful solvers pay full gas costs, though DApp Governance may subsidize costs based on execution results.
+- By retaining MEV before RPCs or relays see the transaction, Atlas reduces the centralization risk of private order flow.
 
-- The allocation of MEV is modular and fully customizable by DApp Governance.  For example, they could elect to use a portion of the MEV to refund the User's gas cost, a portion to offset the impermanent loss of the protocol's liquidity providers, and the remainder to buy that protocol's governance token for the User. 
+## Disadvantages
 
-- Due to the unique nature of the Execution Environment - a smart account that Atlas creates to facilitate a trustless environment for Users, Solvers, and DApps  - Users have an extra layer of protection against allowance-based exploits.
+- Solvers **must pay for failed operations**, unlike early Ethereum transactions with "free reverts." This discourages spam but increases solver risk.
+- Atlas **uses more block space** than traditional MEV systems due to additional trustless checks and verifications. However, the extra cost is only incurred when its benefit outweighs the cost.
 
-- By default, a successful Solver must pay the full gas cost of the transaction less the gas attributed to the failed operations of other Solvers.  DApp Governance has the option to subsidize a Solver's gas cost *conditionally* based on the *result* of the User's (or Solver's) execution. 
+## Notes
 
-- By putting control of any User-created value in the hands of each frontend's Governance team, and by retaining the MEV or intent-generated value before RPCs or private relays see the transaction, Atlas has the potential to nullify the value of private orderflow, thereby acting as a counterforce to one of the strongest centralization vectors in the Ethereum ecosystem. 
+Auctioneers and Operations Relays may implement **reputation systems** for solver bids to optimize block space usage. While not required, responsible ecosystem members should avoid flooding block space with low-success, high-profit transactions.
 
-### Disadvantages:
+## Development
 
-- Just as in the early days of Ethereum, Solvers do not benefit from "free reverts." If a Solver Operation fails, then the Solver still must pay their gas cost to the Bundler.  Gas cost acts as a DDoS mitigator - this is a good thing for permissionless auctions. 
+Conflicting `foundry` formatter versions can cause CI/CD failures. Developers should lock their local `foundry` version to match the repository workflow:
 
-- Atlas represents a less efficient use of block space than traditional, infrastructure-based MEV capture systems. This arises due to the checks and verifications that allow Atlas to function without relying on privacy guarantees from centralized, third-party infrastructure or off-chain agreements with permissioned builders.  Note that this extra usage of gas will typically be handled by Solvers, and that if no Solver is willing to pay for the increased gas cost then the User can simply do a non-Atlas transaction. In other words, the extra gas cost will only be incurred when its cost is less than its expected benefit. 
-
-### Notes:
-
-Note that the auctioneer (typically the frontend) and/or the Operations relay may want to use a reputation system for solver bids to efficiently use the space in the solverOps[]. This isnt necessarily required - it's not an economic issue - it's just that it's important to be a good member of the ecosystem and not waste too much precious blockspace by filling it with probabilistic solver txs that have a low success rate but a high profit-to-cost ratio.
-
-### Development:
-
-Conflicts between `foundry`'s formatter versions can lead to CI/CD failure. Developers are advised to lock in their local `foundry` version to match the one used by this repository workflows, by running the following command:
-```
+```sh
 foundryup -v nightly-0d8302880b79fa9c3c4aa52ab446583dece19a34
 ```
+
