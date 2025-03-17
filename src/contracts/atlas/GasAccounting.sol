@@ -204,8 +204,7 @@ abstract contract GasAccounting is SafetyLocks {
         return true;
     }
 
-    /// @notice Takes AtlETH from the owner's bonded balance and, if necessary, from the owner's unbonding balance to
-    /// increase transient solver deposits.
+    /// @notice Takes AtlETH from the owner's bonded balance and, if necessary, from the owner's unbonding balance.
     /// @dev No GasLedger accounting changes are made in this function - should be done separately.
     /// @param account The address of the account from which AtlETH is taken.
     /// @param amount The amount of AtlETH to be taken.
