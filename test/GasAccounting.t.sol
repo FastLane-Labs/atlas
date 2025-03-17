@@ -154,6 +154,62 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(bLAfter.borrows, bLBefore.borrows + borrowedAmount, "Borrows should increase by borrowedAmount");
     }
 
+    function test_GasAccounting_assign() public {
+        vm.deal(solverOneEOA, 6e18); // 3 to unbonded, 2 unbonding, 1 bonded
+        vm.startPrank(solverOneEOA);
+        tAtlas.depositAndBond{value: 6e18}(3e18);
+        tAtlas.unbond(2e18);
+
+        EscrowAccountAccessData memory accountData = tAtlas.getAccessData(solverOneEOA);
+        uint256 unbonded = tAtlas.balanceOf(solverOneEOA);
+        uint256 unbonding = tAtlas.balanceOfUnbonding(solverOneEOA);
+        uint256 bonded = tAtlas.balanceOfBonded(solverOneEOA);
+        uint256 bondedTotalSupply = tAtlas.bondedTotalSupply(); // bonded + unbonding included in bondedTotalSupply
+        uint32 lastAccessedBlock;
+
+        vm.roll(block.number + 100); // Move 100 blocks forward
+
+        // Take state snapshot to revert to for each check below
+        uint256 snapshot = vm.snapshotState();
+
+        // Case 1: Reverts if amount is over uint112
+        vm.expectRevert(abi.encodeWithSelector(
+            SafeCast.SafeCastOverflowedUintDowncast.selector, 112, uint256(type(uint112).max) + 1));
+        tAtlas.assign(accountData, solverOneEOA, uint256(type(uint112).max) + 1);
+
+        // Case 2: If bonded balance is sufficient, does not disrupt unbonding or unbonded balances
+        tAtlas.assign(accountData, solverOneEOA, 1e18);
+
+        (, lastAccessedBlock,,,) = tAtlas.accessData(solverOneEOA);
+        assertEq(tAtlas.balanceOf(solverOneEOA), unbonded, "unbonded balance should not change");
+        assertEq(tAtlas.balanceOfUnbonding(solverOneEOA), unbonding, "unbonding balance should not change");
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), bonded - 1e18, "bonded balance should decrease by 1e18");
+        assertEq(tAtlas.bondedTotalSupply(), bondedTotalSupply - 1e18, "bondedTotalSupply should decrease by 1e18");
+        assertEq(lastAccessedBlock, accountData.lastAccessedBlock + 100, "lastAccessedBlock should be updated");
+
+        // Case 3: If bonded balance is insufficient, takes from unbonding balance
+        vm.revertToState(snapshot);
+        tAtlas.assign(accountData, solverOneEOA, 2e18); // should take 1 from bonded, 1 from unbonding
+
+        assertEq(tAtlas.balanceOf(solverOneEOA), unbonded, "unbonded balance should not change");
+        assertEq(tAtlas.balanceOfUnbonding(solverOneEOA), unbonding - 1e18, "unbonding balance should decrease by 1e18");
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), bonded - 1e18, "bonded balance should decrease by 1e18");
+        assertEq(tAtlas.bondedTotalSupply(), bondedTotalSupply - 2e18, "bondedTotalSupply should decrease by 2e18");
+        assertEq(lastAccessedBlock, accountData.lastAccessedBlock + 100, "lastAccessedBlock should be updated");
+
+        // Case 4: If bonded + unbonding balance is insufficient, takes all bonded + unbonding and returns deficit
+        vm.revertToState(snapshot);
+        uint256 expectedDeficit = 4e18 - (bonded + unbonding); // 4 - (1 + 2) = 1: Should be a deficit of 1e18
+        uint256 deficit = tAtlas.assign(accountData, solverOneEOA, 4e18);
+
+        assertEq(tAtlas.balanceOf(solverOneEOA), unbonded, "unbonded balance should not change");
+        assertEq(tAtlas.balanceOfUnbonding(solverOneEOA), 0, "unbonding balance should be 0");
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 0, "bonded balance should be 0");
+        assertEq(tAtlas.bondedTotalSupply(), bondedTotalSupply - 3e18, "bondedTotalSupply should decrease by 3e18");
+        assertEq(lastAccessedBlock, accountData.lastAccessedBlock + 100, "lastAccessedBlock should be updated");
+        assertEq(deficit, expectedDeficit, "deficit should be 1e18");
+    }
+
 }
 
 
@@ -195,8 +251,11 @@ contract TestAtlasGasAcc is TestAtlas {
         EscrowAccountAccessData memory accountData,
         address account,
         uint256 amount
-    ) public returns(uint256) {
-        return _assign(accountData, account, amount);
+    ) public returns(uint256 deficit) {
+        deficit = _assign(accountData, account, amount);
+
+        // NOTE: only persisted to storage here for testing purposes
+        S_accessData[account] = accountData;
     }
 
     function credit(
@@ -249,5 +308,9 @@ contract TestAtlasGasAcc is TestAtlas {
 
     function isBalanceReconciled() public view returns (bool) {
         return _isBalanceReconciled();
+    }
+
+    function getAccessData(address account) public view returns (EscrowAccountAccessData memory) {
+        return S_accessData[account];
     }
 }
