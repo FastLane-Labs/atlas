@@ -5,6 +5,9 @@ import "forge-std/Test.sol";
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import { GasAccLib, GasLedger, BorrowsLedger } from "../src/contracts/libraries/GasAccLib.sol";
 import { AccountingMath } from "../src/contracts/libraries/AccountingMath.sol";
+import { SolverOperation } from "../src/contracts/types/SolverOperation.sol";
+
+import { MockL2GasCalculator } from "./base/MockL2GasCalculator.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 
 contract GasAccLibTest is Test {
@@ -14,7 +17,13 @@ contract GasAccLibTest is Test {
     using GasAccLib for uint256;
     using AccountingMath for uint256;
 
-    function setUp() public {}
+    MockL2GasCalculator mockL2GasCalc;
+    MemoryToCalldataHelper memoryToCalldataHelper;
+
+    function setUp() public {
+        mockL2GasCalc = new MockL2GasCalculator();
+        memoryToCalldataHelper = new MemoryToCalldataHelper();
+    }
 
     function test_GasAccLib_GasLedger_packAndUnpack() public pure {
         GasLedger memory before = GasLedger({
@@ -81,15 +90,62 @@ contract GasAccLibTest is Test {
         assertEq(gL.solverGasLiability(totalSurchargeRate), expected, "solverGasLiability unexpected");
     }
 
-    function test_solverGasLiability() public {
-        // TODO
+    function test_GasAccLib_solverOpCalldataGas() public view {
+        uint256 calldataLength = 500;
+
+        // First, the default calculation, using address(0) as the GasCalculator:
+        uint256 expectedDefaultGas = (calldataLength + GasAccLib._SOLVER_OP_BASE_CALLDATA) * GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED;
+
+        assertEq(GasAccLib.solverOpCalldataGas(calldataLength, address(0)), expectedDefaultGas, "solverOpCalldataGas (default) unexpected");
+
+        // Now, with a mock L2GasCalculator, that returns 5x the default calldata gas:
+        uint256 expectedMockGas = 5 * expectedDefaultGas;
+
+        assertEq(GasAccLib.solverOpCalldataGas(calldataLength, address(mockL2GasCalc)), expectedMockGas, "solverOpCalldataGas (5x mock) unexpected");
     }
 
-    function test_sumSolverOpsCalldataGas() public {
-        // TODO
+    function test_GasAccLib_sumSolverOpsCalldataGas() public view {
+        SolverOperation[] memory solverOps = new SolverOperation[](3);
+        solverOps[0].data = new bytes(100);
+        solverOps[1].data = new bytes(200);
+        solverOps[2].data = new bytes(500);
+
+        // First, the default calculation, using address(0) as the GasCalculator:
+        uint256 expectedDefaultGas = ((solverOps.length * GasAccLib._SOLVER_OP_BASE_CALLDATA) + 100 + 200 + 500) * GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED;
+
+        assertEq(memoryToCalldataHelper.sumSolverOpsCalldataGas(solverOps, address(0)), expectedDefaultGas, "sumSolverOpsCalldataGas (default) unexpected");
+
+        // Now, with a mock L2GasCalculator, that returns 5x the default calldata gas:
+        uint256 expectedMockGas = 5 * expectedDefaultGas;
+
+        assertEq(memoryToCalldataHelper.sumSolverOpsCalldataGas(solverOps, address(mockL2GasCalc)), expectedMockGas, "sumSolverOpsCalldataGas (5x mock) unexpected");
     }
 
-    function test_metacallCalldataGas() public {
-        // TODO
+    function test_GasAccLib_metacallCalldataGas() public view {
+        uint256 msgDataLength = 3_000;
+
+        // First, the default calculation, using address(0) as the GasCalculator:
+        uint256 expectedDefaultGas = msgDataLength * GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED;
+
+        assertEq(GasAccLib.metacallCalldataGas(msgDataLength, address(0)), expectedDefaultGas, "metacallCalldataGas (default) unexpected");
+
+        // Now, with a mock L2GasCalculator, that returns 5x the default calldata gas:
+        uint256 expectedMockGas = 5 * expectedDefaultGas;
+
+        assertEq(GasAccLib.metacallCalldataGas(msgDataLength, address(mockL2GasCalc)), expectedMockGas, "metacallCalldataGas (5x mock) unexpected");
+    }
+}
+
+// Basic helper to convert the SolverOperations[] memory to calldata for testing
+contract MemoryToCalldataHelper {
+    function sumSolverOpsCalldataGas(
+        SolverOperation[] calldata solverOps,
+        address l2GasCalculator
+    )
+        public
+        view
+        returns (uint256 sumCalldataGas)
+    {
+        return GasAccLib.sumSolverOpsCalldataGas(solverOps, l2GasCalculator);
     }
 }
