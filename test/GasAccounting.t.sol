@@ -210,6 +210,24 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(deficit, expectedDeficit, "deficit should be 1e18");
     }
 
+    function test_GasAccounting_credit() public {
+        // Case 1: Should revert if amount is over uint112
+        EscrowAccountAccessData memory accountData = tAtlas.getAccessData(solverOneEOA);
+        vm.expectRevert(abi.encodeWithSelector(
+            SafeCast.SafeCastOverflowedUintDowncast.selector, 112, uint256(type(uint112).max) + 1));
+        tAtlas.credit(accountData, uint256(type(uint112).max) + 1);
+
+        // Case 2: Should credit the account with the amount, and bondedTotalSupply should increase
+        EscrowAccountAccessData memory  newAccData = tAtlas.credit(accountData, 1e18);
+
+        assertEq(newAccData.bonded, accountData.bonded + 1e18, "accountData.bonded should increase by 1e18");
+        assertEq(tAtlas.bondedTotalSupply(), 1e18, "bondedTotalSupply should be 1e18");
+    }
+
+    function test_GasAccounting_handleSolverFailAccounting() public {
+        
+    }
+
 }
 
 
@@ -261,8 +279,11 @@ contract TestAtlasGasAcc is TestAtlas {
     function credit(
         EscrowAccountAccessData memory accountData,
         uint256 amount
-    ) public {
+    ) public returns(EscrowAccountAccessData memory) {
         _credit(accountData, amount);
+
+        // NOTE: only returned for testing purposes
+        return accountData;
     }
 
     function handleSolverFailAccounting(
