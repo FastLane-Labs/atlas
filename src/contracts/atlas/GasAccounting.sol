@@ -276,13 +276,20 @@ abstract contract GasAccounting is SafetyLocks {
         SolverOperation calldata solverOp,
         uint256 dConfigSolverGasLimit,
         uint256 gasWaterMark,
-        uint256 result
+        uint256 result,
+        bool exPostBids
     )
         internal
     {
         GasLedger memory _gL = t_gasLedger.toGasLedger();
         uint256 _bothSurchargeRates = _totalSurchargeRate();
-        uint256 _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR);
+
+        // Solvers do not pay for calldata gas in exPostBids mode.
+        uint256 _calldataGas;
+        if (!exPostBids) {
+            _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR);
+        }
+
         uint256 _gasUsed = _calldataGas + (gasWaterMark + _SOLVER_BASE_GAS_USED - gasleft());
 
         // Deduct solver's max (C + E) gas from remainingMaxGas, for future solver gas liability calculations

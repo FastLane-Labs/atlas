@@ -33,7 +33,7 @@ abstract contract Escrow is AtlETH {
     using SafeCall for address;
     using SafeCast for uint256;
     using AccountingMath for uint256;
-    using GasAccLib for uint256; // To load GasLedger from a transient uint265 var
+    using GasAccLib for uint256;
     using GasAccLib for GasLedger;
 
     constructor(
@@ -230,7 +230,9 @@ abstract contract Escrow is AtlETH {
         ctx.solverOutcome = uint24(_result);
 
         // Account for failed SolverOperation gas costs
-        _handleSolverFailAccounting(solverOp, dConfig.solverGasLimit, _gasWaterMark, _result);
+        _handleSolverFailAccounting(
+            solverOp, dConfig.solverGasLimit, _gasWaterMark, _result, dConfig.callConfig.exPostBids()
+        );
 
         emit SolverTxResult(
             solverOp.solver,
