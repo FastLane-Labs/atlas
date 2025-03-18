@@ -28,6 +28,9 @@ import { BaseTest } from "./base/BaseTest.t.sol";
 
 
 contract GasAccountingTest is AtlasConstants, BaseTest {
+    using GasAccLib for GasLedger;
+    using AccountingMath for uint256;
+
     uint256 public constant ONE_GWEI = 1e9;
 
     TestAtlasGasAcc public tAtlas;
@@ -225,7 +228,133 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
     }
 
     function test_GasAccounting_handleSolverFailAccounting() public {
+        // 3 test scenarios:
+        // 1. result = bundler fault
+        // 2. result = solver fault, no deficit
+        // 3. result = solver fault, with deficit
+
+        SolverOperation memory solverOp;
+        solverOp.from = solverOneEOA;
+        solverOp.data = new bytes(300); // For easy calldata gas estimation
+
+        vm.deal(solverOneEOA, 2e18); // 1 to unbonded, 1 bonded
+        vm.startPrank(solverOneEOA);
+        tAtlas.depositAndBond{value: 2e18}(1e18);
+
+        uint256 dConfigSolverGasLimit = 1_000_000;
+        vm.txGasPrice(1e9); // set gas price to 1 gwei
+        GasLedger memory gLBefore = GasLedger(2_000_000, 0, 0, 0, 0);
+        tAtlas.setGasLedger(gLBefore.pack()); // remainingMaxGas starts at 2M gas so it can decrease
+
+        gLBefore = tAtlas.getGasLedger();
+        EscrowAccountAccessData memory accountDataBefore = tAtlas.getAccessData(solverOneEOA);
+
+        uint256 snapshot = vm.snapshotState();
+
+        // ===============================
+        // Case 1: result = bundler fault
+        // ===============================
+        uint256 result = 1 << uint256(SolverOutcome.InvalidSignature);
+        assertEq(EscrowBits.bundlersFault(result), true, "result should be a bundler fault");
+
+        uint256 gasWaterMark = 1_000_000;
+        uint256 gasLeft = 200_000;
+        uint256 estGasUsed = (gasWaterMark + _SOLVER_BASE_GAS_USED - gasLeft)
+            + GasAccLib.solverOpCalldataGas(solverOp.data.length, address(0));
         
+        tAtlas.handleSolverFailAccounting{gas: gasLeft}(solverOp, dConfigSolverGasLimit, gasWaterMark, result);
+
+        GasLedger memory gLAfter = tAtlas.getGasLedger();
+        EscrowAccountAccessData memory accountDataAfter = tAtlas.getAccessData(solverOneEOA);
+
+        assertApproxEqRel(
+            gLAfter.writeoffsGas,
+            gLBefore.writeoffsGas + estGasUsed,
+            0.02e18, // 2% tolerance
+            "writeoffsGas should increase by estGasUsed");
+        assertEq(gLAfter.solverFaultFailureGas, gLBefore.solverFaultFailureGas, "solverFaultFailureGas should not change");
+        assertEq(accountDataAfter.bonded, accountDataBefore.bonded, "bonded balance should not change");
+        assertEq(accountDataAfter.auctionWins, accountDataBefore.auctionWins, "auctionWins should not change");
+        assertEq(accountDataAfter.auctionFails, accountDataBefore.auctionFails, "auctionFails should not change");
+        assertEq(accountDataAfter.totalGasValueUsed, accountDataBefore.totalGasValueUsed, "totalGasValueUsed should not change");
+
+        // ===============================
+        // Case 2: result = solver fault, no assign deficit
+        // ===============================
+        vm.revertToState(snapshot);
+        result = 1 << uint256(SolverOutcome.SolverOpReverted);
+        assertEq(EscrowBits.bundlersFault(result), false, "result should not be a bundler fault");
+        
+        // No change in gasWaterMark, gasLeft, or estGasUsed --> no assign deficit
+        uint256 estGasValueCharged = estGasUsed.withSurcharge(
+            DEFAULT_ATLAS_SURCHARGE_RATE + DEFAULT_BUNDLER_SURCHARGE_RATE
+        ) * tx.gasprice;
+
+        tAtlas.handleSolverFailAccounting{gas: gasLeft}(solverOp, dConfigSolverGasLimit, gasWaterMark, result);
+
+        gLAfter = tAtlas.getGasLedger();
+        accountDataAfter = tAtlas.getAccessData(solverOneEOA);
+
+        assertApproxEqRel(
+            gLAfter.solverFaultFailureGas,
+            gLBefore.solverFaultFailureGas + estGasUsed,
+            0.02e18, // 2% tolerance
+            "solverFaultFailureGas should increase by estGasUsed");
+        assertEq(gLAfter.writeoffsGas, gLBefore.writeoffsGas, "writeoffsGas should not change");
+        assertApproxEqRel(
+            accountDataAfter.bonded,
+            accountDataBefore.bonded - estGasValueCharged,
+            0.02e18, // 2% tolerance
+            "bonded balance should not change");
+        assertEq(accountDataAfter.auctionWins, accountDataBefore.auctionWins, "auctionWins should not change");
+        assertEq(accountDataAfter.auctionFails, accountDataBefore.auctionFails + 1, "auctionFails should increase by 1");
+        assertApproxEqRel(
+            accountDataAfter.totalGasValueUsed,
+            accountDataBefore.totalGasValueUsed + (estGasValueCharged / _GAS_VALUE_DECIMALS_TO_DROP),
+            0.02e18, // 2% tolerance
+            "totalGasValueUsed should increase by estGasValueCharged");
+
+        // ===============================
+        // Case 3: result = solver fault, with assign deficit
+        // ===============================
+        vm.revertToState(snapshot);
+        result = 1 << uint256(SolverOutcome.SolverOpReverted);
+        assertEq(EscrowBits.bundlersFault(result), false, "result should not be a bundler fault");
+
+        // estGasUsed * tx.gasprice should be > solver's 1e18 bonded, to cause a deficit
+        gasWaterMark = 2e9; // After solver pays 1e18, leaves approx 1e18 deficit
+        gasLeft = 100_000;
+        estGasUsed = (gasWaterMark + _SOLVER_BASE_GAS_USED - gasLeft)
+            + GasAccLib.solverOpCalldataGas(solverOp.data.length, address(0));
+        uint256 estAssignValueInclSurcharges = estGasUsed.withSurcharge(
+            DEFAULT_ATLAS_SURCHARGE_RATE + DEFAULT_BUNDLER_SURCHARGE_RATE
+        ) * tx.gasprice;
+        uint256 estDeficit = estAssignValueInclSurcharges - 1e18; // 1e18 bonded balance
+        uint256 estGasWrittenOff = estGasUsed * estDeficit / estAssignValueInclSurcharges;
+        
+        tAtlas.handleSolverFailAccounting{gas: gasLeft}(solverOp, dConfigSolverGasLimit, gasWaterMark, result);
+
+        gLAfter = tAtlas.getGasLedger();
+        accountDataAfter = tAtlas.getAccessData(solverOneEOA);
+
+        assertApproxEqRel(
+            gLAfter.solverFaultFailureGas,
+            gLBefore.solverFaultFailureGas + (estGasUsed - estGasWrittenOff),
+            0.02e18, // 2% tolerance
+            "solverFaultFailureGas should increase by estGasUsed excl. deficit");
+        assertApproxEqRel(
+            gLAfter.writeoffsGas,
+            gLBefore.writeoffsGas + estGasWrittenOff,
+            0.02e18, // 2% tolerance
+            "writeoffsGas should increase by deficit");
+        assertEq(accountDataAfter.bonded, 0, "bonded balance should be 0 if deficit caused");
+        assertEq(accountDataAfter.auctionWins, accountDataBefore.auctionWins, "auctionWins should not change");
+        assertEq(accountDataAfter.auctionFails, accountDataBefore.auctionFails + 1, "auctionFails should increase by 1");
+        assertApproxEqRel(
+            accountDataAfter.totalGasValueUsed,
+            accountDataBefore.totalGasValueUsed + (1e18 / _GAS_VALUE_DECIMALS_TO_DROP),
+            0.02e18, // 2% tolerance
+            "totalGasValueUsed should increase by deficit");
     }
 
 }
