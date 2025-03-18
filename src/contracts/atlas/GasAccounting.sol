@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 
 import { SafetyLocks } from "./SafetyLocks.sol";
@@ -24,6 +25,7 @@ abstract contract GasAccounting is SafetyLocks {
     using GasAccLib for uint256; // To load GasLedger from a transient uint265 var
     using GasAccLib for GasLedger;
     using GasAccLib for BorrowsLedger;
+    using FixedPointMathLib for uint256;
 
     constructor(
         uint256 escrowDuration,
@@ -282,7 +284,6 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _bothSurchargeRates = _totalSurchargeRate();
         uint256 _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR);
         uint256 _gasUsed = _calldataGas + (gasWaterMark + _SOLVER_BASE_GAS_USED - gasleft());
-        // TODO ^ need to add SOLVER_BASE_GAS_USED to total calcs in AtlasVerification
 
         // Deduct solver's max (C + E) gas from remainingMaxGas, for future solver gas liability calculations
         _gL.remainingMaxGas -= uint48(dConfigSolverGasLimit + _calldataGas);
@@ -314,10 +315,13 @@ abstract contract GasAccounting is SafetyLocks {
             uint256 _gasWrittenOff;
             if (_assignDeficit > 0) {
                 // If any deficit, calculate the gas units unpaid for due to assign deficit.
-                _gasWrittenOff = _assignDeficit / tx.gasprice;
+                // Gas units written off = gas used * (deficit / gas value with surcharges) ratio.
+                // `mulDivUp()` rounds in favor of writeoffs, so we don't overestimate gas that was actually paid for
+                // and end up reimbursing the bundler for more than was actually taken from the solvers.
+                _gasWrittenOff = _gasUsed.mulDivUp(_assignDeficit, _gasValueWithSurcharges);
 
-                // Writeoffs tracks unsurcharged gas units, so cap gasWrittenOff at gasUsed
-                if (_gasWrittenOff > _gasUsed) _gasWrittenOff = _gasUsed;
+                // No risk of underflow in subtraction below, because:
+                // _assignDeficit is <= _gasValueWithSurcharges, so _gasWrittenOff is <= _gasUsed.
 
                 // Deduct gas written off from gas tracked as "paid for" by failed solver
                 _gasUsed -= _gasWrittenOff;
