@@ -311,8 +311,14 @@ abstract contract Escrow is AtlETH {
     {
         // Decrease unreachedSolverGas by the current solverOp's (C + E) max gas
         GasLedger memory _gL = t_gasLedger.toGasLedger();
-        _gL.unreachedSolverGas -= uint48(dConfig.solverGasLimit)
-            + GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR).toUint48();
+        uint256 _calldataGas;
+
+        // Calldata gas is only included if NOT in exPostBids mode.
+        if (!dConfig.callConfig.exPostBids()) {
+            _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR).toUint48();
+        }
+
+        _gL.unreachedSolverGas -= uint48(dConfig.solverGasLimit + _calldataGas);
         t_gasLedger = _gL.pack(); // Persist changes to transient storage before any returns below
 
         if (gasWaterMark < _VALIDATION_GAS_LIMIT + dConfig.solverGasLimit) {
