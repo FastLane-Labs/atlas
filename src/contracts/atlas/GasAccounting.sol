@@ -346,7 +346,7 @@ abstract contract GasAccounting is SafetyLocks {
     function _chargeUnreachedSolversForCalldata(
         SolverOperation[] calldata solverOps,
         GasLedger memory gL,
-        uint256 solverIdx
+        uint256 winningSolverIdx
     )
         internal
         returns (uint256 unreachedCalldataValuePaid)
@@ -357,12 +357,15 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _deficit;
 
         // Start at the solver after the current solverIdx, because current solverIdx is the winner
-        for (uint256 i = solverIdx + 1; i < solverOps.length; ++i) {
+        for (uint256 i = winningSolverIdx + 1; i < solverOps.length; ++i) {
             _calldataGasCost = GasAccLib.solverOpCalldataGas(solverOps[i].data.length, L2_GAS_CALCULATOR) * tx.gasprice;
             _solverData = S_accessData[solverOps[i].from];
 
             // No surcharges added to calldata cost for unreached solvers
             _deficit = _assign(_solverData, solverOps[i].from, _calldataGasCost);
+
+            // Persist _assign() changes to solver account data to storage
+            S_accessData[solverOps[i].from] = _solverData;
 
             unreachedCalldataValuePaid += _calldataGasCost - _deficit;
         }
@@ -372,8 +375,6 @@ abstract contract GasAccounting is SafetyLocks {
         gL.writeoffsGas += (_writeoffGasMarker - gasleft()).toUint48();
     }
 
-    // TODO some rounding bugs - e.g. in fail (testGasRefundBeneficiarySolverFails) atlasSurcharge + bundler base +
-    // surcharge refunds is slightly less than amount assigned to solver for failure.
     function _settle(
         Context memory ctx,
         GasLedger memory gL,
