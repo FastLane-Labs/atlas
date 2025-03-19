@@ -23,8 +23,8 @@ contract Simulator is AtlasErrors, AtlasConstants {
     using CallBits for uint32;
     using AccountingMath for uint256;
 
-    uint256 internal constant _SIM_GAS_SUGGESTED_BUFFER = 30_000; // TODO calc properly
-    uint256 internal constant _SIM_GAS_BEFORE_METACALL = 10_000; // TODO calc properly
+    uint256 internal constant _SIM_GAS_SUGGESTED_BUFFER = 30_000;
+    uint256 internal constant _SIM_GAS_BEFORE_METACALL = 10_000;
 
     address public immutable deployer;
     address public atlas;

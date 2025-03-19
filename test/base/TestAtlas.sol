@@ -81,4 +81,8 @@ contract TestAtlas is Atlas {
     function getSolverLock() public view returns (uint256) {
         return t_solverLock;
     }
+
+    function getPhase() public view returns (uint8) {
+        return _phase();
+    }
 }

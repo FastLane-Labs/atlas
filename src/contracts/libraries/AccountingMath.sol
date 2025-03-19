@@ -39,18 +39,6 @@ library AccountingMath {
         surchargeAmount = unadjustedAmount * surchargeRate / _SCALE;
     }
 
-    function getPortionFromTotalSurcharge(
-        uint256 totalSurcharge,
-        uint256 targetSurchargeRate,
-        uint256 totalSurchargeRate
-    )
-        internal
-        pure
-        returns (uint256 surchargePortion)
-    {
-        surchargePortion = totalSurcharge * targetSurchargeRate / totalSurchargeRate;
-    }
-
     // NOTE: This max should only be applied when there are no winning solvers.
     // Set to 80% of the metacall gas cost, because the remaining 20% can be collected through storage refunds.
     function maxBundlerRefund(uint256 metacallGasCost) internal pure returns (uint256 maxRefund) {
