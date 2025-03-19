@@ -318,6 +318,8 @@ abstract contract Escrow is AtlETH {
             _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR).toUint48();
         }
 
+        // Reset solver's max approved gas spend to 0 at start of each new solver execution
+        _gL.maxApprovedGasSpend = 0;
         _gL.unreachedSolverGas -= uint48(dConfig.solverGasLimit + _calldataGas);
         t_gasLedger = _gL.pack(); // Persist changes to transient storage before any returns below
 
