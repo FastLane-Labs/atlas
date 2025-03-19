@@ -183,9 +183,10 @@ contract TestAtlasGasAcc is TestAtlas {
         GasLedger memory gL,
         uint256 gasMarker,
         address gasRefundBeneficiary,
-        uint256 unreachedCalldataValuePaid
+        uint256 unreachedCalldataValuePaid,
+        bool multipleSuccessfulSolvers
     ) public returns (uint256 claimsPaidToBundler, uint256 netAtlasGasSurcharge) {
-        (claimsPaidToBundler, netAtlasGasSurcharge) = _settle(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid);
+        (claimsPaidToBundler, netAtlasGasSurcharge) = _settle(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid, multipleSuccessfulSolvers);
     }
 
     function updateAnalytics(

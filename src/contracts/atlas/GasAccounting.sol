@@ -376,7 +376,8 @@ abstract contract GasAccounting is SafetyLocks {
         GasLedger memory gL,
         uint256 gasMarker,
         address gasRefundBeneficiary,
-        uint256 unreachedCalldataValuePaid
+        uint256 unreachedCalldataValuePaid,
+        bool multipleSuccessfulSolvers
     )
         internal
         returns (uint256 claimsPaidToBundler, uint256 netAtlasGasSurcharge)
@@ -449,8 +450,16 @@ abstract contract GasAccounting is SafetyLocks {
             // Bundler may still recover a partial refund (from solver fault failure charges) up to 80% of the gas cost
             // of the metacall. The remaining 20% could be recovered through storage refunds, and it is important that
             // metacalls with no winning solver are not profitable for the bundler.
+            // The exception to this rule is when multipleSuccessfulSolvers is set to true. In this case, all solvers
+            // should be able to execute and pay for their own gas + surcharges, but the bundler refund should not be
+            // capped.
 
-            uint256 _maxRefund = (gasMarker - gL.writeoffsGas - _gasLeft) * 8 / 10 * tx.gasprice;
+            uint256 _maxRefund;
+            if (multipleSuccessfulSolvers) {
+                _maxRefund = type(uint256).max;
+            } else {
+                _maxRefund = (gasMarker - gL.writeoffsGas - _gasLeft) * 8 / 10 * tx.gasprice;
+            }
 
             // Bundler gets (base gas cost + bundler surcharge) of solver fault failures, plus any net repayments, plus
             // base gas cost of unreached solver calldata. This is compared to _maxRefund below.

@@ -213,13 +213,30 @@ abstract contract Escrow is AtlETH {
                 // NOTE: we intentionally do not change GasLedger here as we have found a winning solver and don't need
                 // it anymore
 
+                // First successful solver call that paid what it bid
                 if (_result.executionSuccessful()) {
-                    // First successful solver call that paid what it bid
                     emit SolverTxResult(
                         solverOp.solver, solverOp.from, dConfig.to, solverOp.bidToken, bidAmount, true, true, _result
                     );
 
-                    ctx.solverSuccessful = true;
+                    // Keep executing solvers without ending the auction if multipleSuccessfulSolvers is set
+                    if (CallBits.multipleSuccessfulSolvers(dConfig.callConfig)) {
+                        // override successful result to a result that triggers FULL_REFUND in failed solver acct.
+                        _result = 1 << (uint256(SolverOutcome.MultipleSolvers));
+
+                        // explicitly set solverSuccessful to false so that solvers keep executing
+                        ctx.solverSuccessful = false;
+
+                        // In multipleSuccessfulSolvers solvers must each pay a FULL_REFUND.
+                        _handleSolverFailAccounting(
+                            solverOp, dConfig.solverGasLimit, _gasWaterMark, _result
+                        );
+
+                    // In all other configs end auction with first successful solver that paid what it bid.
+                    } else {
+                        // Mark as complete
+                        ctx.solverSuccessful = true;
+                    }
                     ctx.solverOutcome = uint24(_result);
                     return _solverTracker.bidAmount;
                 }

@@ -128,9 +128,15 @@ contract Atlas is Escrow, Factory {
             GasLedger memory _gL = t_gasLedger.toGasLedger(); // Final load, no need to persist changes after this
             uint256 _unreachedCalldataValuePaid = _chargeUnreachedSolversForCalldata(solverOps, _gL, ctx.solverIndex);
 
-            // Gas Refund to sender only if execution is successful
-            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) =
-                _settle(ctx, _gL, _gasMarker, gasRefundBeneficiary, _unreachedCalldataValuePaid);
+            // Gas Refund to sender only if execution is successful, or if multipleSuccessfulSolvers
+            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) = _settle(
+                ctx,
+                _gL,
+                _gasMarker,
+                gasRefundBeneficiary,
+                _unreachedCalldataValuePaid,
+                _dConfig.callConfig.multipleSuccessfulSolvers()
+            );
 
             auctionWon = ctx.solverSuccessful;
             emit MetacallResult(msg.sender, userOp.from, auctionWon, _ethPaidToBundler, _netGasSurcharge);
@@ -339,11 +345,14 @@ contract Atlas is Escrow, Factory {
         for (; ctx.solverIndex < solverOpsLen; ctx.solverIndex++) {
             SolverOperation calldata solverOp = solverOps[ctx.solverIndex];
 
-            _bidAmount = _executeSolverOperation(ctx, dConfig, userOp, solverOp, solverOp.bidAmount, false, returnData);
+            _bidAmount += _executeSolverOperation(ctx, dConfig, userOp, solverOp, solverOp.bidAmount, false, returnData);
 
             if (ctx.solverSuccessful) {
                 return _bidAmount;
             }
+        }
+        if (dConfig.callConfig.multipleSuccessfulSolvers()) {
+            return _bidAmount;
         }
         if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));
         if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
