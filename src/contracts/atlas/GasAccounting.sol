@@ -527,7 +527,10 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _netRepayments;
         if (bL.repays > bL.borrows) _netRepayments = bL.repays - bL.borrows;
 
+        // gL.maxApprovedGasSpend only stores the gas units, must be scaled by tx.gasprice
+        uint256 _maxApprovedGasValue = gL.maxApprovedGasSpend * tx.gasprice;
+
         return (bL.repays >= bL.borrows)
-            && (gL.maxApprovedGasSpend + _netRepayments >= gL.solverGasLiability(_totalSurchargeRate()));
+            && (_maxApprovedGasValue + _netRepayments >= gL.solverGasLiability(_totalSurchargeRate()));
     }
 }
