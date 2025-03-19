@@ -229,7 +229,7 @@ abstract contract Escrow is AtlETH {
 
                         // In multipleSuccessfulSolvers solvers must each pay a FULL_REFUND.
                         _handleSolverFailAccounting(
-                            solverOp, dConfig.solverGasLimit, _gasWaterMark, _result
+                            solverOp, dConfig.solverGasLimit, _gasWaterMark, _result, dConfig.callConfig.exPostBids()
                         );
 
                     // In all other configs end auction with first successful solver that paid what it bid.

@@ -734,7 +734,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         BorrowsLedger memory bL = BorrowsLedger(1e18, 0);
         tAtlas.setBorrowsLedger(bL.pack());
         vm.expectRevert(abi.encodeWithSelector(AtlasErrors.BorrowsNotRepaid.selector, 1e18, 0));
-        tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid);
+        tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid, false);
 
         // Reset borrows ledger back to neutral
         tAtlas.setBorrowsLedger(BorrowsLedger(0,0).pack());
@@ -744,7 +744,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         // ============================================
 
         vm.expectRevert(); // Difficult to predict error values - but should be AssignDeficitTooLarge() error
-        tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid);
+        tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid, false);
 
         // ============================================
         // Case 3: solverOne wins and has bonded atlETH
@@ -776,7 +776,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         estAtlasSurcharge += (uint256(solverFaultFailureGas).getSurcharge(A_SURCHARGE) * tx.gasprice);
 
         // DO SETTLE CALL
-        (uint256 claimsPaidToBundler, uint256 netAtlasGasSurcharge) = tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid);
+        (uint256 claimsPaidToBundler, uint256 netAtlasGasSurcharge) = tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid, false);
 
         EscrowAccountAccessData memory aDataAfter = tAtlas.getAccessData(solverOneEOA);
 
@@ -830,7 +830,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         estAtlasSurcharge += bundlerRefundBeforeCap - estBundlerRefund;
 
         // DO SETTLE CALL
-        (claimsPaidToBundler, netAtlasGasSurcharge) = tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid);
+        (claimsPaidToBundler, netAtlasGasSurcharge) = tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid, false);
 
         aDataAfter = tAtlas.getAccessData(solverOneEOA);
 
