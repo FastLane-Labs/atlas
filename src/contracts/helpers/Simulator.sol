@@ -23,8 +23,8 @@ contract Simulator is AtlasErrors, AtlasConstants {
     using CallBits for uint32;
     using AccountingMath for uint256;
 
-    uint256 internal constant _SIM_GAS_SUGGESTED_BUFFER = 30_000; // TODO calc properly
-    uint256 internal constant _SIM_GAS_BEFORE_METACALL = 10_000; // TODO calc properly
+    uint256 internal constant _SIM_GAS_SUGGESTED_BUFFER = 30_000;
+    uint256 internal constant _SIM_GAS_BEFORE_METACALL = 10_000;
 
     address public immutable deployer;
     address public atlas;
@@ -79,9 +79,14 @@ contract Simulator is AtlasErrors, AtlasConstants {
         view
         returns (uint256)
     {
+        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
         uint256 bundlerSurchargeRate = IAtlas(atlas).bundlerSurchargeRate();
         uint256 atlasSurchargeRate = IAtlas(atlas).atlasSurchargeRate();
 
+        // In exPostBid mode, solvers do not pay for calldata gas, and these calldata gas vars will be excluded.
+        // In normal bid mode, solvers each pay for their own solverOp calldata gas, and the winning solver pays for the
+        // other non-solver calldata gas as well. In this calculation, there's only 1 solverOp so no need to subtract
+        // calldata of other solverOps as they aren't any.
         uint256 metacallCalldataLength = msg.data.length + DAPP_OP_LENGTH + 28;
         uint256 metacallCalldataGas =
             GasAccLib.metacallCalldataGas(metacallCalldataLength, IAtlas(atlas).L2_GAS_CALCULATOR());
@@ -89,11 +94,16 @@ contract Simulator is AtlasErrors, AtlasConstants {
         uint256 metacallExecutionGas =
             _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOp.gas + userOp.dappGasLimit + solverOp.gas;
 
+        uint256 totalGas = metacallExecutionGas;
+
+        // Only add calldata costs if NOT in exPostBids mode
+        if (!dConfig.callConfig.exPostBids()) {
+            totalGas += metacallCalldataGas;
+        }
+
         // NOTE: In exPostBids mode, the bid-finding solverOp execution gas is written off. So no need to add here.
 
-        return ((metacallCalldataGas + metacallExecutionGas) * solverOp.maxFeePerGas).withSurcharge(
-            bundlerSurchargeRate + atlasSurchargeRate
-        );
+        return (totalGas * solverOp.maxFeePerGas).withSurcharge(bundlerSurchargeRate + atlasSurchargeRate);
     }
 
     function simUserOperation(UserOperation calldata userOp)
