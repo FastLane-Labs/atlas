@@ -116,7 +116,8 @@ abstract contract GasAccounting is SafetyLocks {
     /// (msg.value) or by approving Atlas to use a certain amount of the solver's bonded AtlETH.
     /// @param maxApprovedGasSpend The maximum amount of the solver's bonded AtlETH that Atlas can deduct to cover the
     /// solver's debt.
-    /// @return owed The amount owed, if any, by the solver after reconciliation.
+    /// @return owed The gas and borrow liability owed by the solver. The full gasLiability + borrowLiability amount is
+    /// returned, unless the fulfilled, in which case 0 is returned.
     /// @dev The solver can call this function multiple times until the owed amount is zero.
     /// @dev Note: `reconcile()` must be called by the solver to avoid a `CallbackNotCalled` error in `solverCall()`.
     function reconcile(uint256 maxApprovedGasSpend) external payable returns (uint256 owed) {

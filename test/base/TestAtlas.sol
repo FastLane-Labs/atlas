@@ -77,4 +77,8 @@ contract TestAtlas is Atlas {
     function getBorrowsLedger() public view returns (BorrowsLedger memory bL) {
         return t_borrowsLedger.toBorrowsLedger();
     }
+
+    function getSolverLock() public view returns (uint256) {
+        return t_solverLock;
+    }
 }

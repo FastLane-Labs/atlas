@@ -170,11 +170,156 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
     }
 
     function test_GasAccounting_shortfall() public {
-        // TODO
+        GasLedger memory gL = GasLedger(1_000_000, 0, 0, 0, 0);
+        BorrowsLedger memory bL = BorrowsLedger(1e18, 0);
+        tAtlas.setGasLedger(gL.pack());
+        tAtlas.setBorrowsLedger(bL.pack());
+
+        vm.txGasPrice(1e9); // set gas price to 1 gwei
+
+        // Case 1: Net borrows = 1e18 | gas liability = (1M * 1 gwei * 1 + surcharges)
+        (uint256 gasLiability, uint256 borrowLiability) = tAtlas.shortfall();
+
+        assertEq(gasLiability, (1_000_000 * tx.gasprice).withSurcharge(
+            DEFAULT_ATLAS_SURCHARGE_RATE + DEFAULT_BUNDLER_SURCHARGE_RATE
+        ), "gasLiability 1 not as expected");
+        assertEq(borrowLiability, 1e18, "borrowLiability 1 should be 1e18");
+
+        // Case 2: Net borrows = -1e18 | gas liability = (200k * 1 gwei * 1 + surcharges)
+        tAtlas.setGasLedger(GasLedger(200000, 0, 0, 0, 0).pack());
+        tAtlas.setBorrowsLedger(BorrowsLedger(0, 1e18).pack());
+
+        (gasLiability, borrowLiability) = tAtlas.shortfall();
+
+        assertEq(gasLiability, (200_000 * tx.gasprice).withSurcharge(
+            DEFAULT_ATLAS_SURCHARGE_RATE + DEFAULT_BUNDLER_SURCHARGE_RATE
+        ), "gasLiability 2 not as expected");
+        assertEq(borrowLiability, 0, "borrowLiability 2 should be 0");
     }
 
     function test_GasAccounting_reconcile() public {
-        // TODO
+        // In reality, the solver's contract calls reconcile()
+        address solverContract = makeAddr("SolverContract");
+        hoax(solverOneEOA, 1e18);
+        tAtlas.depositAndBond{ value: 1e18 }(1e18); // solver has 1 ETH bonded
+        tAtlas.setSolverLock(uint256(uint160(solverOneEOA)));
+
+        // Solver has a 1M gas liability, and a 1 ETH borrow liability
+        GasLedger memory gL = GasLedger(1_000_000, 0, 0, 0, 0);
+        BorrowsLedger memory bL = BorrowsLedger(1e18, 0);
+
+        tAtlas.setGasLedger(gL.pack());
+        tAtlas.setBorrowsLedger(bL.pack());
+
+        uint256 expectedGasLiability = (1_000_000 * tx.gasprice).withSurcharge(
+            DEFAULT_ATLAS_SURCHARGE_RATE + DEFAULT_BUNDLER_SURCHARGE_RATE
+        );
+
+        (uint256 gasLiability, uint256 borrowLiability) = tAtlas.shortfall();
+        assertEq(gasLiability, expectedGasLiability, "gasLiability should be 1M gas * gas price * surcharges");
+        assertEq(borrowLiability, 1e18, "borrowLiability should be 1e18");
+
+        // Case 1: should revert if phase is not SolverOperation
+        tAtlas.setLock(executionEnvironment, uint32(0), uint8(ExecutionPhase.UserOperation));
+        vm.prank(solverContract);
+        vm.expectRevert(AtlasErrors.WrongPhase.selector);
+        tAtlas.reconcile(0);
+
+        // Case 2: should revert if caller is not current solverTo address
+        tAtlas.setLock(executionEnvironment, uint32(0), uint8(ExecutionPhase.SolverOperation));
+        tAtlas.setSolverTo(solverContract);
+        vm.prank(executionEnvironment);
+        vm.expectRevert(AtlasErrors.InvalidAccess.selector);
+        tAtlas.reconcile(0);
+
+        uint256 snapshot = vm.snapshotState();
+
+        // Case 3: if only borrow repaid, and not gas spend approved, solver lock should be:
+        // CALLED BACK = true
+        // FULFILLED = false
+        
+        hoax(solverContract, borrowLiability);
+        uint256 totalShortfall = tAtlas.reconcile{value: borrowLiability}(0);
+
+        GasLedger memory gLAfter = tAtlas.getGasLedger();
+        BorrowsLedger memory bLAfter = tAtlas.getBorrowsLedger();
+        uint256 solverLock = tAtlas.getSolverLock();
+
+        assertEq(gLAfter.remainingMaxGas, 1_000_000, "remainingMaxGas should be 1_000_000");
+        assertEq(gLAfter.writeoffsGas, 0, "writeoffsGas should be 0");
+        assertEq(gLAfter.solverFaultFailureGas, 0, "solverFaultFailureGas should be 0");
+        assertEq(gLAfter.unreachedSolverGas, 0, "unreachedSolverGas should be 0");
+        assertEq(gLAfter.maxApprovedGasSpend, 0, "maxApprovedGasSpend should be 0");
+        assertEq(bLAfter.borrows, 1e18, "borrows should be 1e18");
+        assertEq(bLAfter.repays, 1e18, "repays should be 1e18 - repaid borrow debt");
+        assertEq(solverLock, (uint256(uint160(solverOneEOA)) | _SOLVER_CALLED_BACK_MASK), "solver lock should be CALLED BACK only");
+        assertEq(totalShortfall, gasLiability, "totalShortfall should be gasLiability");
+
+        // Case 4: if only gas spend approved, and borrow not repaid, solver lock should be:
+        // CALLED BACK = true
+        // FULFILLED = false
+        vm.revertToState(snapshot);
+
+        vm.prank(solverContract);
+        totalShortfall = tAtlas.reconcile{value: 0}(gasLiability);
+
+        gLAfter = tAtlas.getGasLedger();
+        bLAfter = tAtlas.getBorrowsLedger();
+        solverLock = tAtlas.getSolverLock();
+
+        assertEq(gLAfter.remainingMaxGas, 1_000_000, "remainingMaxGas should be 1_000_000");
+        assertEq(gLAfter.writeoffsGas, 0, "writeoffsGas should be 0");
+        assertEq(gLAfter.solverFaultFailureGas, 0, "solverFaultFailureGas should be 0");
+        assertEq(gLAfter.unreachedSolverGas, 0, "unreachedSolverGas should be 0");
+        assertEq(gLAfter.maxApprovedGasSpend, gasLiability / tx.gasprice, "maxApprovedGasSpend should be gasLiability / tx.gasprice");
+        assertEq(bLAfter.borrows, 1e18, "borrows should be 1e18");
+        assertEq(bLAfter.repays, 0, "repays should be 0");
+        assertEq(solverLock, (uint256(uint160(solverOneEOA)) | _SOLVER_CALLED_BACK_MASK), "solver lock should be CALLED BACK only");
+        assertEq(totalShortfall, borrowLiability + gasLiability, "totalShortfall should be borrowLiability + gasLiability");
+
+        // Case 5: if no gas spend approved, but repayment excess is enough, solver lock should be:
+        // CALLED BACK = true
+        // FULFILLED = true
+        vm.revertToState(snapshot);
+
+        hoax(solverContract, borrowLiability + gasLiability);
+        totalShortfall = tAtlas.reconcile{value: borrowLiability + gasLiability}(0);
+
+        gLAfter = tAtlas.getGasLedger();
+        bLAfter = tAtlas.getBorrowsLedger();
+        solverLock = tAtlas.getSolverLock();
+
+        assertEq(gLAfter.remainingMaxGas, 1_000_000, "remainingMaxGas should be 1_000_000");
+        assertEq(gLAfter.writeoffsGas, 0, "writeoffsGas should be 0");
+        assertEq(gLAfter.solverFaultFailureGas, 0, "solverFaultFailureGas should be 0");
+        assertEq(gLAfter.unreachedSolverGas, 0, "unreachedSolverGas should be 0");
+        assertEq(gLAfter.maxApprovedGasSpend, 0, "maxApprovedGasSpend should be 0");
+        assertEq(bLAfter.borrows, 1e18, "borrows should be 1e18");
+        assertEq(bLAfter.repays, borrowLiability + gasLiability, "repays should be borrowLiability + gasLiability");
+        assertEq(solverLock, (uint256(uint160(solverOneEOA)) | _SOLVER_CALLED_BACK_MASK | _SOLVER_FULFILLED_MASK), "solver lock should be CALLED BACK and FULFILLED");
+        assertEq(totalShortfall, 0, "totalShortfall should be 0");
+
+        // Case 6: if gas spend approved and borrow repaid exactly, solver lock should be:
+        // CALLED BACK = true
+        // FULFILLED = true
+        vm.revertToState(snapshot);
+
+        hoax(solverContract, borrowLiability);
+        totalShortfall = tAtlas.reconcile{value: borrowLiability}(gasLiability);
+
+        gLAfter = tAtlas.getGasLedger();
+        bLAfter = tAtlas.getBorrowsLedger();
+        solverLock = tAtlas.getSolverLock();
+
+        assertEq(gLAfter.remainingMaxGas, 1_000_000, "remainingMaxGas should be 1_000_000");
+        assertEq(gLAfter.writeoffsGas, 0, "writeoffsGas should be 0");
+        assertEq(gLAfter.solverFaultFailureGas, 0, "solverFaultFailureGas should be 0");
+        assertEq(gLAfter.unreachedSolverGas, 0, "unreachedSolverGas should be 0");
+        assertEq(gLAfter.maxApprovedGasSpend, (gasLiability/tx.gasprice), "maxApprovedGasSpend should be gasLiability/tx.gasprice");
+        assertEq(bLAfter.borrows, 1e18, "borrows should be 1e18");
+        assertEq(bLAfter.repays, 1e18, "repays should be 1e18 - repaid borrow debt");
+        assertEq(solverLock, (uint256(uint160(solverOneEOA)) | _SOLVER_CALLED_BACK_MASK | _SOLVER_FULFILLED_MASK), "solver lock should be CALLED BACK and FULFILLED");
+        assertEq(totalShortfall, 0, "totalShortfall should be 0");
     }
 
     function test_GasAccounting_assign() public {
