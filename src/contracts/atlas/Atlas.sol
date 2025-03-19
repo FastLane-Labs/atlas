@@ -71,10 +71,9 @@ contract Atlas is Escrow, Factory {
     {
         // _gasMarker calculated as (Execution gas cost) + (Calldata gas cost). Any gas left at the end of the metacall
         // is deducted from this _gasMarker, resulting in actual execution gas used + calldata gas costs + buffer.
-        // The calldata component is added below after validateCalls().
+        // The calldata component is added below, only if exPostBids = false.
         uint256 _gasLeft = gasleft();
-        uint256 _gasMarker = _gasLeft + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET
-            + GasAccLib.metacallCalldataGas(msg.data.length, L2_GAS_CALCULATOR);
+        uint256 _gasMarker = _gasLeft + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET; // This part is only execution gas.
 
         DAppConfig memory _dConfig;
         bool _isSimulation = msg.sender == SIMULATOR;
@@ -82,38 +81,41 @@ contract Atlas is Escrow, Factory {
         address _bundler = _isSimulation ? dAppOp.bundler : msg.sender;
         (_executionEnvironment, _dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
-        {
-            (uint256 _allSolversGasLimit, uint256 _bidFindOverhead, ValidCallsResult _validCallsResult) = VERIFICATION
-                .validateCalls({
-                dConfig: _dConfig,
-                userOp: userOp,
-                solverOps: solverOps,
-                dAppOp: dAppOp,
-                metacallGasLeft: _gasLeft,
-                msgValue: msg.value,
-                msgSender: _bundler,
-                isSimulation: _isSimulation
-            });
+        // Solvers pay for calldata when exPostBids = false
+        if (!_dConfig.callConfig.exPostBids()) {
+            _gasMarker += GasAccLib.metacallCalldataGas(msg.data.length, L2_GAS_CALCULATOR);
+        }
 
-            // First handle the ValidCallsResult
-            if (_validCallsResult != ValidCallsResult.Valid) {
-                if (_isSimulation) revert VerificationSimFail(_validCallsResult);
+        (uint256 _allSolversGasLimit, uint256 _bidFindOverhead, ValidCallsResult _validCallsResult) = VERIFICATION
+            .validateCalls({
+            dConfig: _dConfig,
+            userOp: userOp,
+            solverOps: solverOps,
+            dAppOp: dAppOp,
+            metacallGasLeft: _gasLeft,
+            msgValue: msg.value,
+            msgSender: _bundler,
+            isSimulation: _isSimulation
+        });
 
-                // Gracefully return for results that need nonces to be stored and prevent replay attacks
-                if (uint8(_validCallsResult) >= _GRACEFUL_RETURN_THRESHOLD && !_dConfig.callConfig.allowsReuseUserOps())
-                {
-                    return false;
-                }
+        // First handle the ValidCallsResult
+        if (_validCallsResult != ValidCallsResult.Valid) {
+            if (_isSimulation) revert VerificationSimFail(_validCallsResult);
 
-                // Revert for all other results
-                revert ValidCalls(_validCallsResult);
+            // Gracefully return for results that need nonces to be stored and prevent replay attacks
+            if (uint8(_validCallsResult) >= _GRACEFUL_RETURN_THRESHOLD && !_dConfig.callConfig.allowsReuseUserOps()) {
+                return false;
             }
 
-            // Initialize the environment lock and accounting values
-            _setEnvironmentLock(_dConfig, _executionEnvironment);
-            _initializeAccountingValues(_gasMarker - _bidFindOverhead, _allSolversGasLimit);
-            // _gasMarker - _bidFindOverhead = estimated winning solver gas liability for (not charged for bid-find gas)
+            // Revert for all other results
+            revert ValidCalls(_validCallsResult);
         }
+
+        // Initialize the environment lock and accounting values
+        _setEnvironmentLock(_dConfig, _executionEnvironment);
+
+        // _gasMarker - _bidFindOverhead = estimated winning solver gas liability (not charged for bid-find gas)
+        _initializeAccountingValues(_gasMarker - _bidFindOverhead, _allSolversGasLimit);
 
         // Calculate `execute` gas limit such that it can fail due to an OOG error caused by any of the hook calls, and
         // the metacall will still have enough gas to gracefully finish and return, storing any nonces required.
@@ -126,7 +128,12 @@ contract Atlas is Escrow, Factory {
             _dConfig, userOp, solverOps, dAppOp.userOpHash, _executionEnvironment, _bundler, _isSimulation
         ) returns (Context memory ctx) {
             GasLedger memory _gL = t_gasLedger.toGasLedger(); // Final load, no need to persist changes after this
-            uint256 _unreachedCalldataValuePaid = _chargeUnreachedSolversForCalldata(solverOps, _gL, ctx.solverIndex);
+            uint256 _unreachedCalldataValuePaid;
+
+            // Only charge unreached solverOps for their calldata if NOT in exPostBids mode
+            if (!_dConfig.callConfig.exPostBids()) {
+                _unreachedCalldataValuePaid = _chargeUnreachedSolversForCalldata(solverOps, _gL, ctx.solverIndex);
+            }
 
             // Gas Refund to sender only if execution is successful, or if multipleSuccessfulSolvers
             (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) = _settle(

@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 
 import { SafetyLocks } from "./SafetyLocks.sol";
@@ -24,6 +25,7 @@ abstract contract GasAccounting is SafetyLocks {
     using GasAccLib for uint256; // To load GasLedger from a transient uint265 var
     using GasAccLib for GasLedger;
     using GasAccLib for BorrowsLedger;
+    using FixedPointMathLib for uint256;
 
     constructor(
         uint256 escrowDuration,
@@ -76,7 +78,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @notice Borrows ETH from the contract, transferring the specified amount to the caller if available.
     /// @dev Borrowing is only available until the end of the SolverOperation phase, for solver protection.
     /// @param amount The amount of ETH to borrow.
-    function borrow(uint256 amount) external payable {
+    function borrow(uint256 amount) external {
         if (amount == 0) return;
 
         // borrow() can only be called by the Execution Environment (by delegatecalling a DAppControl hook), and only
@@ -114,7 +116,8 @@ abstract contract GasAccounting is SafetyLocks {
     /// (msg.value) or by approving Atlas to use a certain amount of the solver's bonded AtlETH.
     /// @param maxApprovedGasSpend The maximum amount of the solver's bonded AtlETH that Atlas can deduct to cover the
     /// solver's debt.
-    /// @return owed The amount owed, if any, by the solver after reconciliation.
+    /// @return owed The gas and borrow liability owed by the solver. The full gasLiability + borrowLiability amount is
+    /// returned, unless the fulfilled, in which case 0 is returned.
     /// @dev The solver can call this function multiple times until the owed amount is zero.
     /// @dev Note: `reconcile()` must be called by the solver to avoid a `CallbackNotCalled` error in `solverCall()`.
     function reconcile(uint256 maxApprovedGasSpend) external payable returns (uint256 owed) {
@@ -204,8 +207,7 @@ abstract contract GasAccounting is SafetyLocks {
         return true;
     }
 
-    /// @notice Takes AtlETH from the owner's bonded balance and, if necessary, from the owner's unbonding balance to
-    /// increase transient solver deposits.
+    /// @notice Takes AtlETH from the owner's bonded balance and, if necessary, from the owner's unbonding balance.
     /// @dev No GasLedger accounting changes are made in this function - should be done separately.
     /// @param account The address of the account from which AtlETH is taken.
     /// @param amount The amount of AtlETH to be taken.
@@ -275,15 +277,21 @@ abstract contract GasAccounting is SafetyLocks {
         SolverOperation calldata solverOp,
         uint256 dConfigSolverGasLimit,
         uint256 gasWaterMark,
-        uint256 result
+        uint256 result,
+        bool exPostBids
     )
         internal
     {
         GasLedger memory _gL = t_gasLedger.toGasLedger();
         uint256 _bothSurchargeRates = _totalSurchargeRate();
-        uint256 _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR);
+
+        // Solvers do not pay for calldata gas in exPostBids mode.
+        uint256 _calldataGas;
+        if (!exPostBids) {
+            _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR);
+        }
+
         uint256 _gasUsed = _calldataGas + (gasWaterMark + _SOLVER_BASE_GAS_USED - gasleft());
-        // TODO ^ need to add SOLVER_BASE_GAS_USED to total calcs in AtlasVerification
 
         // Deduct solver's max (C + E) gas from remainingMaxGas, for future solver gas liability calculations
         _gL.remainingMaxGas -= uint48(dConfigSolverGasLimit + _calldataGas);
@@ -315,10 +323,13 @@ abstract contract GasAccounting is SafetyLocks {
             uint256 _gasWrittenOff;
             if (_assignDeficit > 0) {
                 // If any deficit, calculate the gas units unpaid for due to assign deficit.
-                _gasWrittenOff = _assignDeficit / tx.gasprice;
+                // Gas units written off = gas used * (deficit / gas value with surcharges) ratio.
+                // `mulDivUp()` rounds in favor of writeoffs, so we don't overestimate gas that was actually paid for
+                // and end up reimbursing the bundler for more than was actually taken from the solvers.
+                _gasWrittenOff = _gasUsed.mulDivUp(_assignDeficit, _gasValueWithSurcharges);
 
-                // Writeoffs tracks unsurcharged gas units, so cap gasWrittenOff at gasUsed
-                if (_gasWrittenOff > _gasUsed) _gasWrittenOff = _gasUsed;
+                // No risk of underflow in subtraction below, because:
+                // _assignDeficit is <= _gasValueWithSurcharges, so _gasWrittenOff is <= _gasUsed.
 
                 // Deduct gas written off from gas tracked as "paid for" by failed solver
                 _gasUsed -= _gasWrittenOff;
@@ -343,7 +354,7 @@ abstract contract GasAccounting is SafetyLocks {
     function _chargeUnreachedSolversForCalldata(
         SolverOperation[] calldata solverOps,
         GasLedger memory gL,
-        uint256 solverIdx
+        uint256 winningSolverIdx
     )
         internal
         returns (uint256 unreachedCalldataValuePaid)
@@ -354,12 +365,15 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _deficit;
 
         // Start at the solver after the current solverIdx, because current solverIdx is the winner
-        for (uint256 i = solverIdx + 1; i < solverOps.length; ++i) {
+        for (uint256 i = winningSolverIdx + 1; i < solverOps.length; ++i) {
             _calldataGasCost = GasAccLib.solverOpCalldataGas(solverOps[i].data.length, L2_GAS_CALCULATOR) * tx.gasprice;
             _solverData = S_accessData[solverOps[i].from];
 
             // No surcharges added to calldata cost for unreached solvers
             _deficit = _assign(_solverData, solverOps[i].from, _calldataGasCost);
+
+            // Persist _assign() changes to solver account data to storage
+            S_accessData[solverOps[i].from] = _solverData;
 
             unreachedCalldataValuePaid += _calldataGasCost - _deficit;
         }
@@ -369,8 +383,6 @@ abstract contract GasAccounting is SafetyLocks {
         gL.writeoffsGas += (_writeoffGasMarker - gasleft()).toUint48();
     }
 
-    // TODO some rounding bugs - e.g. in fail (testGasRefundBeneficiarySolverFails) atlasSurcharge + bundler base +
-    // surcharge refunds is slightly less than amount assigned to solver for failure.
     function _settle(
         Context memory ctx,
         GasLedger memory gL,
@@ -525,7 +537,10 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _netRepayments;
         if (bL.repays > bL.borrows) _netRepayments = bL.repays - bL.borrows;
 
+        // gL.maxApprovedGasSpend only stores the gas units, must be scaled by tx.gasprice
+        uint256 _maxApprovedGasValue = gL.maxApprovedGasSpend * tx.gasprice;
+
         return (bL.repays >= bL.borrows)
-            && (gL.maxApprovedGasSpend + _netRepayments >= gL.solverGasLiability(_totalSurchargeRate()));
+            && (_maxApprovedGasValue + _netRepayments >= gL.solverGasLiability(_totalSurchargeRate()));
     }
 }
