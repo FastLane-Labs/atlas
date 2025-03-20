@@ -237,7 +237,8 @@ contract Simulator is AtlasErrors, AtlasConstants {
         payable
     {
         if (msg.sender != address(this)) revert InvalidEntryFunction();
-        if (!IAtlas(atlas).metacall{ value: msg.value, gas: estGasLimit }(userOp, solverOps, dAppOp, address(0))) {
+        bool auctionWon = IAtlas(atlas).metacall{ value: msg.value, gas: estGasLimit }(userOp, solverOps, dAppOp, address(0));
+        if (!auctionWon && !userOp.callConfig.multipleSuccessfulSolvers()) {
             revert NoAuctionWinner(); // should be unreachable
         }
         revert SimulationPassed();
