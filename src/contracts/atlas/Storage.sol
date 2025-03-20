@@ -155,10 +155,11 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         return S_surchargeRates >> 128;
     }
 
-    function bundlerSurchargeRate() external view returns (uint256) {
-        // Includes only the right 128 bits to isolate the bundler rate
-        return S_surchargeRates & ((1 << 128) - 1);
-    }
+    // NOTE: This is only accurate during a metacall. Reset to 0 otherwise
+    // function bundlerSurchargeRate() external view returns (uint256) {
+    //     // Includes only the right 128 bits to isolate the bundler rate
+    //     return S_surchargeRates & ((1 << 128) - 1);
+    // }
 
     // ---------------------------------------------------- //
     //               Storage Internal Getters               //
@@ -173,6 +174,20 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     function _totalSurchargeRate() internal view returns(uint256 totalSurchargeRate) {
         (uint256 atlasRate, uint256 bundlerRate) = _surchargeRates();
         totalSurchargeRate = atlasRate + bundlerRate;
+    }
+
+    // ---------------------------------------------------- //
+    //               Storage Internal Setters               //
+    // ---------------------------------------------------- //
+
+    function _setBundlerSurchargeRate(uint256 newBundlerRate) internal {
+        // Check Bundler gas surcharge fits in 128 bits
+        if(newBundlerRate > type(uint128).max) {
+            revert SurchargeRateTooHigh();
+        }
+
+        // Isolate the Atlas rate and replace the Bundler rate
+        S_surchargeRates = (S_surchargeRates & (type(uint128).max << 128)) | newBundlerRate;
     }
 
     // ---------------------------------------------------- //

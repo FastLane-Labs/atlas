@@ -30,6 +30,7 @@ struct UserOperation {
     address control; // Address of the DAppControl contract
     uint32 callConfig; // Call configuration expected by user, refer to `src/contracts/types/ConfigTypes.sol`
     uint32 dappGasLimit; // Gas limit set by the DAppControl for preOps, allocateValue, and postOps hook execution
+    uint128 bundlerSurchargeRate; // Bundler surcharge rate, set by the DAppControl
     address sessionKey; // Address of the temporary session key which is used to sign the DappOperation
     bytes data; // User operation calldata (used in `data` field of the user call)
     bytes signature; // User operation signature signed by UserOperation.from

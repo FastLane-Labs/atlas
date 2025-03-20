@@ -157,7 +157,8 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
             callConfig: CALL_CONFIG,
             bidToken: getBidFormat(userOp),
             solverGasLimit: getSolverGasLimit(),
-            dappGasLimit: getDAppGasLimit()
+            dappGasLimit: getDAppGasLimit(),
+            bundlerSurchargeRate: getBundlerSurchargeRate()
         });
     }
 

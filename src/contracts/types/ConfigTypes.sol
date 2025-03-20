@@ -7,6 +7,7 @@ struct DAppConfig {
     address bidToken; // address(0) for ETH
     uint32 solverGasLimit; // Max gas limit for solverOp (including preSolver and postSolver) execution
     uint32 dappGasLimit; // Max shared gas limit for preOps, allocateValue, and postOps hook execution
+    uint128 bundlerSurchargeRate; // Bundler surcharge rate
 }
 
 struct CallConfig {

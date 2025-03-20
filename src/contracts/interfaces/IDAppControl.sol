@@ -24,6 +24,8 @@ interface IDAppControl {
 
     function getDAppGasLimit() external view returns (uint32);
 
+    function getBundlerSurchargeRate() external view returns (uint128);
+
     function getBidFormat(UserOperation calldata userOp) external view returns (address bidToken);
 
     function getBidValue(SolverOperation calldata solverOp) external view returns (uint256);
