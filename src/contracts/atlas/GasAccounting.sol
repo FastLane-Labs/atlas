@@ -462,7 +462,7 @@ abstract contract GasAccounting is SafetyLocks {
             // of the metacall. The remaining 20% could be recovered through storage refunds, and it is important that
             // metacalls with no winning solver are not profitable for the bundler.
 
-            uint256 _maxRefund = (gasMarker - gL.writeoffsGas - _gasLeft) * 8 / 10 * tx.gasprice;
+            uint256 _maxRefund = (gasMarker - gL.writeoffsGas - _gasLeft).maxBundlerRefund() * tx.gasprice;
 
             // Bundler gets (base gas cost + bundler surcharge) of solver fault failures, plus any net repayments, plus
             // base gas cost of unreached solver calldata. This is compared to _maxRefund below.
