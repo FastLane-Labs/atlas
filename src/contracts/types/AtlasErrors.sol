@@ -109,4 +109,6 @@ contract AtlasErrors {
     error InsufficientLocalFunds();
     error NotImplemented();
     error InvertBidValueCannotBeExPostBids();
+    error ExPostBidsAndMultipleSuccessfulSolversNotSupportedTogether();
+    error InvertsBidValueAndMultipleSuccessfulSolversNotSupportedTogether();
 }

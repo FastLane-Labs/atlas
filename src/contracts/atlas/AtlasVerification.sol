@@ -249,7 +249,14 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             // Max one of preOps or userOp return data can be tracked, not both
             return ValidCallsResult.InvalidCallConfig;
         }
-
+        if (callConfig.multipleSuccessfulSolvers() && callConfig.exPostBids()) {
+            // Max one of multipleSolvers or exPostBids can be used, not both
+            return ValidCallsResult.ExPostBidsAndMultipleSuccessfulSolversNotSupportedTogether;
+        }
+        if (callConfig.multipleSuccessfulSolvers() && callConfig.invertsBidValue()) {
+            // Max one of multipleSolvers or invertsBidValue can be used, not both
+            return ValidCallsResult.InvertsBidValueAndMultipleSuccessfulSolversNotSupportedTogether;
+        }
         if (callConfig.needsSequentialUserNonces() && callConfig.needsSequentialDAppNonces()) {
             // Max one of user or dapp nonces can be sequential, not both
             return ValidCallsResult.BothUserAndDAppNoncesCannotBeSequential;

@@ -41,5 +41,7 @@ enum ValidCallsResult {
     BothUserAndDAppNoncesCannotBeSequential,
     MetacallGasLimitTooLow,
     MetacallGasLimitTooHigh,
-    DAppGasLimitMismatch
+    DAppGasLimitMismatch,
+    ExPostBidsAndMultipleSuccessfulSolversNotSupportedTogether,
+    InvertsBidValueAndMultipleSuccessfulSolversNotSupportedTogether
 }
