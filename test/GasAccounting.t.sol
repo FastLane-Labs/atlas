@@ -26,6 +26,8 @@ import { MockL2GasCalculator } from "./base/MockL2GasCalculator.sol";
 import { TestAtlas } from "./base/TestAtlas.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 
+import "forge-std/console.sol";
+
 contract GasAccountingTest is AtlasConstants, BaseTest {
     using GasAccLib for GasLedger;
     using GasAccLib for BorrowsLedger;
@@ -851,6 +853,52 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertTrue(estBundlerRefund < bundlerRefundBeforeCap, "bundler refund should be capped at 80%");
 
         // check atlas surcharge included excess bundler surcharge above 80% cap
+        assertApproxEqRel(
+            netAtlasGasSurcharge,
+            estAtlasSurcharge,
+            0.01e18, // 1% tolerance
+            "netAtlasGasSurcharge should be estAtlasSurcharge"
+        );
+        assertEq(tAtlas.cumulativeSurcharge(), atlasSurchargeBefore + netAtlasGasSurcharge, "cumulativeSurcharge should increase by netAtlasGasSurcharge");
+
+        assertEq(tAtlas.getPhase(), uint8(ExecutionPhase.FullyLocked), "phase should be FullyLocked");
+
+        // ============================================
+        // Case 5: no winning solver, multipleSuccessfulSolvers is true
+        // ============================================
+        vm.revertToState(snapshot);
+
+        ctx.solverSuccessful = false;
+        solverFaultFailureGas = 10_000_000; // large solver failure gas, to trigger 80% bundler cap
+        gL = GasLedger(0, writeoffsGas, solverFaultFailureGas, 0, 0);
+
+        bundlerRefundBeforeCap = unreachedCalldataValuePaid 
+            + uint256(solverFaultFailureGas).withSurcharge(B_SURCHARGE) * tx.gasprice;
+
+        // calculate expected atlas surcharge
+        estAtlasSurcharge = uint256(solverFaultFailureGas).getSurcharge(A_SURCHARGE) * tx.gasprice;
+
+        // DO SETTLE CALL
+        (claimsPaidToBundler, netAtlasGasSurcharge) = tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid, true);
+
+        aDataAfter = tAtlas.getAccessData(solverOneEOA);
+
+        // solverOne is not winner - no charge or change in analytics expected
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "solverOne is not winner - no balance change");
+        assertEq(aDataAfter.auctionWins, aDataBefore.auctionWins, "auctionWins should not change");
+        assertEq(aDataAfter.auctionFails, aDataBefore.auctionFails, "auctionFails should not change");
+        assertEq(aDataAfter.totalGasValueUsed, aDataBefore.totalGasValueUsed, "totalGasValueUsed should not change");
+
+        // check bundler refund was not capped at 80%
+        assertApproxEqRel(
+            claimsPaidToBundler,
+            bundlerRefundBeforeCap,
+            0.01e18, // 1% tolerance
+            "C5: claimsPaidToBundler should be BundlerRefundBeforeCap"
+        );
+        assertEq(bundlerBalanceBefore + claimsPaidToBundler, userEOA.balance, "bundler balance should increase by BundlerRefundBeforeCap");
+
+        // check atlas surcharge
         assertApproxEqRel(
             netAtlasGasSurcharge,
             estAtlasSurcharge,
