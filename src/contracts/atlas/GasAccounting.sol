@@ -470,7 +470,7 @@ abstract contract GasAccounting is SafetyLocks {
             if (multipleSuccessfulSolvers) {
                 _maxRefund = type(uint256).max;
             } else {
-                _maxRefund = (gasMarker - gL.writeoffsGas - _gasLeft) * 8 / 10 * tx.gasprice;
+                _maxRefund = (gasMarker - gL.writeoffsGas - _gasLeft).maxBundlerRefund() * tx.gasprice;
             }
 
             // Bundler gets (base gas cost + bundler surcharge) of solver fault failures, plus any net repayments, plus
