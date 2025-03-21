@@ -80,7 +80,7 @@ contract Simulator is AtlasErrors, AtlasConstants {
         returns (uint256)
     {
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
-        uint256 bundlerSurchargeRate = IAtlas(atlas).bundlerSurchargeRate();
+        uint256 bundlerSurchargeRate = userOp.bundlerSurchargeRate;
         uint256 atlasSurchargeRate = IAtlas(atlas).atlasSurchargeRate();
 
         // In exPostBid mode, solvers do not pay for calldata gas, and these calldata gas vars will be excluded.

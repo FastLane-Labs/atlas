@@ -47,7 +47,6 @@ contract Permit69Test is BaseTest {
         mockAtlas = new MockAtlasForPermit69Tests({
             escrowDuration: 64,
             atlasSurchargeRate: DEFAULT_ATLAS_SURCHARGE_RATE,
-            bundlerSurchargeRate: DEFAULT_BUNDLER_SURCHARGE_RATE,
             verification: expectedAtlasVerificationAddr,
             simulator: address(0),
             factoryLib: address(factoryLib),
@@ -305,7 +304,6 @@ contract MockAtlasForPermit69Tests is Atlas {
     constructor(
         uint256 escrowDuration,
         uint256 atlasSurchargeRate,
-        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address _surchargeRecipient,
@@ -315,7 +313,6 @@ contract MockAtlasForPermit69Tests is Atlas {
         Atlas(
             escrowDuration,
             atlasSurchargeRate,
-            bundlerSurchargeRate,
             verification,
             simulator,
             _surchargeRecipient,

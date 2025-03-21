@@ -104,5 +104,4 @@ interface IAtlas {
     function surchargeRecipient() external view returns (address);
     function pendingSurchargeRecipient() external view returns (address);
     function atlasSurchargeRate() external view returns (uint256);
-    function bundlerSurchargeRate() external view returns (uint256);
 }

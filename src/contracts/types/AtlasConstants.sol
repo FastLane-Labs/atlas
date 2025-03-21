@@ -42,6 +42,11 @@ contract AtlasConstants {
     uint256 internal constant _SOLVER_CALLED_BACK_MASK = 1 << 161;
     uint256 internal constant _SOLVER_FULFILLED_MASK = 1 << 162;
 
+    // Left-most 128 bits of S_surchargeRates
+    uint256 internal constant _ATLAS_SURCHARGE_MASK = uint256(0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
+    // Right-most 128 bits of S_surchargeRates
+    uint256 internal constant _BUNDLER_SURCHARGE_MASK = uint256(0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
+
     // Used to set Lock phase without changing the activeEnvironment or callConfig.
     uint256 internal constant _LOCK_PHASE_MASK =
         uint256(0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00);

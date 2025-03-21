@@ -11,7 +11,7 @@ import "../src/contracts/types/ConfigTypes.sol";
 import "../src/contracts/types/LockTypes.sol";
 
 contract MockSafetyLocks is SafetyLocks {
-    constructor() SafetyLocks(0, 1_000_000, 1_000_000, address(0), address(0), address(0), address(0)) { }
+    constructor() SafetyLocks(0, 1_000_000, address(0), address(0), address(0), address(0)) { }
 
     function initializeLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) external payable {
         DAppConfig memory dConfig;
