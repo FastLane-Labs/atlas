@@ -22,6 +22,8 @@ import "../types/UserOperation.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
+import "forge-std/console.sol";
+
 /// @title Escrow
 /// @author FastLane Labs
 /// @notice This Escrow component of Atlas handles execution of stages by calling corresponding functions on the
@@ -228,6 +230,8 @@ abstract contract Escrow is AtlETH {
                         ctx.solverSuccessful = false;
 
                         // In multipleSuccessfulSolvers solvers must each pay a FULL_REFUND.
+                        console.log("_gasWaterMark: ", _gasWaterMark);
+                        console.log("dConfig.solverGasLimit: ", dConfig.solverGasLimit);
                         _handleSolverFailAccounting(
                             solverOp, dConfig.solverGasLimit, _gasWaterMark, _result, dConfig.callConfig.exPostBids()
                         );

@@ -416,7 +416,6 @@ abstract contract GasAccounting is SafetyLocks {
 
         // NOTE: Trivial for bundler to run a different EOA for solver so no bundler == solver carveout.
         if (ctx.solverSuccessful) {
-            // CASE: Winning solver is not the bundler.
 
             // Winning solver should pay for:
             // - Gas (C + E) used by their solverOp

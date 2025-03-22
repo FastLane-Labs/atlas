@@ -19,6 +19,8 @@ import "../types/DAppOperation.sol";
 import "../types/EscrowTypes.sol";
 import "../types/ValidCalls.sol";
 
+import "forge-std/console.sol";
+
 /// @title AtlasVerification
 /// @author FastLane Labs
 /// @notice AtlasVerification handles the verification of DAppConfigs, UserOperations, SolverOperations, and
@@ -78,6 +80,9 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             // allowUnapprovedDAppSignatories still verifies signature match, but does not check
             // if dApp owner approved the signer.
             bool allowUnapprovedDAppSignatories;
+            console.log(msgSender);
+            //console.log(dAppOp);
+            console.log(dConfig.callConfig);
             (verifyCallsResult, allowUnapprovedDAppSignatories) =
                 _verifyAuctioneer(dConfig, userOp, solverOps, dAppOp, msgSender);
 
@@ -86,6 +91,8 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             }
 
             // Check dapp signature
+            console.log("allowUnapprovedDAppSignatories: ", allowUnapprovedDAppSignatories);
+            console.log("isSimulation: ", isSimulation);
             verifyCallsResult = _verifyDApp(dConfig, dAppOp, msgSender, allowUnapprovedDAppSignatories, isSimulation);
             if (verifyCallsResult != ValidCallsResult.Valid) {
                 return (allSolversGasLimit, bidFindOverhead, verifyCallsResult);
@@ -257,6 +264,18 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             // Max one of multipleSolvers or invertsBidValue can be used, not both
             return ValidCallsResult.InvertsBidValueAndMultipleSuccessfulSolversNotSupportedTogether;
         }
+        if (callConfig.multipleSuccessfulSolvers() && callConfig.allowsZeroSolvers()) {
+            // Max one of multipleSolvers or invertsBidValue can be used, not both
+            return ValidCallsResult.NeedSolversForMultipleSuccessfulSolvers;
+        }
+        if (callConfig.multipleSuccessfulSolvers() && callConfig.allowsSolverAuctioneer()) {
+            // Max one of multipleSolvers or invertsBidValue can be used, not both
+            return ValidCallsResult.SolverCannotBeAuctioneerForMultipleSuccessfulSolvers;
+        }
+        if (callConfig.multipleSuccessfulSolvers() && callConfig.needsFulfillment()) {
+            // Max one of multipleSolvers or invertsBidValue can be used, not both
+            return ValidCallsResult.CannotRequireFulfillmentForMultipleSuccessfulSolvers;
+        }
         if (callConfig.needsSequentialUserNonces() && callConfig.needsSequentialDAppNonces()) {
             // Max one of user or dapp nonces can be sequential, not both
             return ValidCallsResult.BothUserAndDAppNoncesCannotBeSequential;
@@ -316,7 +335,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         }
 
         if (dConfig.callConfig.allowsUnknownAuctioneer()) return (ValidCallsResult.Valid, true);
-
+        console.log("here");
         return (ValidCallsResult.Valid, false);
     }
 

@@ -43,5 +43,8 @@ enum ValidCallsResult {
     MetacallGasLimitTooHigh,
     DAppGasLimitMismatch,
     ExPostBidsAndMultipleSuccessfulSolversNotSupportedTogether,
-    InvertsBidValueAndMultipleSuccessfulSolversNotSupportedTogether
+    InvertsBidValueAndMultipleSuccessfulSolversNotSupportedTogether,
+    NeedSolversForMultipleSuccessfulSolvers,
+    SolverCannotBeAuctioneerForMultipleSuccessfulSolvers,
+    CannotRequireFulfillmentForMultipleSuccessfulSolvers
 }

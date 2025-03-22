@@ -111,4 +111,8 @@ contract AtlasErrors {
     error InvertBidValueCannotBeExPostBids();
     error ExPostBidsAndMultipleSuccessfulSolversNotSupportedTogether();
     error InvertsBidValueAndMultipleSuccessfulSolversNotSupportedTogether();
+    error NeedSolversForMultipleSuccessfulSolvers();
+    error SolverCannotBeAuctioneerForMultipleSuccessfulSolvers();
+    error CannotRequireFulfillmentForMultipleSuccessfulSolvers();
+    
 }
