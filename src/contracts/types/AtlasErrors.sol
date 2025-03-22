@@ -114,5 +114,4 @@ contract AtlasErrors {
     error NeedSolversForMultipleSuccessfulSolvers();
     error SolverCannotBeAuctioneerForMultipleSuccessfulSolvers();
     error CannotRequireFulfillmentForMultipleSuccessfulSolvers();
-    
 }

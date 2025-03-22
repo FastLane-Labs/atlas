@@ -354,13 +354,17 @@ contract Atlas is Escrow, Factory {
 
             _bidAmount += _executeSolverOperation(ctx, dConfig, userOp, solverOp, solverOp.bidAmount, false, returnData);
 
+            // If a winning solver is found, stop iterating through the solverOps and return the winning bid
             if (ctx.solverSuccessful) {
                 return _bidAmount;
             }
         }
+
+        // If no winning solver, but multipleSuccessfulSolvers is true, return the sum of solver bid amounts
         if (dConfig.callConfig.multipleSuccessfulSolvers()) {
             return _bidAmount;
         }
+
         if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));
         if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
         return 0;

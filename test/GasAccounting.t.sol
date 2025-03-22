@@ -26,8 +26,6 @@ import { MockL2GasCalculator } from "./base/MockL2GasCalculator.sol";
 import { TestAtlas } from "./base/TestAtlas.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 
-import "forge-std/console.sol";
-
 contract GasAccountingTest is AtlasConstants, BaseTest {
     using GasAccLib for GasLedger;
     using GasAccLib for BorrowsLedger;

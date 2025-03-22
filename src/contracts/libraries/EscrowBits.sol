@@ -38,8 +38,8 @@ library EscrowBits {
             | 1 << uint256(SolverOutcome.BalanceNotReconciled) // <- detected by Escrow
             | 1 << uint256(SolverOutcome.CallbackNotCalled) // <- detected by Escrow
             | 1 << uint256(SolverOutcome.EVMError) // <- default if err by EE
-            | 1 << uint256(SolverOutcome.MultipleSolvers) // <- overriden in Escrow
-    );
+            | 1 << uint256(SolverOutcome.MultipleSolvers)
+    ); // <- MultipleSolvers is not an error, just used to charge each successful solver for just their own gas
 
     function canExecute(uint256 result) internal pure returns (bool) {
         return (result == 0);

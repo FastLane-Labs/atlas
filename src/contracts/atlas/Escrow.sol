@@ -220,21 +220,18 @@ abstract contract Escrow is AtlETH {
                     );
 
                     // Keep executing solvers without ending the auction if multipleSuccessfulSolvers is set
-                    if (CallBits.multipleSuccessfulSolvers(dConfig.callConfig)) {
-                        // override successful result to a result that triggers FULL_REFUND in failed solver acct.
+                    if (dConfig.callConfig.multipleSuccessfulSolvers()) {
+                        // ctx.solverSuccessful is implicitly left as false in multipleSuccessfulSolvers mode
+
+                        // Indicates that solver must be charged for their own gas + surcharges
                         _result = 1 << (uint256(SolverOutcome.MultipleSolvers));
 
-                        // explicitly set solverSuccessful to false so that solvers keep executing
-                        ctx.solverSuccessful = false;
-
                         // In multipleSuccessfulSolvers solvers must each pay a FULL_REFUND.
-                        _handleSolverFailAccounting(
-                            solverOp, dConfig.solverGasLimit, _gasWaterMark, _result, dConfig.callConfig.exPostBids()
-                        );
-
-                    // In all other configs end auction with first successful solver that paid what it bid.
+                        // exPostBids is not supported in multipleSuccessfulSolvers mode, so exPostBids = false here.
+                        _handleSolverFailAccounting(solverOp, dConfig.solverGasLimit, _gasWaterMark, _result, false);
                     } else {
-                        // Mark as complete
+                        // If not in multipleSuccessfulSolvers mode, end the auction with the first successful solver
+                        // that paid what it bid
                         ctx.solverSuccessful = true;
                     }
                     ctx.solverOutcome = uint24(_result);
