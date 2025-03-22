@@ -12,9 +12,6 @@ import {AtlasEvents} from "../src/contracts/types/AtlasEvents.sol";
 import {SolverOutcome} from "../src/contracts/types/EscrowTypes.sol";
 import "../src/contracts/libraries/CallVerification.sol";
 import "../src/contracts/interfaces/IAtlas.sol";
-
-import "forge-std/console.sol";
-
 /// @dev this test is used to illustrate and test the multiple successful solvers feature
 /// @dev MultipleSolversDAppControl serves as both the dapp and dAppControl contracts
 /// @dev It tracks an "accumulatedAuxillaryBid" which is the sum of all auxillary bids from all solvers
@@ -181,8 +178,6 @@ contract MultipleSolversTest is BaseTest, AtlasErrors {
         SolverOperation[] memory solverOps = new SolverOperation[](2);
         solverOps[0] = solverOp1;
         solverOps[1] = solverOp2;
-
-        console.log("bundler in tests: ", bundler);
 
         bytes32 callChainHash = CallVerification.getCallChainHash(userOp, solverOps);
         DAppOperation memory dappOp = buildDAppOperation(userOpHash, callChainHash, bundler);
