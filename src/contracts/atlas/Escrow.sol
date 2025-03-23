@@ -215,10 +215,6 @@ abstract contract Escrow is AtlETH {
 
                 // First successful solver call that paid what it bid
                 if (_result.executionSuccessful()) {
-                    emit SolverTxResult(
-                        solverOp.solver, solverOp.from, dConfig.to, solverOp.bidToken, bidAmount, true, true, _result
-                    );
-
                     // Keep executing solvers without ending the auction if multipleSuccessfulSolvers is set
                     if (dConfig.callConfig.multipleSuccessfulSolvers()) {
                         // ctx.solverSuccessful is implicitly left as false in multipleSuccessfulSolvers mode
@@ -234,6 +230,12 @@ abstract contract Escrow is AtlETH {
                         // that paid what it bid
                         ctx.solverSuccessful = true;
                     }
+
+                    // Event includes MultipleSolvers in the result field, if set above. Otherwise result = 0.
+                    emit SolverTxResult(
+                        solverOp.solver, solverOp.from, dConfig.to, solverOp.bidToken, bidAmount, true, true, _result
+                    );
+
                     ctx.solverOutcome = uint24(_result);
                     return _solverTracker.bidAmount;
                 }
