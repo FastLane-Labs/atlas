@@ -16,8 +16,7 @@ bytes32 constant USER_TYPEHASH_TRUSTED = keccak256(
 );
 
 // Length of UserOperation in hex chars, assuming empty signature field, excluding the dynamic userOp.data field.
-uint256 constant USER_OP_STATIC_LENGTH = 544;
-// TODO update this ^ to include bundlerSurchargeRate
+uint256 constant USER_OP_STATIC_LENGTH = 576;
 
 struct UserOperation {
     address from; // User address

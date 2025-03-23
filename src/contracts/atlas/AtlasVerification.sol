@@ -561,6 +561,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                         userOp.control,
                         userOp.callConfig,
                         userOp.dappGasLimit,
+                        userOp.bundlerSurchargeRate,
                         userOp.sessionKey
                     )
                 )
@@ -581,6 +582,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                         userOp.control,
                         userOp.callConfig,
                         userOp.dappGasLimit,
+                        userOp.bundlerSurchargeRate,
                         userOp.sessionKey,
                         keccak256(userOp.data)
                     )
