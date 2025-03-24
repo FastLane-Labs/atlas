@@ -325,6 +325,96 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(totalShortfall, 0, "totalShortfall should be 0");
     }
 
+    function test_show_borrows_and_repays_accumulate_after_multiple_reconciles() public {
+        // Setup two solvers
+        address solver1Contract = makeAddr("Solver1Contract");
+        address solver2Contract = makeAddr("Solver2Contract");
+        
+        // Setup solver1
+        hoax(solverOneEOA, 1e18);
+        tAtlas.depositAndBond{ value: 1e18 }(1e18);
+        
+        // Setup solver2
+        hoax(solverTwoEOA, 1e18);
+        tAtlas.depositAndBond{ value: 1e18 }(1e18);
+
+        // Set initial solver lock for solver1
+        tAtlas.setLock(executionEnvironment, uint32(0), uint8(ExecutionPhase.SolverOperation));
+        tAtlas.setSolverTo(solver1Contract);
+        // Set solver lock with just the address, no flags yet
+        tAtlas.setSolverLock(uint256(uint160(solverOneEOA)));
+
+        // Setup gas ledger for both solvers
+        GasLedger memory gL = GasLedger(2_000_000, 0, 0, 2_000_000, 0);
+        tAtlas.setGasLedger(gL.pack());
+
+        // Fund Atlas contract so it can handle borrows
+        vm.deal(address(tAtlas), 10e18);
+
+        // Solver1 borrows 1 ETH
+        hoax(executionEnvironment);
+        tAtlas.borrow(1e18);
+
+        // Verify borrows ledger after solver1's borrow
+        BorrowsLedger memory bL = tAtlas.getBorrowsLedger();
+        assertEq(bL.borrows, 1e18, "borrows should be 1e18 after solver1's borrow");
+        assertEq(bL.repays, 0, "repays should be 0 before solver1's reconcile");
+
+        uint256 expectedGasLiability = (1_000_000 * tx.gasprice).withSurcharge(
+            A_SURCHARGE + B_SURCHARGE
+        );
+
+        // Solver1 reconciles successfully
+        hoax(solver1Contract, 1e18);
+        uint256 totalShortfall = tAtlas.reconcile{value: 1e18}(expectedGasLiability);
+
+        // Verify solver1's state
+        uint256 solver1Lock = tAtlas.getSolverLock();
+        // The lock should be: solver address in lower 160 bits | CALLED_BACK_MASK | FULFILLED_MASK
+        assertEq(solver1Lock, (uint256(uint160(solverOneEOA)) | _SOLVER_CALLED_BACK_MASK | _SOLVER_FULFILLED_MASK), 
+            "solver1 lock should be CALLED BACK and FULFILLED");
+        assertEq(totalShortfall, 0, "solver1 shortfall should be 0");
+
+        // Verify borrows ledger after solver1's reconcile
+        bL = tAtlas.getBorrowsLedger();
+        assertEq(bL.borrows, 1e18, "borrows should still be 1e18 after solver1's reconcile");
+        assertEq(bL.repays, 1e18, "repays should be 1e18 after solver1's reconcile");
+
+        // Test solver2 reconciliation
+        tAtlas.setSolverTo(solver2Contract);
+        // Set solver lock with just the address, no flags yet
+        tAtlas.setSolverLock(uint256(uint160(solverTwoEOA)));
+
+        // Solver2 borrows 1 ETH
+        hoax(executionEnvironment);
+        tAtlas.borrow(1e18);
+
+        // Verify borrows ledger after solver2's borrow
+        bL = tAtlas.getBorrowsLedger();
+        assertEq(bL.borrows, 2e18, "borrows should be 2e18 after solver2's borrow");
+        assertEq(bL.repays, 1e18, "repays should still be 1e18 before solver2's reconcile");
+
+        // Solver2 reconciles successfully
+        hoax(solver2Contract, 1e18);
+        totalShortfall = tAtlas.reconcile{value: 1e18}(expectedGasLiability);
+
+        // Verify solver2's state
+        uint256 solver2Lock = tAtlas.getSolverLock();
+        // The lock should be: solver address in lower 160 bits | CALLED_BACK_MASK | FULFILLED_MASK
+        assertEq(solver2Lock, (uint256(uint160(solverTwoEOA)) | _SOLVER_CALLED_BACK_MASK | _SOLVER_FULFILLED_MASK), 
+            "solver2 lock should be CALLED BACK and FULFILLED");
+        assertEq(totalShortfall, 0, "solver2 shortfall should be 0");
+
+        // Verify final state
+        GasLedger memory finalGL = tAtlas.getGasLedger();
+        BorrowsLedger memory finalBL = tAtlas.getBorrowsLedger();
+        
+        assertEq(finalBL.borrows, 2e18, "total borrows should be 2e18");
+        assertEq(finalBL.repays, 2e18, "total repays should be 2e18");
+        //assertEq(finalGL.maxApprovedGasSpend, (expectedGasLiability/tx.gasprice) * 2, 
+        //    "maxApprovedGasSpend should be 2x gas liability, it is not being summed because Atlas expects reconcile to only be called once");
+    }
+
     function test_GasAccounting_assign() public {
         vm.deal(solverOneEOA, 6e18); // 3 to unbonded, 2 unbonding, 1 bonded
         vm.startPrank(solverOneEOA);
