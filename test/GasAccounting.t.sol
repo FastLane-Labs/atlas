@@ -784,7 +784,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             tAtlas.balanceOfBonded(solverOneEOA),
             1e18 - estWinningSolverCharge,
             0.01e18, // 1% tolerance
-            "winning solver bonded balance should decrease by estWinningSolverCharge"
+            "C3: winning solver bonded balance should decrease by estWinningSolverCharge"
         );
         assertApproxEqRel(
             claimsPaidToBundler,
@@ -792,23 +792,23 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             0.01e18, // 1% tolerance
             "C3: claimsPaidToBundler should be estBundlerRefund"
         );
-        assertEq(bundlerBalanceBefore + claimsPaidToBundler, userEOA.balance, "bundler balance should increase by estWinningSolverCharge");
+        assertEq(bundlerBalanceBefore + claimsPaidToBundler, userEOA.balance, "C3: bundler balance should increase by estWinningSolverCharge");
         assertApproxEqRel(
             netAtlasGasSurcharge,
             estAtlasSurcharge,
             0.01e18, // 1% tolerance
-            "netAtlasGasSurcharge should be estAtlasSurcharge"
+            "C3: netAtlasGasSurcharge should be estAtlasSurcharge"
         );
-        assertEq(tAtlas.cumulativeSurcharge(), atlasSurchargeBefore + netAtlasGasSurcharge, "cumulativeSurcharge should increase by netAtlasGasSurcharge");
-        assertEq(aDataAfter.auctionWins, aDataBefore.auctionWins + 1, "auctionWins should increase by 1");
-        assertEq(aDataAfter.auctionFails, aDataBefore.auctionFails, "auctionFails should not change");
+        assertEq(tAtlas.cumulativeSurcharge(), atlasSurchargeBefore + netAtlasGasSurcharge, "C3: cumulativeSurcharge should increase by netAtlasGasSurcharge");
+        assertEq(aDataAfter.auctionWins, aDataBefore.auctionWins + 1, "C3: auctionWins should increase by 1");
+        assertEq(aDataAfter.auctionFails, aDataBefore.auctionFails, "C3: auctionFails should not change");
         assertApproxEqRel(
             aDataAfter.totalGasValueUsed,
             aDataBefore.totalGasValueUsed + (estWinningSolverCharge / _GAS_VALUE_DECIMALS_TO_DROP),
             0.01e18, // 1% tolerance
-            "totalGasValueUsed should increase by estWinningSolverCharge"
+            "C3: totalGasValueUsed should increase by estWinningSolverCharge"
         );
-        assertEq(tAtlas.getPhase(), uint8(ExecutionPhase.FullyLocked), "phase should be FullyLocked");
+        assertEq(tAtlas.getPhase(), uint8(ExecutionPhase.FullyLocked), "C3: phase should be FullyLocked");
 
         // ============================================
         // Case 4: no winning solver
@@ -817,10 +817,10 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         ctx.solverSuccessful = false;
         solverFaultFailureGas = 10_000_000; // large solver failure gas, to trigger 80% bundler cap
+        unreachedCalldataValuePaid = 0; // no unreached solvers if no winning solver
         gL = GasLedger(0, writeoffsGas, solverFaultFailureGas, 0, 0);
 
-        uint256 bundlerRefundBeforeCap = unreachedCalldataValuePaid 
-            + uint256(solverFaultFailureGas).withSurcharge(B_SURCHARGE) * tx.gasprice;
+        uint256 bundlerRefundBeforeCap = uint256(solverFaultFailureGas).withSurcharge(B_SURCHARGE) * tx.gasprice;
 
         // calculate expected bundler refund --> hits the 80% cap
         estBundlerRefund = (gasMarker - writeoffsGas - settleGas) * 8 / 10 * tx.gasprice;
@@ -835,10 +835,10 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         aDataAfter = tAtlas.getAccessData(solverOneEOA);
 
         // solverOne is not winner - no charge or change in analytics expected
-        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "solverOne is not winner - no balance change");
-        assertEq(aDataAfter.auctionWins, aDataBefore.auctionWins, "auctionWins should not change");
-        assertEq(aDataAfter.auctionFails, aDataBefore.auctionFails, "auctionFails should not change");
-        assertEq(aDataAfter.totalGasValueUsed, aDataBefore.totalGasValueUsed, "totalGasValueUsed should not change");
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "C4: solverOne is not winner - no balance change");
+        assertEq(aDataAfter.auctionWins, aDataBefore.auctionWins, "C4: auctionWins should not change");
+        assertEq(aDataAfter.auctionFails, aDataBefore.auctionFails, "C4: auctionFails should not change");
+        assertEq(aDataAfter.totalGasValueUsed, aDataBefore.totalGasValueUsed, "C4: totalGasValueUsed should not change");
 
         // check bundler refund was capped at 80%
         assertApproxEqRel(
@@ -847,19 +847,19 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             0.01e18, // 1% tolerance
             "C4: claimsPaidToBundler should be estBundlerRefund"
         );
-        assertEq(bundlerBalanceBefore + claimsPaidToBundler, userEOA.balance, "bundler balance should increase by estBundlerRefund");
-        assertTrue(estBundlerRefund < bundlerRefundBeforeCap, "bundler refund should be capped at 80%");
+        assertEq(bundlerBalanceBefore + claimsPaidToBundler, userEOA.balance, "C4: bundler balance should increase by estBundlerRefund");
+        assertTrue(estBundlerRefund < bundlerRefundBeforeCap, "C4: bundler refund should be capped at 80%");
 
         // check atlas surcharge included excess bundler surcharge above 80% cap
         assertApproxEqRel(
             netAtlasGasSurcharge,
             estAtlasSurcharge,
             0.01e18, // 1% tolerance
-            "netAtlasGasSurcharge should be estAtlasSurcharge"
+            "C4: netAtlasGasSurcharge should be estAtlasSurcharge"
         );
-        assertEq(tAtlas.cumulativeSurcharge(), atlasSurchargeBefore + netAtlasGasSurcharge, "cumulativeSurcharge should increase by netAtlasGasSurcharge");
+        assertEq(tAtlas.cumulativeSurcharge(), atlasSurchargeBefore + netAtlasGasSurcharge, "C4: cumulativeSurcharge should increase by netAtlasGasSurcharge");
 
-        assertEq(tAtlas.getPhase(), uint8(ExecutionPhase.FullyLocked), "phase should be FullyLocked");
+        assertEq(tAtlas.getPhase(), uint8(ExecutionPhase.FullyLocked), "C4: phase should be FullyLocked");
     }
 
     function test_GasAccounting_updateAnalytics() public {

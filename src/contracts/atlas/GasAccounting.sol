@@ -466,8 +466,10 @@ abstract contract GasAccounting is SafetyLocks {
 
             // Bundler gets (base gas cost + bundler surcharge) of solver fault failures, plus any net repayments, plus
             // base gas cost of unreached solver calldata. This is compared to _maxRefund below.
+            // `unreachedCalldataValuePaid` is not added here as it should always be 0 when solverSuccessful = false,
+            // because there should then be no unreached solvers.
             uint256 _bundlerCutBeforeLimit = uint256(gL.solverFaultFailureGas).withSurcharge(_bundlerSurchargeRate)
-                * tx.gasprice + uint256(_netRepayments) + unreachedCalldataValuePaid;
+                * tx.gasprice + uint256(_netRepayments);
 
             // Atlas only keeps the Atlas surcharge of solver fault failures, and any gas due to bundler that exceeds
             // the 80% limit.
