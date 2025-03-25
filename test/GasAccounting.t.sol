@@ -411,8 +411,8 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         
         assertEq(finalBL.borrows, 2e18, "total borrows should be 2e18");
         assertEq(finalBL.repays, 2e18, "total repays should be 2e18");
-        //assertEq(finalGL.maxApprovedGasSpend, (expectedGasLiability/tx.gasprice) * 2, 
-        //    "maxApprovedGasSpend should be 2x gas liability, it is not being summed because Atlas expects reconcile to only be called once");
+        assertEq(finalGL.maxApprovedGasSpend, (expectedGasLiability/tx.gasprice), 
+            "maxApprovedGasSpend is not being summed, this is OK because handleFailSolverAccounting doesn't use maxApprovedGasSpend");
     }
 
     function test_GasAccounting_assign() public {
