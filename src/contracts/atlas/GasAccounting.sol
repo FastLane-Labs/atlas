@@ -362,25 +362,33 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _writeoffGasMarker = gasleft();
         EscrowAccountAccessData memory _solverData;
         uint256 _calldataGasCost;
+        uint256 _totalDeficit;
         uint256 _deficit;
+        address _from;
 
         // Start at the solver after the current solverIdx, because current solverIdx is the winner
         for (uint256 i = winningSolverIdx + 1; i < solverOps.length; ++i) {
+            _from = solverOps[i].from;
             _calldataGasCost = GasAccLib.solverOpCalldataGas(solverOps[i].data.length, L2_GAS_CALCULATOR) * tx.gasprice;
-            _solverData = S_accessData[solverOps[i].from];
+            _solverData = S_accessData[_from];
 
             // No surcharges added to calldata cost for unreached solvers
-            _deficit = _assign(_solverData, solverOps[i].from, _calldataGasCost);
+            _deficit = _assign(_solverData, _from, _calldataGasCost);
 
             // Persist _assign() changes to solver account data to storage
-            S_accessData[solverOps[i].from] = _solverData;
+            S_accessData[_from] = _solverData;
 
+            // The sum of value paid less deficits is tracked and used in `_settle()`
             unreachedCalldataValuePaid += _calldataGasCost - _deficit;
+
+            // Any deficits from the `_assign()` operations are converted to gas units and written off so as not to
+            // charge the winning solver for calldata that is not their responsibility, in `_settle()`.
+            if (_deficit > 0) _totalDeficit += _deficit.divUp(tx.gasprice);
         }
 
         // The gas cost of this loop is always paid by the bundler so as not to charge the winning solver for an
-        // excessive number of loops and SSTOREs via _assign(). This gas is therefore added to writeoffs.
-        gL.writeoffsGas += (_writeoffGasMarker - gasleft()).toUint48();
+        // excessive number of loops and SSTOREs via `_assign()`. This gas is therefore added to writeoffs.
+        gL.writeoffsGas += (_writeoffGasMarker - gasleft() + _totalDeficit).toUint48();
     }
 
     function _settle(

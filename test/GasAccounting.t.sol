@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import "forge-std/Test.sol";
 
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
+import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
 
 import { GasAccounting } from "../src/contracts/atlas/GasAccounting.sol";
 import { AtlasEvents } from "../src/contracts/types/AtlasEvents.sol";
@@ -31,6 +32,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
     using GasAccLib for BorrowsLedger;
     using GasAccLib for uint256;
     using AccountingMath for uint256;
+    using FixedPointMathLib for uint256;
 
     uint256 public constant ONE_GWEI = 1e9;
     uint256 public constant SCALE = AccountingMath._SCALE;
@@ -598,24 +600,26 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         GasLedger memory gL = GasLedger(0, 0, 0, 0, 0);
         uint256 solverOpCalldataGasValue =
             GasAccLib.solverOpCalldataGas(solverOps[0].data.length, address(0)) * tx.gasprice;
-        uint256 loopIterGas = 4000; // approx gas used for 1 loop
-        uint256 constGas = 350; // approx constant gas used besides the loop
+        uint256 loopIterGasNormal = 3600; // approx gas used for 1 loop, `_assign()` charges just bonded successfully
+        uint256 loopIterGasDeficit = 6800; // approx gas used for 1 loop with deficit in `_assign()`
+        uint256 constGas = 340; // approx constant gas used besides the loop
 
         // Give solvers bonded atlETH to pay with
         hoax(solverOneEOA, 1e18);
         tAtlas.depositAndBond{ value: 1e18 }(1e18);
         hoax(solverTwoEOA, 1e18);
         tAtlas.depositAndBond{ value: 1e18 }(1e18);
-        hoax(solverThreeEOA, 1e18);
+
+        uint256 snapshot = vm.snapshotState();
+
+        hoax(solverThreeEOA, 1e18); // Solver 3 will have no bonded atlETH in Case 4 below.
         tAtlas.depositAndBond{ value: 1e18 }(1e18);
 
         // Sum of starting bonded balances should be 3e18
-        assertEq(tAtlas.bondedTotalSupply(), 3e18, "bondedTotalSupply should be 3e18");
-        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "solverOneEOA bonded balance should start 1e18");
-        assertEq(tAtlas.balanceOfBonded(solverTwoEOA), 1e18, "solverTwoEOA bonded balance should start 1e18");
-        assertEq(tAtlas.balanceOfBonded(solverThreeEOA), 1e18, "solverThreeEOA bonded balance should start 1e18");
-
-        uint256 snapshot = vm.snapshotState();
+        assertEq(tAtlas.bondedTotalSupply(), 3e18, "C0: bondedTotalSupply should be 3e18");
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "C0: solverOneEOA bonded balance should start 1e18");
+        assertEq(tAtlas.balanceOfBonded(solverTwoEOA), 1e18, "C0: solverTwoEOA bonded balance should start 1e18");
+        assertEq(tAtlas.balanceOfBonded(solverThreeEOA), 1e18, "C0: solverThreeEOA bonded balance should start 1e18");
 
         // ===============================
         // Case 1: No unreached solvers -> winning solver idx = 2
@@ -624,22 +628,24 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         GasLedger memory gLAfter = tAtlas.getGasLedger();
 
-        assertEq(unreachedCalldataValuePaid, 0, "unreachedCalldataValuePaid should be 0");
-        assertEq(tAtlas.bondedTotalSupply(), 3e18, "bondedTotalSupply should be 3e18");
-        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "solverOneEOA bonded balance should be 1e18");
-        assertEq(tAtlas.balanceOfBonded(solverTwoEOA), 1e18, "solverTwoEOA bonded balance should be 1e18");
-        assertEq(tAtlas.balanceOfBonded(solverThreeEOA), 1e18, "solverThreeEOA bonded balance should be 1e18");
+        assertEq(unreachedCalldataValuePaid, 0, "C1: unreachedCalldataValuePaid should be 0");
+        assertEq(tAtlas.bondedTotalSupply(), 3e18, "C1: bondedTotalSupply should be 3e18");
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "C1: solverOneEOA bonded balance should be 1e18");
+        assertEq(tAtlas.balanceOfBonded(solverTwoEOA), 1e18, "C1: solverTwoEOA bonded balance should be 1e18");
+        assertEq(tAtlas.balanceOfBonded(solverThreeEOA), 1e18, "C1: solverThreeEOA bonded balance should be 1e18");
         assertApproxEqRel(
             gLAfter.writeoffsGas,
             constGas, // no loops, just constant gas
-            0.1e18, // 10% tolerance, because smol number
-            "writeoffsGas should not change"
+            0.02e18, // 2% tolerance, because smol number
+            "C1: writeoffsGas should not change"
         );
 
         // ===============================
         // Case 2: 1 unreached solver -> winning solver idx = 1
         // ===============================
         vm.revertToState(snapshot);
+        hoax(solverThreeEOA, 1e18); // solver 3 has bonded atlETH in this case
+        tAtlas.depositAndBond{ value: 1e18 }(1e18);
 
         unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata(solverOps, gL, 1);
 
@@ -648,31 +654,33 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(
             unreachedCalldataValuePaid,
             solverOpCalldataGasValue,
-            "unreachedCalldataValuePaid should be 1x solverOpCalldataGasValue"
+            "C2: unreachedCalldataValuePaid should be 1x solverOpCalldataGasValue"
         );
         assertEq(
             tAtlas.bondedTotalSupply(),
             3e18 - solverOpCalldataGasValue,
-            "bondedTotalSupply should be 3e18 - solverOpCalldataGasValue"
+            "C2: bondedTotalSupply should be 3e18 - solverOpCalldataGasValue"
         );
-        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "solverOneEOA bonded balance should be 1e18");
-        assertEq(tAtlas.balanceOfBonded(solverTwoEOA), 1e18, "solverTwoEOA bonded balance should be 1e18");
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "C2: solverOneEOA bonded balance should be 1e18");
+        assertEq(tAtlas.balanceOfBonded(solverTwoEOA), 1e18, "C2: solverTwoEOA bonded balance should be 1e18");
         assertEq(
             tAtlas.balanceOfBonded(solverThreeEOA),
             1e18 - solverOpCalldataGasValue,
-            "solverThreeEOA bonded balance should be 1e18 - solverOpCalldataGasValue"
+            "C2: solverThreeEOA bonded balance should be 1e18 - solverOpCalldataGasValue"
         );
         assertApproxEqRel(
             gLAfter.writeoffsGas,
-            loopIterGas + constGas, // 1 iteration + constant gas
+            loopIterGasNormal + constGas, // 1 normal iteration + constant gas
             0.02e18, // 2% tolerance
-            "writeoffsGas should increase by approx 1 loop"
+            "C2: writeoffsGas should increase by approx 1 loop"
         );
 
         // ===============================
-        // Case 3: 2 unreached solvers -> winning solver idx = 0
+        // Case 3: 2 unreached solvers -> winning solver idx = 0 | no deficits
         // ===============================
         vm.revertToState(snapshot);
+        hoax(solverThreeEOA, 1e18); // solver 3 has bonded atlETH in this case
+        tAtlas.depositAndBond{ value: 1e18 }(1e18);
 
         unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata(solverOps, gL, 0);
 
@@ -681,29 +689,69 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(
             unreachedCalldataValuePaid,
             solverOpCalldataGasValue * 2,
-            "unreachedCalldataValuePaid should be 2x solverOpCalldataGasValue"
+            "C3: unreachedCalldataValuePaid should be 2x solverOpCalldataGasValue"
         );
         assertEq(
             tAtlas.bondedTotalSupply(),
             3e18 - (2 * solverOpCalldataGasValue),
-            "bondedTotalSupply should be 3e18 - 2 * solverOpCalldataGasValue"
+            "C3: bondedTotalSupply should be 3e18 - 2 * solverOpCalldataGasValue"
         );
-        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "solverOneEOA bonded balance should be 1e18");
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "C3: solverOneEOA bonded balance should be 1e18");
         assertEq(
             tAtlas.balanceOfBonded(solverTwoEOA),
             1e18 - solverOpCalldataGasValue,
-            "solverTwoEOA bonded balance should be 1e18 - solverOpCalldataGasValue"
+            "C3: solverTwoEOA bonded balance should be 1e18 - solverOpCalldataGasValue"
         );
         assertEq(
             tAtlas.balanceOfBonded(solverThreeEOA),
             1e18 - solverOpCalldataGasValue,
-            "solverThreeEOA bonded balance should be 1e18 - solverOpCalldataGasValue"
+            "C3: solverThreeEOA bonded balance should be 1e18 - solverOpCalldataGasValue"
         );
         assertApproxEqRel(
             gLAfter.writeoffsGas,
-            2 * loopIterGas + constGas, // 2 iterations + constant gas
+            2 * loopIterGasNormal + constGas, // 2 normal iterations + constant gas
             0.02e18, // 2% tolerance
-            "writeoffsGas should increase by approx 2 loops"
+            "C3: writeoffsGas should increase by approx 2 loops"
+        );
+
+        // ===============================
+        // Case 4: 2 unreached solvers -> winning solver idx = 0 | solverThree has no bonded atlETH -> deficit
+        // ===============================
+        vm.revertToState(snapshot);
+
+        // No bonded atlETH for solver 3 in this case - but set storage slot to non-zero for gas calcs
+        tAtlas.setAccessData(solverThreeEOA, EscrowAccountAccessData(0, uint32(block.number - 1), 0, 0, 0));
+
+        unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata(solverOps, gL, 0);
+
+        gLAfter = tAtlas.getGasLedger();
+
+        assertEq(
+            unreachedCalldataValuePaid,
+            solverOpCalldataGasValue, // Only 1x calldata gas value paid. Solver 3's calldata is written off
+            "C4: unreachedCalldataValuePaid should be 1x solverOpCalldataGasValue"
+        );
+        assertEq(
+            tAtlas.bondedTotalSupply(),
+            2e18 - solverOpCalldataGasValue,
+            "C4: bondedTotalSupply should be 2e18 - 1x solverOpCalldataGasValue"
+        );
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "C4: solverOneEOA bonded balance should be 1e18");
+        assertEq(
+            tAtlas.balanceOfBonded(solverTwoEOA),
+            1e18 - solverOpCalldataGasValue,
+            "C4: solverTwoEOA bonded balance should be 1e18 - solverOpCalldataGasValue"
+        );
+        assertEq(
+            tAtlas.balanceOfBonded(solverThreeEOA),
+            0, // Because solver 3 has no bonded atlETH at start of this test case
+            "C4: solverThreeEOA bonded balance should be 0"
+        );
+        assertApproxEqRel(
+            gLAfter.writeoffsGas, // incl solver 3 calldata gas + extra gas from deficit calc in assign()
+            loopIterGasNormal + loopIterGasDeficit + constGas + solverOpCalldataGasValue.divUp(tx.gasprice),
+            0.02e18, // 2% tolerance
+            "C4: writeoffsGas should increase by 1 normal loop + 1 deficit assign loop + solver 3's calldata gas"
         );
     }
 
@@ -1081,5 +1129,10 @@ contract TestAtlasGasAcc is TestAtlas {
 
     function getAccessData(address account) public view returns (EscrowAccountAccessData memory) {
         return S_accessData[account];
+    }
+
+    // NOTE: Only done to make storage slot non-zero to make gas calculations easier
+    function setAccessData(address account, EscrowAccountAccessData memory aData) public {
+        S_accessData[account] = aData;
     }
 }
