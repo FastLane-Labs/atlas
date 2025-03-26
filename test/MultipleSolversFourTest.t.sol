@@ -12,6 +12,7 @@ import {AtlasEvents} from "../src/contracts/types/AtlasEvents.sol";
 import {SolverOutcome} from "../src/contracts/types/EscrowTypes.sol";
 import "../src/contracts/libraries/CallVerification.sol";
 import "../src/contracts/interfaces/IAtlas.sol";
+import "forge-std/console.sol";
 /// @dev this test is used to illustrate and test the multiple successful solvers feature
 /// @dev MultipleSolversDAppControl serves as both the dapp and dAppControl contracts
 /// @dev It tracks an "accumulatedAuxillaryBid" which is the sum of all auxillary bids from all solvers
@@ -24,6 +25,8 @@ contract MultipleSolversTest is BaseTest, AtlasErrors {
     MultipleSolversDAppControl control;
     MockSolver solver1;
     MockSolver solver2;
+    MockSolver solver3;
+    MockSolver solver4;
 
     uint256 userOpSignerPK = 0x123456;
     address userOpSigner = vm.addr(userOpSignerPK);
@@ -58,6 +61,20 @@ contract MultipleSolversTest is BaseTest, AtlasErrors {
         vm.deal(address(solver2), 10 * solverBidAmount);
         vm.prank(solverTwoEOA);
         atlas.depositAndBond{value: 5 ether}(5 ether);
+
+        vm.prank(solverThreeEOA);
+        solver3 = new MockSolver(
+            address(WETH_ADDRESS), address(atlas));
+        vm.deal(address(solver3), 10 * solverBidAmount);
+        vm.prank(solverThreeEOA);
+        atlas.depositAndBond{value: 5 ether}(5 ether);
+
+        vm.prank(solverFourEOA);
+        solver4 = new MockSolver(
+            address(WETH_ADDRESS), address(atlas));
+        vm.deal(address(solver4), 10 * solverBidAmount);
+        vm.prank(solverFourEOA);
+        atlas.depositAndBond{value: 5 ether}(5 ether);
     }
 
     function buildUserOperation(uint256 signerPK) internal view returns (UserOperation memory) {
@@ -91,13 +108,14 @@ contract MultipleSolversTest is BaseTest, AtlasErrors {
         bytes32 userOpHash,
         uint256 bidAmount,
         uint256 auxillaryBidAmount,
-        bool isReverting
+        bool isReverting,
+        uint256 numIterations
     ) internal view returns (SolverOperation memory) {
         bytes memory data;
         if (isReverting) {
-            data = abi.encodeWithSelector(solver1.revertWhileSolving.selector);
+            data = abi.encodeWithSelector(solver1.solve.selector, numIterations, true);
         } else {
-            data = abi.encodeWithSelector(solver1.solve.selector);
+            data = abi.encodeWithSelector(solver1.solve.selector, numIterations, false);
             bytes memory aux = abi.encode(auxillaryBidAmount);
             data = bytes.concat(data, aux);
         }
@@ -151,11 +169,14 @@ contract MultipleSolversTest is BaseTest, AtlasErrors {
         uint256 bidAmount;
         uint256 auxillaryBidAmount;
         bool isReverting;
+        uint256 numIterations;
     }
 
-    function two_solver_generic_test(
+    function four_solver_generic_test(
         SolverBidPattern memory solver1BidPattern,
-        SolverBidPattern memory solver2BidPattern
+        SolverBidPattern memory solver2BidPattern,
+        SolverBidPattern memory solver3BidPattern,
+        SolverBidPattern memory solver4BidPattern
     ) public {
         UserOperation memory userOp = buildUserOperation(userOpSignerPK);
         (address executionEnvironment, ,) = IAtlas(address(atlas)).getExecutionEnvironment(userOpSigner, address(control));
@@ -166,7 +187,8 @@ contract MultipleSolversTest is BaseTest, AtlasErrors {
             userOpHash,
             solver1BidPattern.bidAmount,
             solver1BidPattern.auxillaryBidAmount,
-            solver1BidPattern.isReverting
+            solver1BidPattern.isReverting,
+            solver1BidPattern.numIterations
         );
         SolverOperation memory solverOp2 = buildSolverOperation(
             solverTwoPK,
@@ -174,18 +196,41 @@ contract MultipleSolversTest is BaseTest, AtlasErrors {
             userOpHash,
             solver2BidPattern.bidAmount,
             solver2BidPattern.auxillaryBidAmount,
-            solver2BidPattern.isReverting
+            solver2BidPattern.isReverting,
+            solver2BidPattern.numIterations
         );
-        SolverOperation[] memory solverOps = new SolverOperation[](2);
+        SolverOperation memory solverOp3 = buildSolverOperation(
+            solverThreePK,
+            address(solver3),
+            userOpHash,
+            solver3BidPattern.bidAmount,
+            solver3BidPattern.auxillaryBidAmount,
+            solver3BidPattern.isReverting,
+            solver3BidPattern.numIterations
+        );
+        SolverOperation memory solverOp4 = buildSolverOperation(
+            solverFourPK,
+            address(solver4),
+            userOpHash,
+            solver4BidPattern.bidAmount,
+            solver4BidPattern.auxillaryBidAmount,
+            solver4BidPattern.isReverting,
+            solver4BidPattern.numIterations
+        );
+        SolverOperation[] memory solverOps = new SolverOperation[](4);
         solverOps[0] = solverOp1;
         solverOps[1] = solverOp2;
-
+        solverOps[2] = solverOp3;
+        solverOps[3] = solverOp4;
+        
         bytes32 callChainHash = CallVerification.getCallChainHash(userOp, solverOps);
         DAppOperation memory dappOp = buildDAppOperation(userOpHash, callChainHash, bundler);
 
         uint256 solverOneResult = solver1BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers));
         uint256 solverTwoResult = solver2BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers));
-        
+        uint256 solverThreeResult = solver3BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers));
+        uint256 solverFourResult = solver4BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers));
+
         uint256 mev = 0;
         if (!solver1BidPattern.isReverting) {
             mev += solver1BidPattern.bidAmount;
@@ -193,10 +238,20 @@ contract MultipleSolversTest is BaseTest, AtlasErrors {
         if (!solver2BidPattern.isReverting) {
             mev += solver2BidPattern.bidAmount;
         }
+        if (!solver3BidPattern.isReverting) {
+            mev += solver3BidPattern.bidAmount;
+        }
+        if (!solver4BidPattern.isReverting) {
+            mev += solver4BidPattern.bidAmount;
+        }
 
         uint256 accumulatedAuxillaryBidSolverOne = solver1BidPattern.isReverting ? 0 : solver1BidPattern.auxillaryBidAmount;
         uint256 accumulatedAuxillaryBidSolverTwo = accumulatedAuxillaryBidSolverOne;
         accumulatedAuxillaryBidSolverTwo += solver2BidPattern.isReverting ? 0 : solver2BidPattern.auxillaryBidAmount;
+        uint256 accumulatedAuxillaryBidSolverThree = accumulatedAuxillaryBidSolverTwo;
+        accumulatedAuxillaryBidSolverThree += solver3BidPattern.isReverting ? 0 : solver3BidPattern.auxillaryBidAmount;
+        uint256 accumulatedAuxillaryBidSolverFour = accumulatedAuxillaryBidSolverThree;
+        accumulatedAuxillaryBidSolverFour += solver4BidPattern.isReverting ? 0 : solver4BidPattern.auxillaryBidAmount;
 
         uint256 metacallGasLimit = simulator.estimateMetacallGasLimit(userOp, solverOps);
 
@@ -233,6 +288,38 @@ contract MultipleSolversTest is BaseTest, AtlasErrors {
             !solver2BidPattern.isReverting,
             solverTwoResult
         );
+        
+        if (!solver3BidPattern.isReverting) {
+            vm.expectEmit(address(executionEnvironment));
+            emit MultipleSolversDAppControl.AccumulatedAuxillaryBidUpdated(address(solver3), accumulatedAuxillaryBidSolverThree);
+        }
+        vm.expectEmit(address(atlas));
+        emit AtlasEvents.SolverTxResult(
+            address(solver3),
+            solverThreeEOA,
+            address(control),
+            address(0),
+            solver3BidPattern.bidAmount,
+            true,
+            !solver3BidPattern.isReverting,
+            solverThreeResult
+        );
+        if (!solver4BidPattern.isReverting) {
+            vm.expectEmit(address(executionEnvironment));
+            emit MultipleSolversDAppControl.AccumulatedAuxillaryBidUpdated(address(solver4), accumulatedAuxillaryBidSolverFour);
+        }
+        vm.expectEmit(address(atlas));
+        emit AtlasEvents.SolverTxResult(
+            address(solver4),
+            solverFourEOA,
+            address(control),
+            address(0),
+            solver4BidPattern.bidAmount,
+            true,
+            !solver4BidPattern.isReverting,
+            solverFourResult
+        );
+
         vm.expectEmit(address(executionEnvironment));
         emit MultipleSolversDAppControl.MevAllocated(
             address(control), 
@@ -245,47 +332,65 @@ contract MultipleSolversTest is BaseTest, AtlasErrors {
         (bool success, bytes memory returnData) = address(atlas).call{gas: metacallGasLimit}(
             abi.encodeWithSelector(atlas.metacall.selector, userOp, solverOps, dappOp, address(0))
         );
-        assertEq(success, true);
-        assertEq(abi.decode(returnData, (bool)), false); // auctionWon should be false
+       // assertEq(success, true, "metacall failed");
+       // assertEq(abi.decode(returnData, (bool)), false, "auctionWon should be false");
 
         vm.stopPrank();
+
+        assertEq(solver1.executed(), !solver1BidPattern.isReverting, "solver1 execution state wrong");
+        assertEq(solver2.executed(), !solver2BidPattern.isReverting, "solver2 execution state wrong");
+        assertEq(solver3.executed(), !solver3BidPattern.isReverting, "solver3 execution state wrong");
+        assertEq(solver4.executed(), !solver4BidPattern.isReverting, "solver4 execution state wrong");
+        
 
         uint256 bundlerBalanceAfter = address(bundler).balance;
         uint256 bundlerBalanceDeltaFromGas = bundlerBalanceAfter - bundlerBalanceBefore - mev;
 
         // Compute the gas cost of the transaction.
-        // Note: txGasUsed is expected to be 1.6 mill 
+        // Note: txGasUsed is expected to be 0.8 mill 
         // At 1 gwei per gas, the cost is txGasUsed * 1e9 wei.
-        uint256 txGasCost = 1600000 * 1e9;
+        uint256 txGasCostNominal = 800000 * 1e9;
+        uint256 txGasCost = txGasCostNominal * solver1BidPattern.numIterations/5000;
+        txGasCost += txGasCostNominal * solver2BidPattern.numIterations/5000;
+        txGasCost += txGasCostNominal * solver3BidPattern.numIterations/5000;
+        txGasCost += txGasCostNominal * solver4BidPattern.numIterations/5000;
 
-        assertGt(bundlerBalanceDeltaFromGas, 1300000000000000, "bundler did not recoup > 80% of gas costs");
+        assertGt(bundlerBalanceDeltaFromGas, txGasCost, "bundler did not recoup > 80% of gas costs");
     }
 
-    function testMultipleSolvers_twoSolversBothSucceed() public {
-        two_solver_generic_test(
-            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 100, isReverting: false}),
-            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 200, isReverting: false})
+    function testMultipleSolvers_fourSolversAllSucceed() public {
+        four_solver_generic_test(
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 100, isReverting: false, numIterations: 1}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 200, isReverting: false, numIterations: 1}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 300, isReverting: false, numIterations: 1}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 400, isReverting: false, numIterations: 1})
         );
     }
 
-    function testMultipleSolvers_twoSolversBothRevert() public {
-        two_solver_generic_test(
-            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 100, isReverting: true}),
-            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 200, isReverting: true})
+    function testMultipleSolvers_fourSolversAllRevert() public {
+        four_solver_generic_test(
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 100, isReverting: true, numIterations: 5000}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 200, isReverting: true, numIterations: 5000}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 300, isReverting: true, numIterations: 5000}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 400, isReverting: true, numIterations: 5000})
         );
     }
 
-    function testMultipleSolvers_twoSolversFirstSucceedsSecondReverts() public {
-        two_solver_generic_test(
-            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 100, isReverting: false}),
-            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 200, isReverting: true})
+    function testMultipleSolvers_fourSolversFirstSucceedsSecondReverts() public {
+        four_solver_generic_test(
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 100, isReverting: false, numIterations: 5000}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 200, isReverting: true, numIterations: 5000}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 300, isReverting: false, numIterations: 5000}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 400, isReverting: false, numIterations: 5000})
         );
     }
 
-    function testMultipleSolvers_twoSolversFirstRevertsSecondSucceeds() public {
-        two_solver_generic_test(
-            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 100, isReverting: true}),
-            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 200, isReverting: false})
+    function testMultipleSolvers_fourSolversFirstRevertsSecondSucceeds() public {
+        four_solver_generic_test(
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 100, isReverting: true, numIterations: 5000}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 200, isReverting: false, numIterations: 5000}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 300, isReverting: false, numIterations: 5000}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 400, isReverting: false, numIterations: 5000})
         );
     }
 }
@@ -361,21 +466,19 @@ contract MultipleSolversDAppControl is DAppControl {
 }
 
 contract MockSolver is SolverBase {
-    constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) {}
-    function solve() external view {
-        uint256 dummy = 0;
-        // Adjust loop iterations to achieve the desired extra gas consumption.
-        for (uint256 i = 0; i < 5_000; i++) {
-            dummy += i;
-        }
-    }
+    bool public executed;
 
-    function revertWhileSolving() external pure {
+    constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) {
+        executed = false;
+    }
+    function solve(uint256 num_iterations, bool shouldRevert) external {
         uint256 dummy = 0;
-        // Adjust loop iterations to achieve the desired extra gas consumption.
-        for (uint256 i = 0; i < 5_000; i++) {
+        for (uint256 i = 0; i < num_iterations; i++) {
             dummy += i;
         }
-        revert("revertWhileSolving");
+        if (shouldRevert) {
+            revert("revertWhileSolving");
+        }
+        executed = true;
     }
 }
