@@ -338,7 +338,7 @@ contract MultipleSolversDAppControl is DAppControl {
     }
 
     function _postSolverCall(SolverOperation calldata solverOp, bytes calldata) internal override {
-        uint256 auxillaryBidAmount = abi.decode(solverOp.data[4:], (uint256));
+        uint256 auxillaryBidAmount = abi.decode(solverOp.data[solverOp.data.length - 32:], (uint256));
         uint256 newAccumulatedAuxillaryBid = MultipleSolversDAppControl(address(CONTROL)).accumulatedAuxillaryBid() + auxillaryBidAmount;
         MultipleSolversDAppControl(address(CONTROL)).setAccumulatedAuxillaryBid(newAccumulatedAuxillaryBid);
 
