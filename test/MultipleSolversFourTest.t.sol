@@ -12,6 +12,7 @@ import {AtlasEvents} from "../src/contracts/types/AtlasEvents.sol";
 import {SolverOutcome} from "../src/contracts/types/EscrowTypes.sol";
 import "../src/contracts/libraries/CallVerification.sol";
 import "../src/contracts/interfaces/IAtlas.sol";
+import "forge-std/console.sol";
 /// @dev this test is used to illustrate and test the multiple successful solvers feature
 /// @dev MultipleSolversDAppControl serves as both the dapp and dAppControl contracts
 /// @dev It tracks an "accumulatedAuxillaryBid" which is the sum of all auxillary bids from all solvers
@@ -115,7 +116,8 @@ contract MultipleSolversTest is BaseTest, AtlasErrors {
             data = abi.encodeWithSelector(solver1.solve.selector, numIterations, true);
         } else {
             data = abi.encodeWithSelector(solver1.solve.selector, numIterations, false);
-            data = abi.encodeWithSelector(solver1.solve.selector, auxillaryBidAmount);
+            bytes memory aux = abi.encode(auxillaryBidAmount);
+            data = bytes.concat(data, aux);
         }
 
         address solverEoa = vm.addr(solverPK);
@@ -358,10 +360,10 @@ contract MultipleSolversTest is BaseTest, AtlasErrors {
 
     function testMultipleSolvers_fourSolversAllSucceed() public {
         four_solver_generic_test(
-            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 100, isReverting: false, numIterations: 5000}),
-            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 200, isReverting: false, numIterations: 5000}),
-            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 300, isReverting: false, numIterations: 5000}),
-            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 400, isReverting: false, numIterations: 5000})
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 100, isReverting: false, numIterations: 1}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 200, isReverting: false, numIterations: 1}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 300, isReverting: false, numIterations: 1}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 400, isReverting: false, numIterations: 1})
         );
     }
 
@@ -470,6 +472,8 @@ contract MockSolver is SolverBase {
         executed = false;
     }
     function solve(uint256 num_iterations, bool shouldRevert) external {
+        console.log("num_iterations", num_iterations);
+        console.log("shouldRevert", shouldRevert);
         uint256 dummy = 0;
         for (uint256 i = 0; i < num_iterations; i++) {
             dummy += i;

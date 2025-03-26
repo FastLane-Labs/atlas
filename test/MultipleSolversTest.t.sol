@@ -98,7 +98,8 @@ contract MultipleSolversTest is BaseTest, AtlasErrors {
             data = abi.encodeWithSelector(solver1.revertWhileSolving.selector);
         } else {
             data = abi.encodeWithSelector(solver1.solve.selector);
-            data = abi.encodeWithSelector(solver1.solve.selector, auxillaryBidAmount);
+            bytes memory aux = abi.encode(auxillaryBidAmount);
+            data = bytes.concat(data, aux);
         }
 
         address solverEoa = vm.addr(solverPK);
