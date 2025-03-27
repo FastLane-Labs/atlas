@@ -235,15 +235,14 @@ abstract contract Escrow is AtlETH {
                     emit SolverTxResult(
                         solverOp.solver, solverOp.from, dConfig.to, solverOp.bidToken, bidAmount, true, true, _result
                     );
-
-                    ctx.solverOutcome = uint24(_result);
+                    ctx.solverOutcome = uint256(_result);
                     return _solverTracker.bidAmount;
                 }
             }
         }
 
         // If we reach this point, the solver call did not execute successfully.
-        ctx.solverOutcome = uint24(_result);
+        ctx.solverOutcome = _result;
 
         // Account for failed SolverOperation gas costs
         _handleSolverFailAccounting(

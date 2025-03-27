@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 struct Context {
     bytes32 userOpHash; // not packed
     address executionEnvironment; // not packed
-    uint24 solverOutcome;
+    uint256 solverOutcome;
     uint8 solverIndex;
     uint8 solverCount;
     uint8 callDepth;

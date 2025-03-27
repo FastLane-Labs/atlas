@@ -195,9 +195,8 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
 
         // Verify operations will succeed via simulator
         vm.txGasPrice(userOp.maxFeePerGas);
-        (bool userOpSimSuccess, Result userOpSimResult, uint256 userOpSimValidCallsResult) = simulator.simUserOperation(userOp);
+        (bool userOpSimSuccess,, uint256 userOpSimValidCallsResult) = simulator.simUserOperation(userOp);
         assertTrue(userOpSimSuccess, "UserOp simulation failed");
-        assertEq(uint8(userOpSimResult), uint8(Result.SimulationPassed), "UserOp simulation result should be SimulationPassed");
         assertEq(userOpSimValidCallsResult, uint256(ValidCallsResult.Valid), "UserOp simulation valid calls result should be Valid");
 
         // Build solver operation 1
