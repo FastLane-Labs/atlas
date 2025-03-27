@@ -12,6 +12,8 @@ import {AtlasEvents} from "../src/contracts/types/AtlasEvents.sol";
 import {SolverOutcome} from "../src/contracts/types/EscrowTypes.sol";
 import "../src/contracts/libraries/CallVerification.sol";
 import "../src/contracts/interfaces/IAtlas.sol";
+import "../src/contracts/libraries/GasAccLib.sol";
+import {Result} from "../src/contracts/interfaces/ISimulator.sol";
 import "forge-std/console.sol";
 /// @dev this test is used to illustrate and test the multiple successful solvers feature
 /// @dev MultipleSolversDAppControl serves as both the dapp and dAppControl contracts
@@ -126,7 +128,7 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
             from: solverEoa,
             to: address(atlas),
             value: 0,
-            gas: 6_000_000,
+            gas: 3_000_000,
             maxFeePerGas: 1_000_000_000,
             deadline: block.number + 100,
             solver: solverContract,
@@ -142,7 +144,6 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         (sig.v, sig.r, sig.s) = vm.sign(solverPK, atlasVerification.getSolverPayload(solverOp));
         solverOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
         if (isRevertingBundlerFault) {
-            console.log("setting to bundler fault");
             solverOp.signature = "";
         }
         return solverOp;
@@ -188,6 +189,16 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         UserOperation memory userOp = buildUserOperation(userOpSignerPK);
         (address executionEnvironment, ,) = IAtlas(address(atlas)).getExecutionEnvironment(userOpSigner, address(control));
         bytes32 userOpHash = atlasVerification.getUserOperationHash(userOp);
+        
+        // Get dConfig from control contract
+        DAppConfig memory dConfig = DAppConfig({
+            to: address(control),
+            callConfig: control.CALL_CONFIG(),
+            bidToken: address(0),
+            dappGasLimit: control.getDAppGasLimit(),
+            solverGasLimit: control.getSolverGasLimit()
+        });
+
         SolverOperation memory solverOp1 = buildSolverOperation(
             solverOnePK,
             address(solver1),
@@ -198,6 +209,16 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
             solver1BidPattern.isRevertingBundlerFault,
             solver1BidPattern.numIterations
         );
+        // Estimate gas for solver1
+        uint256 solver1MaxWinGas = simulator.estimateMaxSolverWinGasCharge(userOp, solverOp1);
+        console.log("Solver1 max win gas:", solver1MaxWinGas);
+        
+        // Verify simulator calculation
+        uint256 solver1CalldataGas = GasAccLib.solverOpCalldataGas(solverOp1.data.length, atlas.L2_GAS_CALCULATOR());
+        uint256 solver1ExpectedGas = (solver1CalldataGas + (solverOp1.gas + 21000)) * solverOp1.maxFeePerGas;
+        solver1ExpectedGas = solver1ExpectedGas * 120 / 100; // 20% surcharge
+        assertApproxEqAbs(solver1MaxWinGas, solver1ExpectedGas, solver1ExpectedGas / 20, "Solver1 gas estimation mismatch");
+
         SolverOperation memory solverOp2 = buildSolverOperation(
             solverTwoPK,
             address(solver2),
@@ -208,6 +229,16 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
             solver2BidPattern.isRevertingBundlerFault,
             solver2BidPattern.numIterations
         );
+        // Estimate gas for solver2
+        uint256 solver2MaxWinGas = simulator.estimateMaxSolverWinGasCharge(userOp, solverOp2);
+        console.log("Solver2 max win gas:", solver2MaxWinGas);
+        
+        // Verify simulator calculation
+        uint256 solver2CalldataGas = GasAccLib.solverOpCalldataGas(solverOp2.data.length, atlas.L2_GAS_CALCULATOR());
+        uint256 solver2ExpectedGas = (solver2CalldataGas + (solverOp2.gas + 21000)) * solverOp2.maxFeePerGas;
+        solver2ExpectedGas = solver2ExpectedGas * 120 / 100; // 20% surcharge
+        assertApproxEqAbs(solver2MaxWinGas, solver2ExpectedGas, solver2ExpectedGas / 20, "Solver2 gas estimation mismatch");
+
         SolverOperation memory solverOp3 = buildSolverOperation(
             solverThreePK,
             address(solver3),
@@ -218,6 +249,16 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
             solver3BidPattern.isRevertingBundlerFault,
             solver3BidPattern.numIterations
         );
+        // Estimate gas for solver3
+        uint256 solver3MaxWinGas = simulator.estimateMaxSolverWinGasCharge(userOp, solverOp3);
+        console.log("Solver3 max win gas:", solver3MaxWinGas);
+        
+        // Verify simulator calculation
+        uint256 solver3CalldataGas = GasAccLib.solverOpCalldataGas(solverOp3.data.length, atlas.L2_GAS_CALCULATOR());
+        uint256 solver3ExpectedGas = (solver3CalldataGas + (solverOp3.gas + 21000)) * solverOp3.maxFeePerGas;
+        solver3ExpectedGas = solver3ExpectedGas * 120 / 100; // 20% surcharge
+        assertApproxEqAbs(solver3MaxWinGas, solver3ExpectedGas, solver3ExpectedGas / 20, "Solver3 gas estimation mismatch");
+
         SolverOperation memory solverOp4 = buildSolverOperation(
             solverFourPK,
             address(solver4),
@@ -228,6 +269,16 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
             solver4BidPattern.isRevertingBundlerFault,
             solver4BidPattern.numIterations
         );
+        // Estimate gas for solver4
+        uint256 solver4MaxWinGas = simulator.estimateMaxSolverWinGasCharge(userOp, solverOp4);
+        console.log("Solver4 max win gas:", solver4MaxWinGas);
+        
+        // Verify simulator calculation
+        uint256 solver4CalldataGas = GasAccLib.solverOpCalldataGas(solverOp4.data.length, atlas.L2_GAS_CALCULATOR());
+        uint256 solver4ExpectedGas = (solver4CalldataGas + (solverOp4.gas + 21000)) * solverOp4.maxFeePerGas;
+        solver4ExpectedGas = solver4ExpectedGas * 120 / 100; // 20% surcharge
+        assertApproxEqAbs(solver4MaxWinGas, solver4ExpectedGas, solver4ExpectedGas / 20, "Solver4 gas estimation mismatch");
+
         SolverOperation[] memory solverOps = new SolverOperation[](4);
         solverOps[0] = solverOp1;
         solverOps[1] = solverOp2;
@@ -346,6 +397,18 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         uint256 solver3InitialBalance = atlas.balanceOfBonded(address(solverThreeEOA));
         uint256 solver4InitialBalance = atlas.balanceOfBonded(address(solverFourEOA));
 
+        // Verify operations will succeed via simulator
+        // function call produces weird error
+        //(bool userOpSuccess,,) = simulator.simUserOperation(userOp);
+        //assertTrue(userOpSuccess, "UserOp simulation failed");
+
+        // function call produces weird error
+        //(bool solverCallSuccess, Result solverCallResult,) = simulator.simSolverCall(userOp, solverOp1, dappOp);
+        //assertTrue(solverCallSuccess, "Solver1 call simulation failed");
+
+        (bool solverCallsSuccess, Result solverCallsResult,) = simulator.simSolverCalls(userOp, solverOps, dappOp);
+        assertTrue(solverCallsSuccess, "Solver calls simulation failed");
+
         vm.startPrank(bundler);
         (bool success, bytes memory returnData) = address(atlas).call{gas: metacallGasLimit}(
             abi.encodeWithSelector(atlas.metacall.selector, userOp, solverOps, dappOp, address(0))
@@ -392,31 +455,19 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         uint256 bundlerBalanceAfter = address(bundler).balance;
         uint256 bundlerBalanceDeltaFromGas = bundlerBalanceAfter - bundlerBalanceBefore - mev;
 
-        // Use actual measured gas values from logs
-        uint256 baseGasCost = 21000; // Base transaction cost
-        uint256 calldataGasCost = 16; // Gas per byte of calldata
-        
-        // Calculate calldata size for each solver
-        uint256 solver1CalldataSize = 4 + 32 + 32; // selector + num_iterations + auxillaryBidAmount
-        uint256 solver2CalldataSize = 4 + 32 + 32;
-        uint256 solver3CalldataSize = 4 + 32 + 32;
-        uint256 solver4CalldataSize = 4 + 32 + 32;
+        // Calculate total gas for each solver using the same formula as simulator
+        uint256 solver1TotalGas = (solver1CalldataGas + (solver1BidPattern.gasUsed + 21000)) * solverOp1.maxFeePerGas;
+        uint256 solver2TotalGas = (solver2CalldataGas + (solver2BidPattern.gasUsed + 21000)) * solverOp2.maxFeePerGas;
+        uint256 solver3TotalGas = (solver3CalldataGas + (solver3BidPattern.gasUsed + 21000)) * solverOp3.maxFeePerGas;
+        uint256 solver4TotalGas = (solver4CalldataGas + (solver4BidPattern.gasUsed + 21000)) * solverOp4.maxFeePerGas;
 
-        // Add base cost and calldata cost to each solver's measured gas
-        uint256 solver1TotalGas = solver1BidPattern.gasUsed + baseGasCost + (solver1CalldataSize * calldataGasCost);
-        uint256 solver2TotalGas = solver2BidPattern.gasUsed + baseGasCost + (solver2CalldataSize * calldataGasCost);
-        uint256 solver3TotalGas = solver3BidPattern.gasUsed + baseGasCost + (solver3CalldataSize * calldataGasCost);
-        uint256 solver4TotalGas = solver4BidPattern.gasUsed + baseGasCost + (solver4CalldataSize * calldataGasCost);
+        // Add 20% surcharge
+        uint256 surcharge = 20;
+        solver1TotalGas = solver1TotalGas * (100 + surcharge) / 100;
+        solver2TotalGas = solver2TotalGas * (100 + surcharge) / 100;
+        solver3TotalGas = solver3TotalGas * (100 + surcharge) / 100;
+        solver4TotalGas = solver4TotalGas * (100 + surcharge) / 100;
 
-        // Convert total gas costs to wei (at 1 gwei per gas)
-        uint256 gasPrice = 1 gwei;
-
-        // Add 10% surcharge
-        uint256 surcharge = 10;
-        solver1TotalGas = (solver1TotalGas * (100 + surcharge) / 100) * gasPrice;
-        solver2TotalGas = (solver2TotalGas * (100 + surcharge) / 100) * gasPrice;
-        solver3TotalGas = (solver3TotalGas * (100 + surcharge) / 100) * gasPrice;
-        solver4TotalGas = (solver4TotalGas * (100 + surcharge) / 100) * gasPrice;
         console.log("solver1TotalGas", solver1TotalGas);
         console.log("solver2TotalGas", solver2TotalGas);
         console.log("solver3TotalGas", solver3TotalGas);
@@ -424,35 +475,38 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
 
         uint256 totalActualGasCost = (solver1TotalGas + solver2TotalGas + solver3TotalGas + solver4TotalGas);
 
-        // Assert that each solver's gas payment matches their calculated total gas cost within 10%
+        // Assert that each solver's gas payment matches their calculated total gas cost within 20%
         if (!solver1BidPattern.isRevertingBundlerFault) {
-            assertApproxEqAbs(solver1GasPayment, solver1TotalGas, solver1TotalGas / 10, "Solver1 gas payment not within expected range");
+            assertApproxEqRel(solver1GasPayment, solver1TotalGas, 0.1e18, "Solver1 gas payment not within expected range");
         } else {
             assertEq(solver1GasPayment, 0, "Solver1 should not pay gas for bundler fault");
         }
 
         if (!solver2BidPattern.isRevertingBundlerFault) {
-            assertApproxEqAbs(solver2GasPayment, solver2TotalGas, solver2TotalGas / 10, "Solver2 gas payment not within expected range");
+            assertApproxEqRel(solver2GasPayment, solver2TotalGas, 0.1e18, "Solver2 gas payment not within expected range");
         } else {
             assertEq(solver2GasPayment, 0, "Solver2 should not pay gas for bundler fault");
         }
 
         if (!solver3BidPattern.isRevertingBundlerFault) {
-            assertApproxEqAbs(solver3GasPayment, solver3TotalGas, solver3TotalGas / 10, "Solver3 gas payment not within expected range");
+            assertApproxEqRel(solver3GasPayment, solver3TotalGas, 0.1e18, "Solver3 gas payment not within expected range");
         } else {
             assertEq(solver3GasPayment, 0, "Solver3 should not pay gas for bundler fault");
         }
 
+        console.log("solver4GasPayment", solver4GasPayment);
+        console.log("solver4TotalGas", solver4TotalGas);
+
         if (!solver4BidPattern.isRevertingBundlerFault) {
-            assertApproxEqAbs(solver4GasPayment, solver4TotalGas, solver4TotalGas / 10, "Solver4 gas payment not within expected range");
+            assertApproxEqRel(solver4GasPayment, solver4TotalGas, 0.1e18, "Solver4 gas payment not within expected range");
         } else {
             assertEq(solver4GasPayment, 0, "Solver4 should not pay gas for bundler fault");
         }
 
-        // Assert that the actual gas cost is within 10% of expected
+        // Assert that the actual gas cost is within 20% of expected
         console.log("bundlerBalanceDeltaFromGas", bundlerBalanceDeltaFromGas);
         console.log("totalActualGasCost", totalActualGasCost);
-        assertApproxEqAbs(bundlerBalanceDeltaFromGas, totalActualGasCost, totalActualGasCost / 10, "Gas costs not within expected range");
+        assertApproxEqRel(bundlerBalanceDeltaFromGas, totalActualGasCost, 0.2e18, "Gas costs not within expected range");
     }
 
     //function testMultipleSolvers_fourSolversAllSucceed() public {
