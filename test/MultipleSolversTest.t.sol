@@ -362,7 +362,7 @@ contract MultipleSolversDAppControl is DAppControl {
 
 contract MockSolver is SolverBase {
     constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) {}
-    function solve() external view {
+    function solve() external pure {
         uint256 dummy = 0;
         // Adjust loop iterations to achieve the desired extra gas consumption.
         for (uint256 i = 0; i < 5_000; i++) {

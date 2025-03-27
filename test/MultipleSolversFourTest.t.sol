@@ -10,6 +10,7 @@ import {UserOperation} from "../src/contracts/types/UserOperation.sol";
 import {DAppOperation} from "../src/contracts/types/DAppOperation.sol";
 import {AtlasEvents} from "../src/contracts/types/AtlasEvents.sol";
 import {SolverOutcome} from "../src/contracts/types/EscrowTypes.sol";
+import {ValidCallsResult} from "../src/contracts/types/ValidCalls.sol";
 import "../src/contracts/libraries/CallVerification.sol";
 import "../src/contracts/interfaces/IAtlas.sol";
 import "../src/contracts/libraries/GasAccLib.sol";
@@ -186,19 +187,20 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         SolverBidPattern memory solver3BidPattern,
         SolverBidPattern memory solver4BidPattern
     ) public {
+
+        // Build user operation
         UserOperation memory userOp = buildUserOperation(userOpSignerPK);
         (address executionEnvironment, ,) = IAtlas(address(atlas)).getExecutionEnvironment(userOpSigner, address(control));
         bytes32 userOpHash = atlasVerification.getUserOperationHash(userOp);
-        
-        // Get dConfig from control contract
-        DAppConfig memory dConfig = DAppConfig({
-            to: address(control),
-            callConfig: control.CALL_CONFIG(),
-            bidToken: address(0),
-            dappGasLimit: control.getDAppGasLimit(),
-            solverGasLimit: control.getSolverGasLimit()
-        });
 
+        // Verify operations will succeed via simulator
+        vm.txGasPrice(userOp.maxFeePerGas);
+        (bool userOpSimSuccess, Result userOpSimResult, uint256 userOpSimValidCallsResult) = simulator.simUserOperation(userOp);
+        assertTrue(userOpSimSuccess, "UserOp simulation failed");
+        assertEq(uint8(userOpSimResult), uint8(Result.SimulationPassed), "UserOp simulation result should be SimulationPassed");
+        assertEq(userOpSimValidCallsResult, uint256(ValidCallsResult.Valid), "UserOp simulation valid calls result should be Valid");
+
+        // Build solver operation 1
         SolverOperation memory solverOp1 = buildSolverOperation(
             solverOnePK,
             address(solver1),
@@ -219,6 +221,17 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         solver1ExpectedGas = solver1ExpectedGas * 120 / 100; // 20% surcharge
         assertApproxEqAbs(solver1MaxWinGas, solver1ExpectedGas, solver1ExpectedGas / 20, "Solver1 gas estimation mismatch");
 
+        // simulate solver1 call
+        SolverOperation[] memory solverOps1 = new SolverOperation[](1);
+        solverOps1[0] = solverOp1;
+        bytes32 callChainHash1 = CallVerification.getCallChainHash(userOp, solverOps1);
+        DAppOperation memory dappOp1 = buildDAppOperation(userOpHash, callChainHash1, bundler);
+        vm.txGasPrice(userOp.maxFeePerGas);
+        (bool solver1CallSuccess, Result solver1CallResult,) = simulator.simSolverCall(userOp, solverOp1, dappOp1);
+        assertTrue(solver1CallSuccess, "Solver1 call simulation failed");
+        assertEq(uint8(solver1CallResult), uint8(Result.SimulationPassed), "Solver1 call result should be SimulationPassed");
+
+        // Build solver operation 2
         SolverOperation memory solverOp2 = buildSolverOperation(
             solverTwoPK,
             address(solver2),
@@ -239,6 +252,15 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         solver2ExpectedGas = solver2ExpectedGas * 120 / 100; // 20% surcharge
         assertApproxEqAbs(solver2MaxWinGas, solver2ExpectedGas, solver2ExpectedGas / 20, "Solver2 gas estimation mismatch");
 
+        // simulate solver2 call
+        SolverOperation[] memory solverOps2 = new SolverOperation[](1);
+        solverOps2[0] = solverOp2;
+        bytes32 callChainHash2 = CallVerification.getCallChainHash(userOp, solverOps2);
+        DAppOperation memory dappOp2 = buildDAppOperation(userOpHash, callChainHash2, bundler);
+        vm.txGasPrice(userOp.maxFeePerGas);
+        (bool solver2CallSuccess, Result solver2CallResult,) = simulator.simSolverCall(userOp, solverOp2, dappOp2);
+
+        // Build solver operation 3
         SolverOperation memory solverOp3 = buildSolverOperation(
             solverThreePK,
             address(solver3),
@@ -259,6 +281,15 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         solver3ExpectedGas = solver3ExpectedGas * 120 / 100; // 20% surcharge
         assertApproxEqAbs(solver3MaxWinGas, solver3ExpectedGas, solver3ExpectedGas / 20, "Solver3 gas estimation mismatch");
 
+        // simulate solver3 call
+        SolverOperation[] memory solverOps3 = new SolverOperation[](1);
+        solverOps3[0] = solverOp3;
+        bytes32 callChainHash3 = CallVerification.getCallChainHash(userOp, solverOps3);
+        DAppOperation memory dappOp3 = buildDAppOperation(userOpHash, callChainHash3, bundler);
+        vm.txGasPrice(userOp.maxFeePerGas);
+        (bool solver3CallSuccess, Result solver3CallResult,) = simulator.simSolverCall(userOp, solverOp3, dappOp3);
+
+        // Build solver operation 4
         SolverOperation memory solverOp4 = buildSolverOperation(
             solverFourPK,
             address(solver4),
@@ -279,12 +310,21 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         solver4ExpectedGas = solver4ExpectedGas * 120 / 100; // 20% surcharge
         assertApproxEqAbs(solver4MaxWinGas, solver4ExpectedGas, solver4ExpectedGas / 20, "Solver4 gas estimation mismatch");
 
+        // simulate solver4 call
+        SolverOperation[] memory solverOps4 = new SolverOperation[](1);
+        solverOps4[0] = solverOp4;
+        bytes32 callChainHash4 = CallVerification.getCallChainHash(userOp, solverOps4);
+        DAppOperation memory dappOp4 = buildDAppOperation(userOpHash, callChainHash4, bundler);
+        vm.txGasPrice(userOp.maxFeePerGas);
+        (bool solver4CallSuccess, Result solver4CallResult,) = simulator.simSolverCall(userOp, solverOp4, dappOp4);
+
+        // Build solver ops
         SolverOperation[] memory solverOps = new SolverOperation[](4);
         solverOps[0] = solverOp1;
         solverOps[1] = solverOp2;
         solverOps[2] = solverOp3;
         solverOps[3] = solverOp4;
-        
+
         bytes32 callChainHash = CallVerification.getCallChainHash(userOp, solverOps);
         DAppOperation memory dappOp = buildDAppOperation(userOpHash, callChainHash, bundler);
 
@@ -396,18 +436,6 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         uint256 solver2InitialBalance = atlas.balanceOfBonded(address(solverTwoEOA));
         uint256 solver3InitialBalance = atlas.balanceOfBonded(address(solverThreeEOA));
         uint256 solver4InitialBalance = atlas.balanceOfBonded(address(solverFourEOA));
-
-        // Verify operations will succeed via simulator
-        // function call produces weird error
-        //(bool userOpSuccess,,) = simulator.simUserOperation(userOp);
-        //assertTrue(userOpSuccess, "UserOp simulation failed");
-
-        // function call produces weird error
-        //(bool solverCallSuccess, Result solverCallResult,) = simulator.simSolverCall(userOp, solverOp1, dappOp);
-        //assertTrue(solverCallSuccess, "Solver1 call simulation failed");
-
-        (bool solverCallsSuccess, Result solverCallsResult,) = simulator.simSolverCalls(userOp, solverOps, dappOp);
-        assertTrue(solverCallsSuccess, "Solver calls simulation failed");
 
         vm.startPrank(bundler);
         (bool success, bytes memory returnData) = address(atlas).call{gas: metacallGasLimit}(
@@ -591,6 +619,7 @@ contract MultipleSolversDAppControl is DAppControl {
 
     function _preOpsCall(UserOperation calldata) internal override returns (bytes memory) {
         MultipleSolversDAppControl(address(CONTROL)).setAccumulatedAuxillaryBid(0);
+        return bytes("");
     }
 
     function _postSolverCall(SolverOperation calldata solverOp, bytes calldata) internal override {
