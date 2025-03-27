@@ -227,9 +227,14 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         bytes32 callChainHash1 = CallVerification.getCallChainHash(userOp, solverOps1);
         DAppOperation memory dappOp1 = buildDAppOperation(userOpHash, callChainHash1, bundler);
         vm.txGasPrice(userOp.maxFeePerGas);
-        (bool solver1CallSuccess, Result solver1CallResult,) = simulator.simSolverCall(userOp, solverOp1, dappOp1);
-        assertTrue(solver1CallSuccess, "Solver1 call simulation failed");
-        assertEq(uint8(solver1CallResult), uint8(Result.SimulationPassed), "Solver1 call result should be SimulationPassed");
+        (bool solver1CallSuccess, Result solver1CallResult, uint256 solver1SimOutcome) = simulator.simSolverCall(userOp, solverOp1, dappOp1);
+        if (solver1BidPattern.isRevertingBundlerFault || solver1BidPattern.isReverting) {
+            assertFalse(solver1CallSuccess, "Solver1 call simulation should fail");
+        } else {
+            assertTrue(solver1CallSuccess, "Solver1 call simulation failed");
+            assertEq(uint8(solver1CallResult), uint8(Result.SimulationPassed), "Solver1 call result should be SimulationPassed");
+            console.log("Solver1 sim outcome:", solver1SimOutcome);
+        }
 
         // Build solver operation 2
         SolverOperation memory solverOp2 = buildSolverOperation(
@@ -258,7 +263,14 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         bytes32 callChainHash2 = CallVerification.getCallChainHash(userOp, solverOps2);
         DAppOperation memory dappOp2 = buildDAppOperation(userOpHash, callChainHash2, bundler);
         vm.txGasPrice(userOp.maxFeePerGas);
-        (bool solver2CallSuccess, Result solver2CallResult,) = simulator.simSolverCall(userOp, solverOp2, dappOp2);
+        (bool solver2CallSuccess, Result solver2CallResult, uint256 solver2SimOutcome) = simulator.simSolverCall(userOp, solverOp2, dappOp2);
+        if (solver2BidPattern.isRevertingBundlerFault || solver2BidPattern.isReverting) {
+            assertFalse(solver2CallSuccess, "Solver2 call simulation should fail");
+        } else {
+            assertTrue(solver2CallSuccess, "Solver2 call simulation failed");
+            assertEq(uint8(solver2CallResult), uint8(Result.SimulationPassed), "Solver2 call result should be SimulationPassed");
+            console.log("Solver2 sim outcome:", solver2SimOutcome);
+        }
 
         // Build solver operation 3
         SolverOperation memory solverOp3 = buildSolverOperation(
@@ -287,7 +299,14 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         bytes32 callChainHash3 = CallVerification.getCallChainHash(userOp, solverOps3);
         DAppOperation memory dappOp3 = buildDAppOperation(userOpHash, callChainHash3, bundler);
         vm.txGasPrice(userOp.maxFeePerGas);
-        (bool solver3CallSuccess, Result solver3CallResult,) = simulator.simSolverCall(userOp, solverOp3, dappOp3);
+        (bool solver3CallSuccess, Result solver3CallResult, uint256 solver3SimOutcome) = simulator.simSolverCall(userOp, solverOp3, dappOp3);
+        if (solver3BidPattern.isRevertingBundlerFault || solver3BidPattern.isReverting) {
+            assertFalse(solver3CallSuccess, "Solver3 call simulation should fail");
+        } else {
+            assertTrue(solver3CallSuccess, "Solver3 call simulation failed");
+            assertEq(uint8(solver3CallResult), uint8(Result.SimulationPassed), "Solver3 call result should be SimulationPassed");
+            console.log("Solver3 sim outcome:", solver3SimOutcome);
+        }
 
         // Build solver operation 4
         SolverOperation memory solverOp4 = buildSolverOperation(
@@ -316,8 +335,15 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         bytes32 callChainHash4 = CallVerification.getCallChainHash(userOp, solverOps4);
         DAppOperation memory dappOp4 = buildDAppOperation(userOpHash, callChainHash4, bundler);
         vm.txGasPrice(userOp.maxFeePerGas);
-        (bool solver4CallSuccess, Result solver4CallResult,) = simulator.simSolverCall(userOp, solverOp4, dappOp4);
-
+        (bool solver4CallSuccess, Result solver4CallResult, uint256 solver4SimOutcome) = simulator.simSolverCall(userOp, solverOp4, dappOp4);
+        if (solver4BidPattern.isRevertingBundlerFault || solver4BidPattern.isReverting) {
+            assertFalse(solver4CallSuccess, "Solver4 call simulation should fail");
+        } else {
+            assertTrue(solver4CallSuccess, "Solver4 call simulation failed");
+            assertEq(uint8(solver4CallResult), uint8(Result.SimulationPassed), "Solver4 call result should be SimulationPassed");
+            console.log("Solver4 sim outcome:", solver4SimOutcome);
+        }
+        
         // Build solver ops
         SolverOperation[] memory solverOps = new SolverOperation[](4);
         solverOps[0] = solverOp1;
