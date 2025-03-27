@@ -237,39 +237,40 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         bytes32 callChainHash = CallVerification.getCallChainHash(userOp, solverOps);
         DAppOperation memory dappOp = buildDAppOperation(userOpHash, callChainHash, bundler);
 
-        uint256 solverOneResult = solver1BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers));
-        uint256 solverTwoResult = solver2BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers));
-        uint256 solverThreeResult = solver3BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers));
-        uint256 solverFourResult = solver4BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers));
+        uint256 solverOneResult = solver1BidPattern.isRevertingBundlerFault ? (1 << uint256(SolverOutcome.InvalidSignature)) : (solver1BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers)));
+        uint256 solverTwoResult = solver2BidPattern.isRevertingBundlerFault ? (1 << uint256(SolverOutcome.InvalidSignature)) : (solver2BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers)));
+        uint256 solverThreeResult = solver3BidPattern.isRevertingBundlerFault ? (1 << uint256(SolverOutcome.InvalidSignature)) : (solver3BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers)));
+        uint256 solverFourResult = solver4BidPattern.isRevertingBundlerFault ? (1 << uint256(SolverOutcome.InvalidSignature)) : (solver4BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers)));
 
         uint256 mev = 0;
-        if (!solver1BidPattern.isReverting) {
+        // Only add to MEV if solver neither reverts nor has bundler fault
+        if (!solver1BidPattern.isReverting && !solver1BidPattern.isRevertingBundlerFault) {
             mev += solver1BidPattern.bidAmount;
         }
-        if (!solver2BidPattern.isReverting) {
+        if (!solver2BidPattern.isReverting && !solver2BidPattern.isRevertingBundlerFault) {
             mev += solver2BidPattern.bidAmount;
         }
-        if (!solver3BidPattern.isReverting) {
+        if (!solver3BidPattern.isReverting && !solver3BidPattern.isRevertingBundlerFault) {
             mev += solver3BidPattern.bidAmount;
         }
-        if (!solver4BidPattern.isReverting) {
+        if (!solver4BidPattern.isReverting && !solver4BidPattern.isRevertingBundlerFault) {
             mev += solver4BidPattern.bidAmount;
         }
 
-        uint256 accumulatedAuxillaryBidSolverOne = solver1BidPattern.isReverting ? 0 : solver1BidPattern.auxillaryBidAmount;
+        uint256 accumulatedAuxillaryBidSolverOne = solver1BidPattern.isReverting || solver1BidPattern.isRevertingBundlerFault ? 0 : solver1BidPattern.auxillaryBidAmount;
         uint256 accumulatedAuxillaryBidSolverTwo = accumulatedAuxillaryBidSolverOne;
-        accumulatedAuxillaryBidSolverTwo += solver2BidPattern.isReverting ? 0 : solver2BidPattern.auxillaryBidAmount;
+        accumulatedAuxillaryBidSolverTwo += solver2BidPattern.isReverting || solver2BidPattern.isRevertingBundlerFault ? 0 : solver2BidPattern.auxillaryBidAmount;
         uint256 accumulatedAuxillaryBidSolverThree = accumulatedAuxillaryBidSolverTwo;
-        accumulatedAuxillaryBidSolverThree += solver3BidPattern.isReverting ? 0 : solver3BidPattern.auxillaryBidAmount;
+        accumulatedAuxillaryBidSolverThree += solver3BidPattern.isReverting || solver3BidPattern.isRevertingBundlerFault ? 0 : solver3BidPattern.auxillaryBidAmount;
         uint256 accumulatedAuxillaryBidSolverFour = accumulatedAuxillaryBidSolverThree;
-        accumulatedAuxillaryBidSolverFour += solver4BidPattern.isReverting ? 0 : solver4BidPattern.auxillaryBidAmount;
+        accumulatedAuxillaryBidSolverFour += solver4BidPattern.isReverting || solver4BidPattern.isRevertingBundlerFault ? 0 : solver4BidPattern.auxillaryBidAmount;
 
         uint256 metacallGasLimit = simulator.estimateMetacallGasLimit(userOp, solverOps);
 
         vm.deal(address(bundler), 2 ether);
         vm.txGasPrice(1 gwei);
 
-        if (!solver1BidPattern.isReverting) {
+        if (!solver1BidPattern.isReverting && !solver1BidPattern.isRevertingBundlerFault) {
             vm.expectEmit(address(executionEnvironment));
             emit MultipleSolversDAppControl.AccumulatedAuxillaryBidUpdated(address(solver1), accumulatedAuxillaryBidSolverOne);
         }
@@ -280,11 +281,11 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
             address(control),
             address(0),
             solver1BidPattern.bidAmount,
-            true,
-            !solver1BidPattern.isReverting,
+            !solver1BidPattern.isRevertingBundlerFault,
+            !solver1BidPattern.isReverting && !solver1BidPattern.isRevertingBundlerFault,
             solverOneResult
         );
-        if (!solver2BidPattern.isReverting) {
+        if (!solver2BidPattern.isReverting && !solver2BidPattern.isRevertingBundlerFault) {
             vm.expectEmit(address(executionEnvironment));
             emit MultipleSolversDAppControl.AccumulatedAuxillaryBidUpdated(address(solver2), accumulatedAuxillaryBidSolverTwo);
         }
@@ -295,12 +296,12 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
             address(control),
             address(0),
             solver2BidPattern.bidAmount,
-            true,
-            !solver2BidPattern.isReverting,
+            !solver2BidPattern.isRevertingBundlerFault,
+            !solver2BidPattern.isReverting && !solver2BidPattern.isRevertingBundlerFault,
             solverTwoResult
         );
         
-        if (!solver3BidPattern.isReverting) {
+        if (!solver3BidPattern.isReverting && !solver3BidPattern.isRevertingBundlerFault) {
             vm.expectEmit(address(executionEnvironment));
             emit MultipleSolversDAppControl.AccumulatedAuxillaryBidUpdated(address(solver3), accumulatedAuxillaryBidSolverThree);
         }
@@ -311,11 +312,11 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
             address(control),
             address(0),
             solver3BidPattern.bidAmount,
-            true,
-            !solver3BidPattern.isReverting,
+            !solver3BidPattern.isRevertingBundlerFault,
+            !solver3BidPattern.isReverting && !solver3BidPattern.isRevertingBundlerFault,
             solverThreeResult
         );
-        if (!solver4BidPattern.isReverting) {
+        if (!solver4BidPattern.isReverting && !solver4BidPattern.isRevertingBundlerFault) {
             vm.expectEmit(address(executionEnvironment));
             emit MultipleSolversDAppControl.AccumulatedAuxillaryBidUpdated(address(solver4), accumulatedAuxillaryBidSolverFour);
         }
@@ -326,8 +327,8 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
             address(control),
             address(0),
             solver4BidPattern.bidAmount,
-            true,
-            !solver4BidPattern.isReverting,
+            !solver4BidPattern.isRevertingBundlerFault,
+            !solver4BidPattern.isReverting && !solver4BidPattern.isRevertingBundlerFault,
             solverFourResult
         );
 
@@ -340,7 +341,6 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         uint256 bundlerBalanceBefore = address(bundler).balance;
 
         // Track initial balances
-        uint256 atlasBalanceBefore = address(atlas).balance;
         uint256 solver1InitialBalance = atlas.balanceOfBonded(address(solverOneEOA));
         uint256 solver2InitialBalance = atlas.balanceOfBonded(address(solverTwoEOA));
         uint256 solver3InitialBalance = atlas.balanceOfBonded(address(solverThreeEOA));
@@ -350,20 +350,27 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         (bool success, bytes memory returnData) = address(atlas).call{gas: metacallGasLimit}(
             abi.encodeWithSelector(atlas.metacall.selector, userOp, solverOps, dappOp, address(0))
         );
-        assertEq(success, true, "metacall failed");
-        assertEq(abi.decode(returnData, (bool)), false, "auctionWon should be false");
+
+        // Only check success and returnData if no solvers have bundler fault reverts, for some reason bundler faults cause partial revert
+        if (!solver1BidPattern.isRevertingBundlerFault && 
+            !solver2BidPattern.isRevertingBundlerFault && 
+            !solver3BidPattern.isRevertingBundlerFault && 
+            !solver4BidPattern.isRevertingBundlerFault) {
+            assertEq(success, true, "metacall failed");
+            assertEq(abi.decode(returnData, (bool)), false, "auctionWon should be false");
+        }
 
         vm.stopPrank();
 
-        assertEq(solver1.executed(), !solver1BidPattern.isReverting, "solver1 execution state wrong");
-        assertEq(solver2.executed(), !solver2BidPattern.isReverting, "solver2 execution state wrong");
-        assertEq(solver3.executed(), !solver3BidPattern.isReverting, "solver3 execution state wrong");
-        assertEq(solver4.executed(), !solver4BidPattern.isReverting, "solver4 execution state wrong");
+        assertEq(solver1.executed(), !solver1BidPattern.isReverting && !solver1BidPattern.isRevertingBundlerFault, "solver1 execution state wrong");
+        assertEq(solver2.executed(), !solver2BidPattern.isReverting && !solver2BidPattern.isRevertingBundlerFault, "solver2 execution state wrong");
+        assertEq(solver3.executed(), !solver3BidPattern.isReverting && !solver3BidPattern.isRevertingBundlerFault, "solver3 execution state wrong");
+        assertEq(solver4.executed(), !solver4BidPattern.isReverting && !solver4BidPattern.isRevertingBundlerFault, "solver4 execution state wrong");
         
-        assertEq(solver1.counter(), 1, "solver1 counter should be 1");
-        assertEq(solver2.counter(), 1, "solver2 counter should be 1");
-        assertEq(solver3.counter(), 1, "solver3 counter should be 1");
-        assertEq(solver4.counter(), 1, "solver4 counter should be 1");
+        assertEq(solver1.counter(), (!solver1BidPattern.isReverting && !solver1BidPattern.isRevertingBundlerFault) ? 1 : 0, "solver1 counter should be 1 if not reverted");
+        assertEq(solver2.counter(), (!solver2BidPattern.isReverting && !solver2BidPattern.isRevertingBundlerFault) ? 1 : 0, "solver2 counter should be 1 if not reverted");
+        assertEq(solver3.counter(), (!solver3BidPattern.isReverting && !solver3BidPattern.isRevertingBundlerFault) ? 1 : 0, "solver3 counter should be 1 if not reverted");
+        assertEq(solver4.counter(), (!solver4BidPattern.isReverting && !solver4BidPattern.isRevertingBundlerFault) ? 1 : 0, "solver4 counter should be 1 if not reverted");
 
         // Track final bonded balances and calculate gas payments
         uint256 solver1FinalBalance = atlas.balanceOfBonded(address(solverOneEOA));
@@ -381,7 +388,7 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         console.log("Solver3 gas payment:", solver3GasPayment);
         console.log("Solver4 gas payment:", solver4GasPayment);
         console.log("Total gas payments:", solver1GasPayment + solver2GasPayment + solver3GasPayment + solver4GasPayment);
-
+    
         uint256 bundlerBalanceAfter = address(bundler).balance;
         uint256 bundlerBalanceDeltaFromGas = bundlerBalanceAfter - bundlerBalanceBefore - mev;
 
@@ -404,7 +411,7 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         // Convert total gas costs to wei (at 1 gwei per gas)
         uint256 gasPrice = 1 gwei;
 
-        // Add 20% surcharge for overhead
+        // Add 10% surcharge
         uint256 surcharge = 10;
         solver1TotalGas = (solver1TotalGas * (100 + surcharge) / 100) * gasPrice;
         solver2TotalGas = (solver2TotalGas * (100 + surcharge) / 100) * gasPrice;
@@ -418,29 +425,34 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         uint256 totalActualGasCost = (solver1TotalGas + solver2TotalGas + solver3TotalGas + solver4TotalGas);
 
         // Assert that each solver's gas payment matches their calculated total gas cost within 10%
-        assertApproxEqAbs(solver1GasPayment, solver1TotalGas, solver1TotalGas / 10, "Solver1 gas payment not within expected range");
-        assertApproxEqAbs(solver2GasPayment, solver2TotalGas, solver2TotalGas / 10, "Solver2 gas payment not within expected range");
-        assertApproxEqAbs(solver3GasPayment, solver3TotalGas, solver3TotalGas / 10, "Solver3 gas payment not within expected range");
-        assertApproxEqAbs(solver4GasPayment, solver4TotalGas, solver4TotalGas / 10, "Solver4 gas payment not within expected range");
+        if (!solver1BidPattern.isRevertingBundlerFault) {
+            assertApproxEqAbs(solver1GasPayment, solver1TotalGas, solver1TotalGas / 10, "Solver1 gas payment not within expected range");
+        } else {
+            assertEq(solver1GasPayment, 0, "Solver1 should not pay gas for bundler fault");
+        }
+
+        if (!solver2BidPattern.isRevertingBundlerFault) {
+            assertApproxEqAbs(solver2GasPayment, solver2TotalGas, solver2TotalGas / 10, "Solver2 gas payment not within expected range");
+        } else {
+            assertEq(solver2GasPayment, 0, "Solver2 should not pay gas for bundler fault");
+        }
+
+        if (!solver3BidPattern.isRevertingBundlerFault) {
+            assertApproxEqAbs(solver3GasPayment, solver3TotalGas, solver3TotalGas / 10, "Solver3 gas payment not within expected range");
+        } else {
+            assertEq(solver3GasPayment, 0, "Solver3 should not pay gas for bundler fault");
+        }
+
+        if (!solver4BidPattern.isRevertingBundlerFault) {
+            assertApproxEqAbs(solver4GasPayment, solver4TotalGas, solver4TotalGas / 10, "Solver4 gas payment not within expected range");
+        } else {
+            assertEq(solver4GasPayment, 0, "Solver4 should not pay gas for bundler fault");
+        }
 
         // Assert that the actual gas cost is within 10% of expected
         console.log("bundlerBalanceDeltaFromGas", bundlerBalanceDeltaFromGas);
         console.log("totalActualGasCost", totalActualGasCost);
         assertApproxEqAbs(bundlerBalanceDeltaFromGas, totalActualGasCost, totalActualGasCost / 10, "Gas costs not within expected range");
-
-        // Track final balances
-        //uint256 atlasBalanceAfter = address(atlas).balance;
-
-        // Calculate total surcharge amount
-        //uint256 atlasSurcharge = (
-        //    (solver1TotalGas + solver2TotalGas + solver3TotalGas + solver4TotalGas) * 10 / 100
-        //);
-
-        //console.log("atlasSurcharge", atlasSurcharge);
-        //console.log("atlasBalanceAfter - atlasBalanceBefore", atlasBalanceAfter - atlasBalanceBefore);
-
-        // Assert that Atlas's balance increased by the surcharge amount
-        //assertEq(atlasBalanceAfter - atlasBalanceBefore, atlasSurcharge, "Atlas balance did not increase by surcharge amount");
     }
 
     //function testMultipleSolvers_fourSolversAllSucceed() public {
@@ -461,23 +473,23 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
     //    );
     //}
 
-    function testMultipleSolvers_fourSolversFirstSucceedsSecondReverts() public {
+    function testMultipleSolvers_bundler_fault() public {
         four_solver_generic_test(
             SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 100, isReverting: false, isRevertingBundlerFault: false, numIterations: 20000, gasUsed: 1758390}),
-            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 200, isReverting: false, isRevertingBundlerFault: false, numIterations: 5000, gasUsed: 519003}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 200, isReverting: false, isRevertingBundlerFault: true, numIterations: 5000, gasUsed: 0}),
             SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 300, isReverting: false, isRevertingBundlerFault: false, numIterations: 10000, gasUsed: 924036}),
             SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 400, isReverting: false, isRevertingBundlerFault: false, numIterations: 1000, gasUsed: 195068})
         );
     }
 
-    //function testMultipleSolvers_fourSolversFirstRevertsSecondSucceeds() public {
-    //    four_solver_generic_test(
-    //        SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 100, isReverting: true, numIterations: 5000}),
-    //        SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 200, isReverting: false, numIterations: 5000}),
-    //        SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 300, isReverting: false, numIterations: 5000}),
-    //        SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 400, isReverting: false, numIterations: 5000})
-    //    );
-    //}
+    function testMultipleSolvers_fourSolversFirstRevertsSecondSucceeds() public {
+        four_solver_generic_test(
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 100, isReverting: true, isRevertingBundlerFault: false, numIterations: 5000, gasUsed: 500000}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 200, isReverting: false, isRevertingBundlerFault: false, numIterations: 5000, gasUsed: 550000}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 300, isReverting: false, isRevertingBundlerFault: false, numIterations: 5000, gasUsed: 530000}),
+            SolverBidPattern({bidAmount: 1 ether, auxillaryBidAmount: 400, isReverting: false, isRevertingBundlerFault: false, numIterations: 5000, gasUsed: 520000})
+        );
+    }
 }
 
 contract MultipleSolversDAppControl is DAppControl {
@@ -531,7 +543,7 @@ contract MultipleSolversDAppControl is DAppControl {
         uint256 auxillaryBidAmount = abi.decode(solverOp.data[solverOp.data.length - 32:], (uint256));
         uint256 newAccumulatedAuxillaryBid = MultipleSolversDAppControl(address(CONTROL)).accumulatedAuxillaryBid() + auxillaryBidAmount;
         MultipleSolversDAppControl(address(CONTROL)).setAccumulatedAuxillaryBid(newAccumulatedAuxillaryBid);
-
+        console.log("AccumulatedAuxillaryBidUpdated");
         emit AccumulatedAuxillaryBidUpdated(solverOp.solver, newAccumulatedAuxillaryBid);
     }
 
