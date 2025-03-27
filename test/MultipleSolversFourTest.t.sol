@@ -467,16 +467,10 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
             abi.encodeWithSelector(atlas.metacall.selector, userOp, solverOps, dappOp, address(0))
         );
 
-        // Only check success and returnData if no solvers have bundler fault reverts, for some reason bundler faults cause partial revert
-        if (!solver1BidPattern.isRevertingBundlerFault && 
-            !solver2BidPattern.isRevertingBundlerFault && 
-            !solver3BidPattern.isRevertingBundlerFault && 
-            !solver4BidPattern.isRevertingBundlerFault) {
-            assertEq(success, true, "metacall failed");
-            assertEq(abi.decode(returnData, (bool)), false, "auctionWon should be false");
-        }
-
         vm.stopPrank();
+
+        assertEq(success, true, "metacall failed");
+        assertEq(abi.decode(returnData, (bool)), false, "auctionWon should be false");
 
         assertEq(solver1.executed(), !solver1BidPattern.isReverting && !solver1BidPattern.isRevertingBundlerFault, "solver1 execution state wrong");
         assertEq(solver2.executed(), !solver2BidPattern.isReverting && !solver2BidPattern.isRevertingBundlerFault, "solver2 execution state wrong");
