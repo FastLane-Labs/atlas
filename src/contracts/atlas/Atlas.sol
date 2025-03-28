@@ -20,7 +20,6 @@ import { GasAccLib, GasLedger } from "../libraries/GasAccLib.sol";
 import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { SolverOutcome } from "../types/EscrowTypes.sol";
-import "forge-std/console.sol";
 /// @title Atlas V1.5
 /// @author FastLane Labs
 /// @notice The Execution Abstraction protocol.

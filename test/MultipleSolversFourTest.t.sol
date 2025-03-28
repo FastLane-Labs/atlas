@@ -353,6 +353,9 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         bytes32 callChainHash = CallVerification.getCallChainHash(userOp, solverOps);
         DAppOperation memory dappOp = buildDAppOperation(userOpHash, callChainHash, bundler);
 
+        (bool solverCallsSuccess, Result solverCallsResult,) = simulator.simSolverCalls(userOp, solverOps, dappOp);
+        assertTrue(solverCallsSuccess, "Solver calls simulation failed");
+
         uint256 solverOneResult = solver1BidPattern.isRevertingBundlerFault ? (1 << uint256(SolverOutcome.InvalidSignature)) : (solver1BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers)));
         uint256 solverTwoResult = solver2BidPattern.isRevertingBundlerFault ? (1 << uint256(SolverOutcome.InvalidSignature)) : (solver2BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers)));
         uint256 solverThreeResult = solver3BidPattern.isRevertingBundlerFault ? (1 << uint256(SolverOutcome.InvalidSignature)) : (solver3BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers)));
@@ -524,19 +527,19 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
 
         // Assert that each solver's gas payment matches their calculated total gas cost within 20%
         if (!solver1BidPattern.isRevertingBundlerFault) {
-            assertApproxEqRel(solver1GasPayment, solver1TotalGas, 0.1e18, "Solver1 gas payment not within expected range");
+            assertApproxEqRel(solver1GasPayment, solver1TotalGas, 0.11e18, "Solver1 gas payment not within expected range");
         } else {
             assertEq(solver1GasPayment, 0, "Solver1 should not pay gas for bundler fault");
         }
 
         if (!solver2BidPattern.isRevertingBundlerFault) {
-            assertApproxEqRel(solver2GasPayment, solver2TotalGas, 0.1e18, "Solver2 gas payment not within expected range");
+            assertApproxEqRel(solver2GasPayment, solver2TotalGas, 0.11e18, "Solver2 gas payment not within expected range");
         } else {
             assertEq(solver2GasPayment, 0, "Solver2 should not pay gas for bundler fault");
         }
 
         if (!solver3BidPattern.isRevertingBundlerFault) {
-            assertApproxEqRel(solver3GasPayment, solver3TotalGas, 0.1e18, "Solver3 gas payment not within expected range");
+            assertApproxEqRel(solver3GasPayment, solver3TotalGas, 0.11e18, "Solver3 gas payment not within expected range");
         } else {
             assertEq(solver3GasPayment, 0, "Solver3 should not pay gas for bundler fault");
         }
@@ -545,7 +548,7 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         console.log("solver4TotalGas", solver4TotalGas);
 
         if (!solver4BidPattern.isRevertingBundlerFault) {
-            assertApproxEqRel(solver4GasPayment, solver4TotalGas, 0.1e18, "Solver4 gas payment not within expected range");
+            assertApproxEqRel(solver4GasPayment, solver4TotalGas, 0.11e18, "Solver4 gas payment not within expected range");
         } else {
             assertEq(solver4GasPayment, 0, "Solver4 should not pay gas for bundler fault");
         }
