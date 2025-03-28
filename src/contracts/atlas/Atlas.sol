@@ -19,7 +19,8 @@ import { SafetyBits } from "../libraries/SafetyBits.sol";
 import { GasAccLib, GasLedger } from "../libraries/GasAccLib.sol";
 import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
-
+import { SolverOutcome } from "../types/EscrowTypes.sol";
+import "forge-std/console.sol";
 /// @title Atlas V1.5
 /// @author FastLane Labs
 /// @notice The Execution Abstraction protocol.
@@ -362,6 +363,9 @@ contract Atlas is Escrow, Factory {
 
         // If no winning solver, but multipleSuccessfulSolvers is true, return the sum of solver bid amounts
         if (dConfig.callConfig.multipleSuccessfulSolvers()) {
+            if (ctx.isSimulation && solverOpsLen == 1 && ctx.solverOutcome != uint24(1 << uint24(SolverOutcome.MultipleSolvers))) {
+                revert SolverSimFail(uint256(ctx.solverOutcome));
+            }
             return _bidAmount;
         }
 
