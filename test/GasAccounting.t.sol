@@ -587,13 +587,26 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
     }
 
     function test_GasAccounting_chargeUnreachedSolversForCalldata() public {
+        bytes32 userOpHash = keccak256("userOpHash");
+        uint256 maxFeePerGas = 1e9; // 1 gwei
+        address bundler = makeAddr("Bundler");
+        bool allowsTrustedOpHash = false;
+
         SolverOperation[] memory solverOps = new SolverOperation[](3);
         solverOps[0].from = solverOneEOA;
         solverOps[0].data = new bytes(300);
+        solverOps[0].userOpHash = userOpHash;
+        solverOps[0].maxFeePerGas = maxFeePerGas;
+
         solverOps[1].from = solverTwoEOA;
         solverOps[1].data = new bytes(300);
+        solverOps[1].userOpHash = userOpHash;
+        solverOps[1].maxFeePerGas = maxFeePerGas;
+
         solverOps[2].from = solverThreeEOA;
         solverOps[2].data = new bytes(300);
+        solverOps[2].userOpHash = userOpHash;
+        solverOps[2].maxFeePerGas = maxFeePerGas;
 
         vm.txGasPrice(1e9); // set gas price to 1 gwei
 
@@ -624,7 +637,15 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         // ===============================
         // Case 1: No unreached solvers -> winning solver idx = 2
         // ===============================
-        uint256 unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata(solverOps, gL, 2);
+        uint256 unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata({
+            solverOps: solverOps, 
+            gL: gL, 
+            winningSolverIdx: 2, 
+            userOpHash: userOpHash,
+            maxFeePerGas: maxFeePerGas, 
+            bundler: bundler, 
+            allowsTrustedOpHash: allowsTrustedOpHash
+        });
 
         GasLedger memory gLAfter = tAtlas.getGasLedger();
 
@@ -647,7 +668,15 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         hoax(solverThreeEOA, 1e18); // solver 3 has bonded atlETH in this case
         tAtlas.depositAndBond{ value: 1e18 }(1e18);
 
-        unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata(solverOps, gL, 1);
+        unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata({
+            solverOps: solverOps, 
+            gL: gL, 
+            winningSolverIdx: 1, 
+            userOpHash: userOpHash,
+            maxFeePerGas: maxFeePerGas, 
+            bundler: bundler, 
+            allowsTrustedOpHash: allowsTrustedOpHash
+        });
 
         gLAfter = tAtlas.getGasLedger();
 
@@ -682,7 +711,15 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         hoax(solverThreeEOA, 1e18); // solver 3 has bonded atlETH in this case
         tAtlas.depositAndBond{ value: 1e18 }(1e18);
 
-        unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata(solverOps, gL, 0);
+        unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata({
+            solverOps: solverOps, 
+            gL: gL, 
+            winningSolverIdx: 0, 
+            userOpHash: userOpHash,
+            maxFeePerGas: maxFeePerGas, 
+            bundler: bundler, 
+            allowsTrustedOpHash: allowsTrustedOpHash
+        });
 
         gLAfter = tAtlas.getGasLedger();
 
@@ -722,7 +759,15 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         // No bonded atlETH for solver 3 in this case - but set storage slot to non-zero for gas calcs
         tAtlas.setAccessData(solverThreeEOA, EscrowAccountAccessData(0, uint32(block.number - 1), 0, 0, 0));
 
-        unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata(solverOps, gL, 0);
+        unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata({
+            solverOps: solverOps, 
+            gL: gL, 
+            winningSolverIdx: 0, 
+            userOpHash: userOpHash,
+            maxFeePerGas: maxFeePerGas, 
+            bundler: bundler, 
+            allowsTrustedOpHash: allowsTrustedOpHash
+        });
 
         gLAfter = tAtlas.getGasLedger();
 
@@ -1083,12 +1128,16 @@ contract TestAtlasGasAcc is TestAtlas {
     function chargeUnreachedSolversForCalldata(
         SolverOperation[] calldata solverOps,
         GasLedger memory gL,
-        uint256 solverIdx
+        uint256 winningSolverIdx,
+        bytes32 userOpHash,
+        uint256 maxFeePerGas,
+        address bundler,
+        bool allowsTrustedOpHash
     )
         public
         returns (uint256 unreachedCalldataValuePaid)
     {
-        unreachedCalldataValuePaid = _chargeUnreachedSolversForCalldata(solverOps, gL, solverIdx);
+        unreachedCalldataValuePaid = _chargeUnreachedSolversForCalldata(solverOps, gL, winningSolverIdx, userOpHash, maxFeePerGas, bundler, allowsTrustedOpHash);
 
         // NOTE: only persisted to storage here for testing purposes
         t_gasLedger = gL.pack();
