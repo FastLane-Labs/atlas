@@ -81,13 +81,13 @@ contract Atlas is Escrow, Factory {
         address _bundler = _isSimulation ? dAppOp.bundler : msg.sender;
         (_executionEnvironment, _dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
-        // Solvers pay for calldata when exPostBids = false
-        if (!_dConfig.callConfig.exPostBids()) {
-            _gasMarker += GasAccLib.metacallCalldataGas(msg.data.length, L2_GAS_CALCULATOR);
-        }
-
-        (uint256 _allSolversGasLimit, uint256 _bidFindOverhead, ValidCallsResult _validCallsResult) = VERIFICATION
-            .validateCalls({
+        // Validate metacall params, and get back vars used in gas accounting logic
+        (
+            uint256 _allSolversGasLimit,
+            uint256 _allSolversCalldataGas,
+            uint256 _bidFindOverhead,
+            ValidCallsResult _validCallsResult
+        ) = VERIFICATION.validateCalls({
             dConfig: _dConfig,
             userOp: userOp,
             solverOps: solverOps,
@@ -97,6 +97,15 @@ contract Atlas is Escrow, Factory {
             msgSender: _bundler,
             isSimulation: _isSimulation
         });
+
+        // Solvers pay for calldata when exPostBids = false
+        if (!_dConfig.callConfig.exPostBids()) {
+            // total calldata gas = solver calldata gas + (userOp + dAppOp + offset) calldata gas
+            _gasMarker += _allSolversCalldataGas
+                + GasAccLib.metacallCalldataGas(
+                    userOp.data.length + USER_OP_STATIC_LENGTH + DAPP_OP_LENGTH + _EXTRA_CALLDATA_LENGTH, L2_GAS_CALCULATOR
+                );
+        }
 
         // First handle the ValidCallsResult
         if (_validCallsResult != ValidCallsResult.Valid) {

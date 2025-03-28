@@ -35,6 +35,8 @@ contract AtlasConstants {
         // length excluding solverOp.data
     uint256 internal constant _SOLVER_BASE_GAS_USED = 5000; // Base gas charged to solver in
         // `_handleSolverFailAccounting()`
+    uint256 internal constant _EXTRA_CALLDATA_LENGTH = 238; // incl. gasRefundBeneficiary address and dynamic offset
+        // calldata
 
     // First 160 bits of _solverLock are the address of the current solver.
     // The 161st bit represents whether the solver has called back via `reconcile`.
