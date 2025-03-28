@@ -40,6 +40,7 @@ library EscrowBits {
             | 1 << uint256(SolverOutcome.EVMError) // <- default if err by EE
             | 1 << uint256(SolverOutcome.MultipleSolvers)
     ); // <- MultipleSolvers is not an error, just used to charge each successful solver for just their own gas
+    // NOTE: MultipleSolvers cast to a uint24 = 0. No more SolverOutcomes can be added without increasing from a uint24 cast.
 
     function canExecute(uint256 result) internal pure returns (bool) {
         return (result == 0);
