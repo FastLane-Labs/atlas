@@ -291,7 +291,7 @@ abstract contract GasAccounting is SafetyLocks {
             _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR);
         }
 
-        uint256 _gasUsed = _calldataGas + (gasWaterMark + _SOLVER_BASE_GAS_USED - gasleft());
+        uint256 _gasUsed = _calldataGas + (gasWaterMark - gasleft());
 
         // Deduct solver's max (C + E) gas from remainingMaxGas, for future solver gas liability calculations
         _gL.remainingMaxGas -= uint48(dConfigSolverGasLimit + _calldataGas);
@@ -301,10 +301,12 @@ abstract contract GasAccounting is SafetyLocks {
         if (result.bundlersFault()) {
             // CASE: Solver is not responsible for the failure of their operation, so we blame the bundler
             // and reduce the total amount refunded to the bundler
+            _gasUsed += _BUNDLER_FAULT_OFFSET;
             _gL.writeoffsGas += uint48(_gasUsed);
         } else {
             // CASE: Solver failed, so we calculate what they owe.
-            uint256 _gasValueWithSurcharges = _gasUsed.withSurcharge(_bothSurchargeRates) * tx.gasprice;
+            _gasUsed += _SOLVER_FAULT_OFFSET;
+            uint256 _gasValueWithSurcharges = (_gasUsed).withSurcharge(_bothSurchargeRates) * tx.gasprice;
 
             EscrowAccountAccessData memory _solverAccountData = S_accessData[solverOp.from];
 
