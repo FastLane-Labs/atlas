@@ -167,6 +167,8 @@ abstract contract Escrow is AtlETH {
     /// @param userOp UserOperation struct containing the user's transaction data relevant to this SolverOperation.
     /// @param solverOp SolverOperation struct containing the solver's bid and execution data.
     /// @param bidAmount The amount of bid submitted by the solver for this operation.
+    /// @param gasWaterMark The gas left at the start of the current solverOp's execution, to be used to charge/write
+    /// off solverOp gas.
     /// @param prevalidated Boolean flag indicating if the solverOp has been prevalidated in bidFind (exPostBids).
     /// @param returnData Data returned from UserOp execution, used as input if necessary.
     /// @return bidAmount The determined bid amount for the SolverOperation if all validations pass and the operation is
@@ -177,14 +179,13 @@ abstract contract Escrow is AtlETH {
         UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         uint256 bidAmount,
+        uint256 gasWaterMark,
         bool prevalidated,
         bytes memory returnData
     )
         internal
         returns (uint256)
     {
-        // Set the gas baseline
-        uint256 _gasWaterMark = gasleft();
         uint256 _result;
         if (!prevalidated) {
             _result = VERIFICATION.verifySolverOp(
@@ -197,7 +198,7 @@ abstract contract Escrow is AtlETH {
         if (_result.canExecute()) {
             uint256 _gasLimit;
             // Verify gasLimit again
-            (_result, _gasLimit) = _validateSolverOpGasAndValue(dConfig, solverOp, _gasWaterMark, _result);
+            (_result, _gasLimit) = _validateSolverOpGasAndValue(dConfig, solverOp, gasWaterMark, _result);
             _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
             // Check for trusted operation hash
@@ -231,7 +232,7 @@ abstract contract Escrow is AtlETH {
 
         // Account for failed SolverOperation gas costs
         _handleSolverFailAccounting(
-            solverOp, dConfig.solverGasLimit, _gasWaterMark, _result, dConfig.callConfig.exPostBids()
+            solverOp, dConfig.solverGasLimit, gasWaterMark, _result, dConfig.callConfig.exPostBids()
         );
 
         emit SolverTxResult(
