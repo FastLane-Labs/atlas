@@ -244,6 +244,7 @@ contract Atlas is Escrow, Factory {
         internal
         returns (uint256)
     {
+        uint256 _gasWaterMark = gasleft(); // track bid-finding gas, to be written off.
         uint256 solverOpsLength = solverOps.length; // computed once for efficiency
 
         // Return early if no solverOps (e.g. in simUserOperation)
@@ -258,7 +259,6 @@ contract Atlas is Escrow, Factory {
         uint256[] memory _bidsAndIndices = new uint256[](solverOpsLength);
         uint256 _bidAmountFound;
         uint256 _bidsAndIndicesLastIndex = solverOpsLength - 1; // Start from the last index
-        uint256 _gasWaterMark = gasleft();
 
         // Get a snapshot of the GasLedger from transient storage, to reset to after bid-finding below
         uint256 _gasLedgerSnapshot = t_gasLedger;
@@ -309,6 +309,9 @@ contract Atlas is Escrow, Factory {
 
         // Finally, iterate through sorted bidsAndIndices array in descending order of bidAmount.
         for (uint256 i = _bidsAndIndicesLastIndex;; /* breaks when 0 */ --i) {
+            // Now, track gas watermark to charge/writeoff gas for each solverOp
+            _gasWaterMark = gasleft();
+
             // Isolate the bidAmount from the packed uint256 value
             _bidAmountFound = _bidsAndIndices[i] >> _BITS_FOR_INDEX;
 
@@ -325,7 +328,7 @@ contract Atlas is Escrow, Factory {
 
             // Execute the solver operation. If solver won, allocate value and return. Otherwise continue looping.
             _bidAmountFound = _executeSolverOperation(
-                ctx, dConfig, userOp, solverOps[_solverIndex], _bidAmountFound, true, returnData
+                ctx, dConfig, userOp, solverOps[_solverIndex], _bidAmountFound, _gasWaterMark, true, returnData
             );
 
             if (ctx.solverSuccessful) {
@@ -361,9 +364,14 @@ contract Atlas is Escrow, Factory {
 
         uint8 solverOpsLen = uint8(solverOps.length);
         for (; ctx.solverIndex < solverOpsLen; ctx.solverIndex++) {
+            // track gas watermark to charge/writeoff gas for each solverOp
+            uint256 _gasWaterMark = gasleft();
+
             SolverOperation calldata solverOp = solverOps[ctx.solverIndex];
 
-            _bidAmount = _executeSolverOperation(ctx, dConfig, userOp, solverOp, solverOp.bidAmount, false, returnData);
+            _bidAmount = _executeSolverOperation(
+                ctx, dConfig, userOp, solverOp, solverOp.bidAmount, _gasWaterMark, false, returnData
+            );
 
             if (ctx.solverSuccessful) {
                 return _bidAmount;
