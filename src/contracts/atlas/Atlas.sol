@@ -236,6 +236,7 @@ contract Atlas is Escrow, Factory {
         internal
         returns (uint256)
     {
+        uint256 _gasWaterMark = gasleft(); // track bid-finding gas, to be written off.
         uint256 solverOpsLength = solverOps.length; // computed once for efficiency
 
         // Return early if no solverOps (e.g. in simUserOperation)
@@ -250,7 +251,6 @@ contract Atlas is Escrow, Factory {
         uint256[] memory _bidsAndIndices = new uint256[](solverOpsLength);
         uint256 _bidAmountFound;
         uint256 _bidsAndIndicesLastIndex = solverOpsLength - 1; // Start from the last index
-        uint256 _gasWaterMark = gasleft();
 
         // Get a snapshot of the GasLedger from transient storage, to reset to after bid-finding below
         uint256 _gasLedgerSnapshot = t_gasLedger;
