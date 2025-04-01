@@ -356,26 +356,37 @@ abstract contract GasAccounting is SafetyLocks {
     function _chargeUnreachedSolversForCalldata(
         SolverOperation[] calldata solverOps,
         GasLedger memory gL,
-        uint256 winningSolverIdx
+        uint256 winningSolverIdx,
+        bytes32 userOpHash,
+        uint256 maxFeePerGas,
+        address bundler,
+        bool allowsTrustedOpHash
     )
         internal
         returns (uint256 unreachedCalldataValuePaid)
     {
         uint256 _writeoffGasMarker = gasleft();
-        EscrowAccountAccessData memory _solverData;
-        uint256 _calldataGasCost;
-        uint256 _totalDeficit;
-        uint256 _deficit;
-        address _from;
 
         // Start at the solver after the current solverIdx, because current solverIdx is the winner
         for (uint256 i = winningSolverIdx + 1; i < solverOps.length; ++i) {
-            _from = solverOps[i].from;
-            _calldataGasCost = GasAccLib.solverOpCalldataGas(solverOps[i].data.length, L2_GAS_CALCULATOR) * tx.gasprice;
-            _solverData = S_accessData[_from];
+            address _from = solverOps[i].from;
+            uint256 _calldataGasCost =
+                GasAccLib.solverOpCalldataGas(solverOps[i].data.length, L2_GAS_CALCULATOR) * tx.gasprice;
+
+            // Verify the solverOp, and write off solver's calldata gas if included due to bundler fault
+            uint256 _result =
+                VERIFICATION.verifySolverOp(solverOps[i], userOpHash, maxFeePerGas, bundler, allowsTrustedOpHash);
+
+            if (_result.bundlersFault()) {
+                gL.writeoffsGas += _calldataGasCost.divUp(tx.gasprice).toUint48();
+                continue;
+            }
+
+            // If solverOp inclusion was not bundler fault, charge solver for calldata gas
+            EscrowAccountAccessData memory _solverData = S_accessData[_from];
 
             // No surcharges added to calldata cost for unreached solvers
-            _deficit = _assign(_solverData, _from, _calldataGasCost);
+            uint256 _deficit = _assign(_solverData, _from, _calldataGasCost);
 
             // Persist _assign() changes to solver account data to storage
             S_accessData[_from] = _solverData;
@@ -385,12 +396,12 @@ abstract contract GasAccounting is SafetyLocks {
 
             // Any deficits from the `_assign()` operations are converted to gas units and written off so as not to
             // charge the winning solver for calldata that is not their responsibility, in `_settle()`.
-            if (_deficit > 0) _totalDeficit += _deficit.divUp(tx.gasprice);
+            if (_deficit > 0) gL.writeoffsGas += _deficit.divUp(tx.gasprice).toUint48();
         }
 
         // The gas cost of this loop is always paid by the bundler so as not to charge the winning solver for an
         // excessive number of loops and SSTOREs via `_assign()`. This gas is therefore added to writeoffs.
-        gL.writeoffsGas += (_writeoffGasMarker - gasleft() + _totalDeficit).toUint48();
+        gL.writeoffsGas += (_writeoffGasMarker - gasleft()).toUint48();
     }
 
     function _settle(

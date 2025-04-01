@@ -141,7 +141,15 @@ contract Atlas is Escrow, Factory {
 
             // Only charge unreached solverOps for their calldata if NOT in exPostBids mode
             if (!_dConfig.callConfig.exPostBids()) {
-                _unreachedCalldataValuePaid = _chargeUnreachedSolversForCalldata(solverOps, _gL, ctx.solverIndex);
+                _unreachedCalldataValuePaid = _chargeUnreachedSolversForCalldata(
+                    solverOps,
+                    _gL,
+                    ctx.solverIndex,
+                    dAppOp.userOpHash,
+                    userOp.maxFeePerGas,
+                    _bundler,
+                    _dConfig.callConfig.allowsTrustedOpHash()
+                );
             }
 
             // Gas Refund to sender only if execution is successful
