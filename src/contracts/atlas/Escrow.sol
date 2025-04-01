@@ -621,6 +621,16 @@ abstract contract Escrow is AtlETH {
         // Make sure there's enough value in Atlas for the Solver
         if (!_borrow(solverOp.value)) revert InsufficientEscrow();
 
+        // Load callConfig from transient storage once here, to be used twice below.
+        uint32 _callConfig = _activeCallConfig();
+
+        // In exPostBids mode, the solver contract should not be sent the solver's discovered bid as it could contain
+        // encoded info computed during bid-finding at the bundler's expense. We thus send a bidAmount of 0 if
+        // exPostBids = true AND ctx.bidFind = false, to incentivise the solver contract to behave in the exact same way
+        // in the real execution as it did in the bid-finding execution. In all other scenarios the bidAmount is sent to
+        // the solver.
+        if (_callConfig.exPostBids() && !ctx.bidFind) bidAmount = 0;
+
         // Optimism's SafeCall lib allows us to limit how much returndata gets copied to memory, to prevent OOG attacks.
         _success = solverOp.solver.safeCall(
             gasleft(),
@@ -634,7 +644,7 @@ abstract contract Escrow is AtlETH {
                     bidAmount,
                     solverOp.data,
                     // Only pass the returnData (either from userOp or preOps) if the dApp requires it
-                    _activeCallConfig().forwardReturnData() ? returnData : new bytes(0)
+                    _callConfig.forwardReturnData() ? returnData : new bytes(0)
                 )
             )
         );
