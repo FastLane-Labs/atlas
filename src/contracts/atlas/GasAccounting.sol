@@ -282,7 +282,7 @@ abstract contract GasAccounting is SafetyLocks {
             _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR);
         }
 
-        uint256 _gasUsed = _calldataGas + (gasWaterMark + _SOLVER_BASE_GAS_USED - gasleft());
+        uint256 _gasUsed = _calldataGas + (gasWaterMark - gasleft());
 
         // Deduct solver's max (C + E) gas from remainingMaxGas, for future solver gas liability calculations
         _gL.remainingMaxGas -= uint48(dConfigSolverGasLimit + _calldataGas);
@@ -292,10 +292,12 @@ abstract contract GasAccounting is SafetyLocks {
         if (result.bundlersFault()) {
             // CASE: Solver is not responsible for the failure of their operation, so we blame the bundler
             // and reduce the total amount refunded to the bundler
+            _gasUsed += _BUNDLER_FAULT_OFFSET;
             _gL.writeoffsGas += uint48(_gasUsed);
         } else {
             // CASE: Solver failed, so we calculate what they owe.
-            uint256 _gasValueWithSurcharges = _gasUsed.withSurcharge(_bothSurchargeRates) * tx.gasprice;
+            _gasUsed += _SOLVER_FAULT_OFFSET;
+            uint256 _gasValueWithSurcharges = (_gasUsed).withSurcharge(_bothSurchargeRates) * tx.gasprice;
 
             EscrowAccountAccessData memory _solverAccountData = S_accessData[solverOp.from];
 
@@ -345,32 +347,51 @@ abstract contract GasAccounting is SafetyLocks {
     function _chargeUnreachedSolversForCalldata(
         SolverOperation[] calldata solverOps,
         GasLedger memory gL,
-        uint256 winningSolverIdx
+        uint256 winningSolverIdx,
+        bytes32 userOpHash,
+        uint256 maxFeePerGas,
+        address bundler,
+        bool allowsTrustedOpHash
     )
         internal
         returns (uint256 unreachedCalldataValuePaid)
     {
         uint256 _writeoffGasMarker = gasleft();
-        EscrowAccountAccessData memory _solverData;
-        uint256 _calldataGasCost;
-        uint256 _deficit;
 
         // Start at the solver after the current solverIdx, because current solverIdx is the winner
         for (uint256 i = winningSolverIdx + 1; i < solverOps.length; ++i) {
-            _calldataGasCost = GasAccLib.solverOpCalldataGas(solverOps[i].data.length, L2_GAS_CALCULATOR) * tx.gasprice;
-            _solverData = S_accessData[solverOps[i].from];
+            address _from = solverOps[i].from;
+            uint256 _calldataGasCost =
+                GasAccLib.solverOpCalldataGas(solverOps[i].data.length, L2_GAS_CALCULATOR) * tx.gasprice;
+
+            // Verify the solverOp, and write off solver's calldata gas if included due to bundler fault
+            uint256 _result =
+                VERIFICATION.verifySolverOp(solverOps[i], userOpHash, maxFeePerGas, bundler, allowsTrustedOpHash);
+
+            if (_result.bundlersFault()) {
+                gL.writeoffsGas += _calldataGasCost.divUp(tx.gasprice).toUint48();
+                continue;
+            }
+
+            // If solverOp inclusion was not bundler fault, charge solver for calldata gas
+            EscrowAccountAccessData memory _solverData = S_accessData[_from];
 
             // No surcharges added to calldata cost for unreached solvers
-            _deficit = _assign(_solverData, solverOps[i].from, _calldataGasCost);
+            uint256 _deficit = _assign(_solverData, _from, _calldataGasCost);
 
             // Persist _assign() changes to solver account data to storage
-            S_accessData[solverOps[i].from] = _solverData;
+            S_accessData[_from] = _solverData;
 
+            // The sum of value paid less deficits is tracked and used in `_settle()`
             unreachedCalldataValuePaid += _calldataGasCost - _deficit;
+
+            // Any deficits from the `_assign()` operations are converted to gas units and written off so as not to
+            // charge the winning solver for calldata that is not their responsibility, in `_settle()`.
+            if (_deficit > 0) gL.writeoffsGas += _deficit.divUp(tx.gasprice).toUint48();
         }
 
         // The gas cost of this loop is always paid by the bundler so as not to charge the winning solver for an
-        // excessive number of loops and SSTOREs via _assign(). This gas is therefore added to writeoffs.
+        // excessive number of loops and SSTOREs via `_assign()`. This gas is therefore added to writeoffs.
         gL.writeoffsGas += (_writeoffGasMarker - gasleft()).toUint48();
     }
 
@@ -455,10 +476,13 @@ abstract contract GasAccounting is SafetyLocks {
 
             uint256 _maxRefund = (gasMarker - gL.writeoffsGas - _gasLeft).maxBundlerRefund() * tx.gasprice;
 
-            // Bundler gets (base gas cost + bundler surcharge) of solver fault failures, plus any net repayments, plus
-            // base gas cost of unreached solver calldata. This is compared to _maxRefund below.
-            uint256 _bundlerCutBeforeLimit = uint256(gL.solverFaultFailureGas).withSurcharge(_bundlerSurchargeRate)
-                * tx.gasprice + uint256(_netRepayments) + unreachedCalldataValuePaid;
+            // Bundler gets (base gas cost + bundler surcharge) of solver fault failures, plus base gas cost of
+            // unreached solver calldata. This is compared to _maxRefund below. Net repayments is added after the 80%
+            // cap has been applied to the gas refund components.
+            // `unreachedCalldataValuePaid` is not added here as it should always be 0 when solverSuccessful = false,
+            // because there should then be no unreached solvers.
+            uint256 _bundlerCutBeforeLimit =
+                uint256(gL.solverFaultFailureGas).withSurcharge(_bundlerSurchargeRate) * tx.gasprice;
 
             // Atlas only keeps the Atlas surcharge of solver fault failures, and any gas due to bundler that exceeds
             // the 80% limit.
@@ -472,6 +496,9 @@ abstract contract GasAccounting is SafetyLocks {
                 // Otherwise, the bundler can receive the full solver fault failure gas
                 claimsPaidToBundler = _bundlerCutBeforeLimit;
             }
+
+            // Finally, add any net repayments, which should not be subject to the 80% cap, to the bundler's claims
+            claimsPaidToBundler += uint256(_netRepayments);
         }
 
         S_cumulativeSurcharge += netAtlasGasSurcharge;

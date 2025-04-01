@@ -146,15 +146,20 @@ contract AtlasVerificationBase is BaseTest {
             .sign(address(atlasVerification), governancePK);
     }
 
-    // TODO update tests to check bidFindOverhead + allSolversGasLimit return values
-    function doValidateCalls(ValidCallsCall memory call) public returns (uint256 allSolversGasLimit, uint256 bidFindOverhead, ValidCallsResult result) {
+    // TODO update tests to check allSolversGasLimit, allSolversCalldataGas, bidFindOverhead return values
+    function doValidateCalls(ValidCallsCall memory call) public returns (
+        uint256 allSolversGasLimit,
+        uint256 allSolversCalldataGas,
+        uint256 bidFindOverhead,
+        ValidCallsResult result
+    ) {
         DAppConfig memory config = dAppControl.getDAppConfig(call.userOp);
 
         // set to just under expected exec gas limit
         call.metacallGasLeft = _gasLim(call.userOp, call.solverOps) - 10_000; 
 
         vm.startPrank(address(atlas));
-        (allSolversGasLimit, bidFindOverhead, result) = atlasVerification.validateCalls(
+        (allSolversGasLimit,  allSolversCalldataGas, bidFindOverhead, result) = atlasVerification.validateCalls(
             config,
             call.userOp,
             call.solverOps,
@@ -175,7 +180,7 @@ contract AtlasVerificationBase is BaseTest {
     function callAndAssert(ValidCallsCall memory call, ValidCallsResult expected) public {
         ValidCallsResult result;
         // TODO add tests for new return values
-        (,, result) = doValidateCalls(call);
+        (,,, result) = doValidateCalls(call);
         assertValidCallsResult(result, expected);
     }
 

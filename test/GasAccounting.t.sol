@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import "forge-std/Test.sol";
 
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
+import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
 
 import { GasAccounting } from "../src/contracts/atlas/GasAccounting.sol";
 import { AtlasEvents } from "../src/contracts/types/AtlasEvents.sol";
@@ -21,6 +22,7 @@ import "../src/contracts/types/SolverOperation.sol";
 import "../src/contracts/types/ConfigTypes.sol";
 
 import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironment.sol";
+import { AtlasVerification } from "../src/contracts/atlas/AtlasVerification.sol";
 
 import { MockL2GasCalculator } from "./base/MockL2GasCalculator.sol";
 import { TestAtlas } from "./base/TestAtlas.sol";
@@ -31,6 +33,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
     using GasAccLib for BorrowsLedger;
     using GasAccLib for uint256;
     using AccountingMath for uint256;
+    using FixedPointMathLib for uint256;
 
     uint256 public constant ONE_GWEI = 1e9;
     uint256 public constant SCALE = AccountingMath._SCALE;
@@ -46,18 +49,32 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         // Compute expected addresses for the deployment
         address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
+        address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
+
+        vm.startPrank(deployer);
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
 
         // Initialize MockGasAccounting
         tAtlas = new TestAtlasGasAcc(
             DEFAULT_ESCROW_DURATION,
             A_SURCHARGE,
-            address(atlasVerification),
+            expectedAtlasVerificationAddr,
             address(simulator),
             deployer,
             address(0),
             address(execEnvTemplate)
         );
+
+        // AtlasVerification needed for unreached solver validation
+        atlasVerification = new AtlasVerification({
+            atlas: expectedAtlasAddr,
+            l2GasCalculator: address(0)
+        });
+
+        vm.stopPrank();
+
+        assertEq(address(tAtlas),expectedAtlasAddr, "Atlas addr not as expected");
+        assertEq(address(atlasVerification),expectedAtlasVerificationAddr, "AtlasVerification addr not as expected");
 
         // Create a mock execution environment - the expected caller in many GasAcc functions
         executionEnvironment = makeAddr("ExecutionEnvironment");
@@ -404,10 +421,11 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
     }
 
     function test_GasAccounting_handleSolverFailAccounting() public {
-        // 3 test scenarios:
+        // 4 test scenarios:
         // 1. result = bundler fault
         // 2. result = solver fault, no deficit
         // 3. result = solver fault, with deficit
+        // 4. result = bundler fault, exPostBids = true
 
         SolverOperation memory solverOp;
         solverOp.from = solverOneEOA;
@@ -431,11 +449,11 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         // Case 1: result = bundler fault
         // ===============================
         uint256 result = 1 << uint256(SolverOutcome.InvalidSignature);
-        assertEq(EscrowBits.bundlersFault(result), true, "result should be a bundler fault");
+        assertEq(EscrowBits.bundlersFault(result), true, "C1: result should be a bundler fault");
 
         uint256 gasWaterMark = 1_000_000;
         uint256 gasLeft = 200_000;
-        uint256 estGasUsed = (gasWaterMark + _SOLVER_BASE_GAS_USED - gasLeft)
+        uint256 estGasUsed = (gasWaterMark + _BUNDLER_FAULT_OFFSET - gasLeft)
             + GasAccLib.solverOpCalldataGas(solverOp.data.length, address(0));
 
         tAtlas.handleSolverFailAccounting{ gas: gasLeft }(solverOp, dConfigSolverGasLimit, gasWaterMark, result, false);
@@ -447,18 +465,18 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             gLAfter.writeoffsGas,
             gLBefore.writeoffsGas + estGasUsed,
             0.02e18, // 2% tolerance
-            "writeoffsGas should increase by estGasUsed"
+            "C1: writeoffsGas should increase by estGasUsed"
         );
         assertEq(
-            gLAfter.solverFaultFailureGas, gLBefore.solverFaultFailureGas, "solverFaultFailureGas should not change"
+            gLAfter.solverFaultFailureGas, gLBefore.solverFaultFailureGas, "C1: solverFaultFailureGas should not change"
         );
-        assertEq(accountDataAfter.bonded, accountDataBefore.bonded, "bonded balance should not change");
-        assertEq(accountDataAfter.auctionWins, accountDataBefore.auctionWins, "auctionWins should not change");
-        assertEq(accountDataAfter.auctionFails, accountDataBefore.auctionFails, "auctionFails should not change");
+        assertEq(accountDataAfter.bonded, accountDataBefore.bonded, "C1: bonded balance should not change");
+        assertEq(accountDataAfter.auctionWins, accountDataBefore.auctionWins, "C1: auctionWins should not change");
+        assertEq(accountDataAfter.auctionFails, accountDataBefore.auctionFails, "C1: auctionFails should not change");
         assertEq(
             accountDataAfter.totalGasValueUsed,
             accountDataBefore.totalGasValueUsed,
-            "totalGasValueUsed should not change"
+            "C1: totalGasValueUsed should not change"
         );
 
         // ===============================
@@ -466,7 +484,11 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         // ===============================
         vm.revertToState(snapshot);
         result = 1 << uint256(SolverOutcome.SolverOpReverted);
-        assertEq(EscrowBits.bundlersFault(result), false, "result should not be a bundler fault");
+        assertEq(EscrowBits.bundlersFault(result), false, "C2: result should not be a bundler fault");
+
+        // Switch to solver fault offset in estGasUsed
+        estGasUsed -= _BUNDLER_FAULT_OFFSET;
+        estGasUsed += _SOLVER_FAULT_OFFSET;
 
         // No change in gasWaterMark, gasLeft, or estGasUsed --> no assign deficit
         uint256 estGasValueCharged =
@@ -481,22 +503,22 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             gLAfter.solverFaultFailureGas,
             gLBefore.solverFaultFailureGas + estGasUsed,
             0.02e18, // 2% tolerance
-            "solverFaultFailureGas should increase by estGasUsed"
+            "C2: solverFaultFailureGas should increase by estGasUsed"
         );
-        assertEq(gLAfter.writeoffsGas, gLBefore.writeoffsGas, "writeoffsGas should not change");
+        assertEq(gLAfter.writeoffsGas, gLBefore.writeoffsGas, "C2: writeoffsGas should not change");
         assertApproxEqRel(
             accountDataAfter.bonded,
             accountDataBefore.bonded - estGasValueCharged,
             0.02e18, // 2% tolerance
-            "bonded balance should not change"
+            "C2: bonded balance should not change"
         );
-        assertEq(accountDataAfter.auctionWins, accountDataBefore.auctionWins, "auctionWins should not change");
-        assertEq(accountDataAfter.auctionFails, accountDataBefore.auctionFails + 1, "auctionFails should increase by 1");
+        assertEq(accountDataAfter.auctionWins, accountDataBefore.auctionWins, "C2: auctionWins should not change");
+        assertEq(accountDataAfter.auctionFails, accountDataBefore.auctionFails + 1, "C2: auctionFails should increase by 1");
         assertApproxEqRel(
             accountDataAfter.totalGasValueUsed,
             accountDataBefore.totalGasValueUsed + (estGasValueCharged / _GAS_VALUE_DECIMALS_TO_DROP),
             0.02e18, // 2% tolerance
-            "totalGasValueUsed should increase by estGasValueCharged"
+            "C2: totalGasValueUsed should increase by estGasValueCharged"
         );
 
         // ===============================
@@ -509,7 +531,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         // estGasUsed * tx.gasprice should be > solver's 1e18 bonded, to cause a deficit
         gasWaterMark = 2e9; // After solver pays 1e18, leaves approx 1e18 deficit
         gasLeft = 100_000;
-        estGasUsed = (gasWaterMark + _SOLVER_BASE_GAS_USED - gasLeft)
+        estGasUsed = (gasWaterMark + _SOLVER_FAULT_OFFSET - gasLeft)
             + GasAccLib.solverOpCalldataGas(solverOp.data.length, address(0));
         uint256 estAssignValueInclSurcharges =
             estGasUsed.withSurcharge(A_SURCHARGE + B_SURCHARGE) * tx.gasprice;
@@ -552,7 +574,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         gasWaterMark = 1_000_000;
         gasLeft = 200_000;
-        estGasUsed = (gasWaterMark + _SOLVER_BASE_GAS_USED - gasLeft); // Calldata excluded
+        estGasUsed = (gasWaterMark + _BUNDLER_FAULT_OFFSET - gasLeft); // Calldata excluded
 
         tAtlas.handleSolverFailAccounting{ gas: gasLeft }(solverOp, dConfigSolverGasLimit, gasWaterMark, result, true);
 
@@ -587,125 +609,256 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
     }
 
     function test_GasAccounting_chargeUnreachedSolversForCalldata() public {
+        bytes32 userOpHash = keccak256("userOpHash");
+        address bundler = makeAddr("Bundler");
+        bool allowsTrustedOpHash = false;
+
+        uint256 maxFeePerGas = 1e9; // 1 gwei
+        vm.txGasPrice(maxFeePerGas); // set gas price to 1 gwei
+
+        // 3 valid solverOps - solver pays calldata gas when unreached
         SolverOperation[] memory solverOps = new SolverOperation[](3);
-        solverOps[0].from = solverOneEOA;
-        solverOps[0].data = new bytes(300);
-        solverOps[1].from = solverTwoEOA;
-        solverOps[1].data = new bytes(300);
-        solverOps[2].from = solverThreeEOA;
-        solverOps[2].data = new bytes(300);
-
-        vm.txGasPrice(1e9); // set gas price to 1 gwei
-
+        solverOps[0] = _buildSolverOp(solverOneEOA, solverOnePK, userOpHash);
+        solverOps[1] = _buildSolverOp(solverTwoEOA, solverTwoPK, userOpHash);
+        solverOps[2] = _buildSolverOp(solverThreeEOA, solverThreePK, userOpHash);
+        
         GasLedger memory gL = GasLedger(0, 0, 0, 0, 0);
         uint256 solverOpCalldataGasValue =
             GasAccLib.solverOpCalldataGas(solverOps[0].data.length, address(0)) * tx.gasprice;
-        uint256 loopIterGas = 4000; // approx gas used for 1 loop
-        uint256 constGas = 350; // approx constant gas used besides the loop
+
+        uint256 constGas = 125; // approx constant gas used besides the loop
+        // approx gas used for 1 loop when validation fails due to bundler fault and calldata gas is written off.
+        uint256 loopGasBundlerFault = 7_000; // cheaper because no `_assign()` operation
+        // approx gas used for 1 loop when validation passes (solver to pay calldata gas) `_assign()` charges just bonded successfully
+        uint256 loopGasSolverFault = 13_350;
+        // approx gas used for 1 loop when validation passes (solver to pay calldata gas) with deficit in `_assign()`
+        uint256 loopGasSolverFaultDeficit = loopGasSolverFault + 3_200; // about 3200 gas more than usual `_assign()` 
 
         // Give solvers bonded atlETH to pay with
         hoax(solverOneEOA, 1e18);
         tAtlas.depositAndBond{ value: 1e18 }(1e18);
         hoax(solverTwoEOA, 1e18);
         tAtlas.depositAndBond{ value: 1e18 }(1e18);
-        hoax(solverThreeEOA, 1e18);
+
+        uint256 snapshot = vm.snapshotState();
+
+        hoax(solverThreeEOA, 1e18); // Solver 3 will have no bonded atlETH in Case 4 below.
         tAtlas.depositAndBond{ value: 1e18 }(1e18);
 
         // Sum of starting bonded balances should be 3e18
-        assertEq(tAtlas.bondedTotalSupply(), 3e18, "bondedTotalSupply should be 3e18");
-        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "solverOneEOA bonded balance should start 1e18");
-        assertEq(tAtlas.balanceOfBonded(solverTwoEOA), 1e18, "solverTwoEOA bonded balance should start 1e18");
-        assertEq(tAtlas.balanceOfBonded(solverThreeEOA), 1e18, "solverThreeEOA bonded balance should start 1e18");
-
-        uint256 snapshot = vm.snapshotState();
+        assertEq(tAtlas.bondedTotalSupply(), 3e18, "C0: bondedTotalSupply should be 3e18");
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "C0: solverOneEOA bonded balance should start 1e18");
+        assertEq(tAtlas.balanceOfBonded(solverTwoEOA), 1e18, "C0: solverTwoEOA bonded balance should start 1e18");
+        assertEq(tAtlas.balanceOfBonded(solverThreeEOA), 1e18, "C0: solverThreeEOA bonded balance should start 1e18");
 
         // ===============================
         // Case 1: No unreached solvers -> winning solver idx = 2
         // ===============================
-        uint256 unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata(solverOps, gL, 2);
+        uint256 unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata({
+            solverOps: solverOps, 
+            gL: gL, 
+            winningSolverIdx: 2, 
+            userOpHash: userOpHash,
+            maxFeePerGas: maxFeePerGas, 
+            bundler: bundler, 
+            allowsTrustedOpHash: allowsTrustedOpHash
+        });
 
         GasLedger memory gLAfter = tAtlas.getGasLedger();
 
-        assertEq(unreachedCalldataValuePaid, 0, "unreachedCalldataValuePaid should be 0");
-        assertEq(tAtlas.bondedTotalSupply(), 3e18, "bondedTotalSupply should be 3e18");
-        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "solverOneEOA bonded balance should be 1e18");
-        assertEq(tAtlas.balanceOfBonded(solverTwoEOA), 1e18, "solverTwoEOA bonded balance should be 1e18");
-        assertEq(tAtlas.balanceOfBonded(solverThreeEOA), 1e18, "solverThreeEOA bonded balance should be 1e18");
+        assertEq(unreachedCalldataValuePaid, 0, "C1: unreachedCalldataValuePaid should be 0");
+        assertEq(tAtlas.bondedTotalSupply(), 3e18, "C1: bondedTotalSupply should be 3e18");
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "C1: solverOneEOA bonded balance should be 1e18");
+        assertEq(tAtlas.balanceOfBonded(solverTwoEOA), 1e18, "C1: solverTwoEOA bonded balance should be 1e18");
+        assertEq(tAtlas.balanceOfBonded(solverThreeEOA), 1e18, "C1: solverThreeEOA bonded balance should be 1e18");
         assertApproxEqRel(
             gLAfter.writeoffsGas,
             constGas, // no loops, just constant gas
-            0.1e18, // 10% tolerance, because smol number
-            "writeoffsGas should not change"
+            0.02e18, // 2% tolerance, because smol number
+            "C1: writeoffsGas should increase by 0 loops, just constant gas"
         );
 
         // ===============================
-        // Case 2: 1 unreached solver -> winning solver idx = 1
+        // Case 2: 1 unreached solver (solverOp valid) -> winning solver idx = 1
         // ===============================
         vm.revertToState(snapshot);
+        hoax(solverThreeEOA, 1e18); // solver 3 has bonded atlETH in this case
+        tAtlas.depositAndBond{ value: 1e18 }(1e18);
 
-        unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata(solverOps, gL, 1);
+        unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata({
+            solverOps: solverOps, 
+            gL: gL, 
+            winningSolverIdx: 1, 
+            userOpHash: userOpHash,
+            maxFeePerGas: maxFeePerGas, 
+            bundler: bundler, 
+            allowsTrustedOpHash: allowsTrustedOpHash
+        });
 
         gLAfter = tAtlas.getGasLedger();
 
         assertEq(
             unreachedCalldataValuePaid,
             solverOpCalldataGasValue,
-            "unreachedCalldataValuePaid should be 1x solverOpCalldataGasValue"
+            "C2: unreachedCalldataValuePaid should be 1x solverOpCalldataGasValue"
         );
         assertEq(
             tAtlas.bondedTotalSupply(),
             3e18 - solverOpCalldataGasValue,
-            "bondedTotalSupply should be 3e18 - solverOpCalldataGasValue"
+            "C2: bondedTotalSupply should be 3e18 - solverOpCalldataGasValue"
         );
-        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "solverOneEOA bonded balance should be 1e18");
-        assertEq(tAtlas.balanceOfBonded(solverTwoEOA), 1e18, "solverTwoEOA bonded balance should be 1e18");
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "C2: solverOneEOA bonded balance should be 1e18");
+        assertEq(tAtlas.balanceOfBonded(solverTwoEOA), 1e18, "C2: solverTwoEOA bonded balance should be 1e18");
         assertEq(
             tAtlas.balanceOfBonded(solverThreeEOA),
             1e18 - solverOpCalldataGasValue,
-            "solverThreeEOA bonded balance should be 1e18 - solverOpCalldataGasValue"
+            "C2: solverThreeEOA bonded balance should be 1e18 - solverOpCalldataGasValue"
         );
         assertApproxEqRel(
             gLAfter.writeoffsGas,
-            loopIterGas + constGas, // 1 iteration + constant gas
+            loopGasSolverFault + constGas, // 1 solver charged iteration + constant gas
             0.02e18, // 2% tolerance
-            "writeoffsGas should increase by approx 1 loop"
+            "C2: writeoffsGas should increase by approx 1 loop"
         );
 
         // ===============================
-        // Case 3: 2 unreached solvers -> winning solver idx = 0
+        // Case 3: 2 unreached solvers (both valid) -> winning solver idx = 0 | no deficits
         // ===============================
         vm.revertToState(snapshot);
+        hoax(solverThreeEOA, 1e18); // solver 3 has bonded atlETH in this case
+        tAtlas.depositAndBond{ value: 1e18 }(1e18);
 
-        unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata(solverOps, gL, 0);
+        unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata({
+            solverOps: solverOps, 
+            gL: gL, 
+            winningSolverIdx: 0, 
+            userOpHash: userOpHash,
+            maxFeePerGas: maxFeePerGas, 
+            bundler: bundler, 
+            allowsTrustedOpHash: allowsTrustedOpHash
+        });
 
         gLAfter = tAtlas.getGasLedger();
 
         assertEq(
             unreachedCalldataValuePaid,
             solverOpCalldataGasValue * 2,
-            "unreachedCalldataValuePaid should be 2x solverOpCalldataGasValue"
+            "C3: unreachedCalldataValuePaid should be 2x solverOpCalldataGasValue"
         );
         assertEq(
             tAtlas.bondedTotalSupply(),
             3e18 - (2 * solverOpCalldataGasValue),
-            "bondedTotalSupply should be 3e18 - 2 * solverOpCalldataGasValue"
+            "C3: bondedTotalSupply should be 3e18 - 2 * solverOpCalldataGasValue"
         );
-        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "solverOneEOA bonded balance should be 1e18");
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "C3: solverOneEOA bonded balance should be 1e18");
         assertEq(
             tAtlas.balanceOfBonded(solverTwoEOA),
             1e18 - solverOpCalldataGasValue,
-            "solverTwoEOA bonded balance should be 1e18 - solverOpCalldataGasValue"
+            "C3: solverTwoEOA bonded balance should be 1e18 - solverOpCalldataGasValue"
         );
         assertEq(
             tAtlas.balanceOfBonded(solverThreeEOA),
             1e18 - solverOpCalldataGasValue,
-            "solverThreeEOA bonded balance should be 1e18 - solverOpCalldataGasValue"
+            "C3: solverThreeEOA bonded balance should be 1e18 - solverOpCalldataGasValue"
         );
         assertApproxEqRel(
             gLAfter.writeoffsGas,
-            2 * loopIterGas + constGas, // 2 iterations + constant gas
+            2 * loopGasSolverFault + constGas, // 2 solver charged iterations + constant gas
             0.02e18, // 2% tolerance
-            "writeoffsGas should increase by approx 2 loops"
+            "C3: writeoffsGas should increase by approx 2 loops"
+        );
+
+        // ===============================
+        // Case 4: 2 unreached solvers -> winning solver idx = 0 | solverThree has no bonded atlETH -> deficit
+        // ===============================
+        vm.revertToState(snapshot);
+
+        // No bonded atlETH for solver 3 in this case - but set storage slot to non-zero for gas calcs
+        tAtlas.setAccessData(solverThreeEOA, EscrowAccountAccessData(0, uint32(block.number - 1), 0, 0, 0));
+
+        unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata({
+            solverOps: solverOps, 
+            gL: gL, 
+            winningSolverIdx: 0, 
+            userOpHash: userOpHash,
+            maxFeePerGas: maxFeePerGas, 
+            bundler: bundler, 
+            allowsTrustedOpHash: allowsTrustedOpHash
+        });
+
+        gLAfter = tAtlas.getGasLedger();
+
+        assertEq(
+            unreachedCalldataValuePaid,
+            solverOpCalldataGasValue, // Only 1x calldata gas value paid. Solver 3's calldata is written off
+            "C4: unreachedCalldataValuePaid should be 1x solverOpCalldataGasValue"
+        );
+        assertEq(
+            tAtlas.bondedTotalSupply(),
+            2e18 - solverOpCalldataGasValue,
+            "C4: bondedTotalSupply should be 2e18 - 1x solverOpCalldataGasValue"
+        );
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "C4: solverOneEOA bonded balance should be 1e18");
+        assertEq(
+            tAtlas.balanceOfBonded(solverTwoEOA),
+            1e18 - solverOpCalldataGasValue,
+            "C4: solverTwoEOA bonded balance should be 1e18 - solverOpCalldataGasValue"
+        );
+        assertEq(
+            tAtlas.balanceOfBonded(solverThreeEOA),
+            0, // Because solver 3 has no bonded atlETH at start of this test case
+            "C4: solverThreeEOA bonded balance should be 0"
+        );
+        assertApproxEqRel(
+            gLAfter.writeoffsGas, // incl solver 3 calldata gas + extra gas from deficit calc in assign()
+            loopGasSolverFault + loopGasSolverFaultDeficit + constGas + solverOpCalldataGasValue.divUp(tx.gasprice),
+            0.02e18, // 2% tolerance
+            "C4: writeoffsGas should increase by 1 normal loop + 1 deficit assign loop + solver 3's calldata gas"
+        );
+
+        // ===============================
+        // Case 5: 2 unreached solvers (both bundler fault) -> winning solver idx = 0
+        // ===============================
+
+        vm.revertToState(snapshot);
+        hoax(solverThreeEOA, 1e18); // solver 3 has bonded atlETH in this case
+        tAtlas.depositAndBond{ value: 1e18 }(1e18);
+
+        // Set last 2 solvers to bundler fault (missing solver signature)
+        solverOps[1].signature = "";
+        solverOps[2].signature = "";
+
+        unreachedCalldataValuePaid = tAtlas.chargeUnreachedSolversForCalldata({
+            solverOps: solverOps, 
+            gL: gL, 
+            winningSolverIdx: 0, 
+            userOpHash: userOpHash,
+            maxFeePerGas: maxFeePerGas, 
+            bundler: bundler, 
+            allowsTrustedOpHash: allowsTrustedOpHash
+        });
+
+        gLAfter = tAtlas.getGasLedger();
+
+        assertEq(
+            unreachedCalldataValuePaid,
+            0, // All unreached calldata written off, not paid
+            "C5: unreachedCalldataValuePaid should be 0"
+        );
+        assertEq(
+            tAtlas.bondedTotalSupply(),
+            3e18,
+            "C5: bondedTotalSupply should be 3e18"
+        );
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "C5: solverOne bonded should not change");
+        assertEq(tAtlas.balanceOfBonded(solverTwoEOA), 1e18, "C5: solverTwo bonded should not change");
+        assertEq(tAtlas.balanceOfBonded(solverThreeEOA), 1e18, "C5: solverThree bonded should not change");
+        assertApproxEqRel(
+            gLAfter.writeoffsGas,
+            // 2 bundler fault iterations + constant gas + 2x calldata gas
+            constGas + (2 * loopGasBundlerFault) + (2 * solverOpCalldataGasValue.divUp(tx.gasprice)), 
+            0.02e18, // 2% tolerance
+            "C5: writeoffsGas should inc by 2 * calldata gas + 2 * bundler loops + constant gas"
         );
     }
 
@@ -786,7 +939,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             tAtlas.balanceOfBonded(solverOneEOA),
             1e18 - estWinningSolverCharge,
             0.01e18, // 1% tolerance
-            "winning solver bonded balance should decrease by estWinningSolverCharge"
+            "C3: winning solver bonded balance should decrease by estWinningSolverCharge"
         );
         assertApproxEqRel(
             claimsPaidToBundler,
@@ -794,23 +947,23 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             0.01e18, // 1% tolerance
             "C3: claimsPaidToBundler should be estBundlerRefund"
         );
-        assertEq(bundlerBalanceBefore + claimsPaidToBundler, userEOA.balance, "bundler balance should increase by estWinningSolverCharge");
+        assertEq(bundlerBalanceBefore + claimsPaidToBundler, userEOA.balance, "C3: bundler balance should increase by estWinningSolverCharge");
         assertApproxEqRel(
             netAtlasGasSurcharge,
             estAtlasSurcharge,
             0.01e18, // 1% tolerance
-            "netAtlasGasSurcharge should be estAtlasSurcharge"
+            "C3: netAtlasGasSurcharge should be estAtlasSurcharge"
         );
-        assertEq(tAtlas.cumulativeSurcharge(), atlasSurchargeBefore + netAtlasGasSurcharge, "cumulativeSurcharge should increase by netAtlasGasSurcharge");
-        assertEq(aDataAfter.auctionWins, aDataBefore.auctionWins + 1, "auctionWins should increase by 1");
-        assertEq(aDataAfter.auctionFails, aDataBefore.auctionFails, "auctionFails should not change");
+        assertEq(tAtlas.cumulativeSurcharge(), atlasSurchargeBefore + netAtlasGasSurcharge, "C3: cumulativeSurcharge should increase by netAtlasGasSurcharge");
+        assertEq(aDataAfter.auctionWins, aDataBefore.auctionWins + 1, "C3: auctionWins should increase by 1");
+        assertEq(aDataAfter.auctionFails, aDataBefore.auctionFails, "C3: auctionFails should not change");
         assertApproxEqRel(
             aDataAfter.totalGasValueUsed,
             aDataBefore.totalGasValueUsed + (estWinningSolverCharge / _GAS_VALUE_DECIMALS_TO_DROP),
             0.01e18, // 1% tolerance
-            "totalGasValueUsed should increase by estWinningSolverCharge"
+            "C3: totalGasValueUsed should increase by estWinningSolverCharge"
         );
-        assertEq(tAtlas.getPhase(), uint8(ExecutionPhase.FullyLocked), "phase should be FullyLocked");
+        assertEq(tAtlas.getPhase(), uint8(ExecutionPhase.FullyLocked), "C3: phase should be FullyLocked");
 
         // ============================================
         // Case 4: no winning solver
@@ -819,10 +972,10 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         ctx.solverSuccessful = false;
         solverFaultFailureGas = 10_000_000; // large solver failure gas, to trigger 80% bundler cap
+        unreachedCalldataValuePaid = 0; // no unreached solvers if no winning solver
         gL = GasLedger(0, writeoffsGas, solverFaultFailureGas, 0, 0);
 
-        uint256 bundlerRefundBeforeCap = unreachedCalldataValuePaid 
-            + uint256(solverFaultFailureGas).withSurcharge(B_SURCHARGE) * tx.gasprice;
+        uint256 bundlerRefundBeforeCap = uint256(solverFaultFailureGas).withSurcharge(B_SURCHARGE) * tx.gasprice;
 
         // calculate expected bundler refund --> hits the 80% cap
         estBundlerRefund = (gasMarker - writeoffsGas - settleGas) * 8 / 10 * tx.gasprice;
@@ -837,10 +990,10 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         aDataAfter = tAtlas.getAccessData(solverOneEOA);
 
         // solverOne is not winner - no charge or change in analytics expected
-        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "solverOne is not winner - no balance change");
-        assertEq(aDataAfter.auctionWins, aDataBefore.auctionWins, "auctionWins should not change");
-        assertEq(aDataAfter.auctionFails, aDataBefore.auctionFails, "auctionFails should not change");
-        assertEq(aDataAfter.totalGasValueUsed, aDataBefore.totalGasValueUsed, "totalGasValueUsed should not change");
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "C4: solverOne is not winner - no balance change");
+        assertEq(aDataAfter.auctionWins, aDataBefore.auctionWins, "C4: auctionWins should not change");
+        assertEq(aDataAfter.auctionFails, aDataBefore.auctionFails, "C4: auctionFails should not change");
+        assertEq(aDataAfter.totalGasValueUsed, aDataBefore.totalGasValueUsed, "C4: totalGasValueUsed should not change");
 
         // check bundler refund was capped at 80%
         assertApproxEqRel(
@@ -849,19 +1002,19 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             0.01e18, // 1% tolerance
             "C4: claimsPaidToBundler should be estBundlerRefund"
         );
-        assertEq(bundlerBalanceBefore + claimsPaidToBundler, userEOA.balance, "bundler balance should increase by estBundlerRefund");
-        assertTrue(estBundlerRefund < bundlerRefundBeforeCap, "bundler refund should be capped at 80%");
+        assertEq(bundlerBalanceBefore + claimsPaidToBundler, userEOA.balance, "C4: bundler balance should increase by estBundlerRefund");
+        assertTrue(estBundlerRefund < bundlerRefundBeforeCap, "C4: bundler refund should be capped at 80%");
 
         // check atlas surcharge included excess bundler surcharge above 80% cap
         assertApproxEqRel(
             netAtlasGasSurcharge,
             estAtlasSurcharge,
             0.01e18, // 1% tolerance
-            "netAtlasGasSurcharge should be estAtlasSurcharge"
+            "C4: netAtlasGasSurcharge should be estAtlasSurcharge"
         );
-        assertEq(tAtlas.cumulativeSurcharge(), atlasSurchargeBefore + netAtlasGasSurcharge, "cumulativeSurcharge should increase by netAtlasGasSurcharge");
+        assertEq(tAtlas.cumulativeSurcharge(), atlasSurchargeBefore + netAtlasGasSurcharge, "C4: cumulativeSurcharge should increase by netAtlasGasSurcharge");
 
-        assertEq(tAtlas.getPhase(), uint8(ExecutionPhase.FullyLocked), "phase should be FullyLocked");
+        assertEq(tAtlas.getPhase(), uint8(ExecutionPhase.FullyLocked), "C4: phase should be FullyLocked");
     }
 
     function test_GasAccounting_updateAnalytics() public {
@@ -944,6 +1097,31 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         tAtlas.setGasLedger(gL.pack());
         assertEq(tAtlas.isBalanceReconciled(), true, "solver liability covered by combo should return true");
     }
+
+
+    // HELPERS
+
+    function _buildSolverOp(address solverEOA, uint256 solverPK, bytes32 userOpHash) internal returns (SolverOperation memory solverOp) {
+        solverOp.from = solverEOA;
+        solverOp.to = address(tAtlas);
+        solverOp.value = 0;
+        solverOp.gas = 1_000_000;
+        solverOp.maxFeePerGas = tx.gasprice;
+        solverOp.deadline = block.number + 100;
+        solverOp.solver = makeAddr("SolverContract");
+        solverOp.control = makeAddr("DAppControl");
+        solverOp.userOpHash = userOpHash;
+        solverOp.bidToken = address(0);
+        solverOp.bidAmount = 0;
+        solverOp.data = new bytes(300);
+
+        // Sign solverOp
+        Sig memory sig;
+        (sig.v, sig.r, sig.s) = vm.sign(solverPK, atlasVerification.getSolverPayload(solverOp));
+        solverOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+    }
+
+
 }
 
 /// @title TestAtlasGasAcc
@@ -1035,12 +1213,16 @@ contract TestAtlasGasAcc is TestAtlas {
     function chargeUnreachedSolversForCalldata(
         SolverOperation[] calldata solverOps,
         GasLedger memory gL,
-        uint256 solverIdx
+        uint256 winningSolverIdx,
+        bytes32 userOpHash,
+        uint256 maxFeePerGas,
+        address bundler,
+        bool allowsTrustedOpHash
     )
         public
         returns (uint256 unreachedCalldataValuePaid)
     {
-        unreachedCalldataValuePaid = _chargeUnreachedSolversForCalldata(solverOps, gL, solverIdx);
+        unreachedCalldataValuePaid = _chargeUnreachedSolversForCalldata(solverOps, gL, winningSolverIdx, userOpHash, maxFeePerGas, bundler, allowsTrustedOpHash);
 
         // NOTE: only persisted to storage here for testing purposes
         t_gasLedger = gL.pack();
@@ -1081,5 +1263,10 @@ contract TestAtlasGasAcc is TestAtlas {
 
     function getAccessData(address account) public view returns (EscrowAccountAccessData memory) {
         return S_accessData[account];
+    }
+
+    // NOTE: Only done to make storage slot non-zero to make gas calculations easier
+    function setAccessData(address account, EscrowAccountAccessData memory aData) public {
+        S_accessData[account] = aData;
     }
 }

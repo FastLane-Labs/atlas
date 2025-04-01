@@ -19,7 +19,12 @@ contract TestAtlasVerification is AtlasVerification {
     )
         public
         view
-        returns (ValidCallsResult validCallsResult, uint256 allSolversGasLimit, uint256 bidFindOverhead)
+        returns (
+            ValidCallsResult validCallsResult,
+            uint256 allSolversGasLimit,
+            uint256 allSolversCalldataGas,
+            uint256 bidFindOverhead
+        )
     {
         return _getAndVerifyGasLimits(solverOps, dConfig, userOpGas, metacallGasLeft);
     }
