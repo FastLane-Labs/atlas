@@ -337,8 +337,6 @@ abstract contract Escrow is AtlETH {
             return (result, gasLimit); // gasLimit = 0
         }
 
-        gasLimit = AccountingMath.solverGasLimitScaledDown(solverOp.gas, dConfig.solverGasLimit);
-
         // Verify that we can lend the solver their tx value
         if (solverOp.value > address(this).balance) {
             result |= 1 << uint256(SolverOutcome.CallValueTooHigh);
@@ -351,6 +349,8 @@ abstract contract Escrow is AtlETH {
         if (_solverBalance < _gL.solverGasLiability(_totalSurchargeRate())) {
             result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
         }
+
+        gasLimit = AccountingMath.solverGasLimitScaledDown(solverOp.gas, dConfig.solverGasLimit);
 
         return (result, gasLimit);
     }
