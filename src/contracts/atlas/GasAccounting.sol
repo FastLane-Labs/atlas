@@ -291,10 +291,10 @@ abstract contract GasAccounting is SafetyLocks {
             _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR);
         }
 
-        uint256 _gasUsed = _calldataGas + (gasWaterMark - gasleft());
-
         // Deduct solver's max (C + E) gas from remainingMaxGas, for future solver gas liability calculations
         _gL.remainingMaxGas -= uint48(dConfigSolverGasLimit + _calldataGas);
+
+        uint256 _gasUsed = _calldataGas + (gasWaterMark - gasleft());
 
         // Calculate what the solver owes
         // NOTE: This will cause an error if you are simulating with a gasPrice of 0
