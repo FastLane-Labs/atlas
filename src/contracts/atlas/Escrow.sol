@@ -186,7 +186,13 @@ abstract contract Escrow is AtlETH {
         internal
         returns (uint256)
     {
+        GasLedger memory _gL = t_gasLedger.toGasLedger();
         uint256 _result;
+
+        // Decrease unreachedSolverGas and reset maxApprovedGasSpend at the start of each solverOp
+        _adjustGasLedgerAtSolverOpStart(_gL, dConfig, solverOp);
+        t_gasLedger = _gL.pack(); // Persist changes to transient storage
+
         if (!prevalidated) {
             _result = VERIFICATION.verifySolverOp(
                 solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler, dConfig.callConfig.allowsTrustedOpHash()
@@ -198,7 +204,7 @@ abstract contract Escrow is AtlETH {
         if (_result.canExecute()) {
             uint256 _gasLimit;
             // Verify gasLimit again
-            (_result, _gasLimit) = _validateSolverOpGasAndValue(dConfig, solverOp, gasWaterMark, _result);
+            (_result, _gasLimit) = _validateSolverOpGasAndValue(_gL, dConfig, solverOp, gasWaterMark, _result);
             _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
             // Check for trusted operation hash
@@ -295,6 +301,35 @@ abstract contract Escrow is AtlETH {
         }
     }
 
+    /// @notice Adjusts the gas ledger before evaluating a SolverOperation.
+    /// @dev Updates the in-memory `gL` by decreasing `unreachedSolverGas` based on the current solverOp's max potential
+    /// gas (execution + calldata if not exPostBids) and resets `maxApprovedGasSpend` to 0. Caller must persist `gL`
+    /// changes to transient storage separately.
+    /// @param gL The GasLedger struct (in memory) to modify.
+    /// @param dConfig DApp configuration containing `solverGasLimit` and `callConfig`.
+    /// @param solverOp The SolverOperation being evaluated.
+    function _adjustGasLedgerAtSolverOpStart(
+        GasLedger memory gL,
+        DAppConfig memory dConfig,
+        SolverOperation calldata solverOp
+    )
+        internal
+    {
+        // Decrease unreachedSolverGas by the current solverOp's (C + E) max gas
+        uint256 _calldataGas;
+
+        // Calldata gas is only included if NOT in exPostBids mode.
+        if (!dConfig.callConfig.exPostBids()) {
+            _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR).toUint48();
+        }
+
+        // Reset solver's max approved gas spend to 0 at start of each new solver execution
+        gL.maxApprovedGasSpend = 0;
+        gL.unreachedSolverGas -= uint48(dConfig.solverGasLimit + _calldataGas);
+
+        // NOTE: GasLedger changes must be persisted to transient storage separately after this function call
+    }
+
     /// @notice Validates a SolverOperation's gas requirements against the escrow state.
     /// @dev Performs a series of checks to ensure that a SolverOperation can be executed within the defined parameters
     /// and limits. This includes verifying that the operation is within the gas limit and that the solver has
@@ -309,6 +344,7 @@ abstract contract Escrow is AtlETH {
     /// @return gasLimit The calculated gas limit for the SolverOperation, considering the operation's gas usage and
     /// the protocol's gas buffers.
     function _validateSolverOpGasAndValue(
+        GasLedger memory gL,
         DAppConfig memory dConfig,
         SolverOperation calldata solverOp,
         uint256 gasWaterMark,
@@ -317,20 +353,6 @@ abstract contract Escrow is AtlETH {
         internal
         returns (uint256, uint256 gasLimit)
     {
-        // Decrease unreachedSolverGas by the current solverOp's (C + E) max gas
-        GasLedger memory _gL = t_gasLedger.toGasLedger();
-        uint256 _calldataGas;
-
-        // Calldata gas is only included if NOT in exPostBids mode.
-        if (!dConfig.callConfig.exPostBids()) {
-            _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR).toUint48();
-        }
-
-        // Reset solver's max approved gas spend to 0 at start of each new solver execution
-        _gL.maxApprovedGasSpend = 0;
-        _gL.unreachedSolverGas -= uint48(dConfig.solverGasLimit + _calldataGas);
-        t_gasLedger = _gL.pack(); // Persist changes to transient storage before any returns below
-
         if (gasWaterMark < _VALIDATION_GAS_LIMIT + dConfig.solverGasLimit) {
             // Make sure to leave enough gas for dApp validation calls
             result |= 1 << uint256(SolverOutcome.UserOutOfGas);
@@ -346,7 +368,7 @@ abstract contract Escrow is AtlETH {
         uint256 _solverBalance = S_accessData[solverOp.from].bonded;
 
         // Checks if solver's bonded balance is enough to cover the max charge should they win, including surcharges
-        if (_solverBalance < _gL.solverGasLiability(_totalSurchargeRate())) {
+        if (_solverBalance < gL.solverGasLiability(_totalSurchargeRate())) {
             result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
         }
 
@@ -412,17 +434,22 @@ abstract contract Escrow is AtlETH {
         returns (uint256 bidAmount)
     {
         // NOTE: To prevent a malicious bundler from aggressively collecting storage refunds,
-        // solvers should not be on the hook for any 'on chain bid finding' gas usage.
+        // solvers should not be on the hook for any 'onchain bid finding' gas usage.
 
         uint256 _gasWaterMark = gasleft();
         uint256 _gasLimit;
+        GasLedger memory _gL = t_gasLedger.toGasLedger();
+
+        // Decrease unreachedSolverGas and reset maxApprovedGasSpend at the start of each solverOp
+        _adjustGasLedgerAtSolverOpStart(_gL, dConfig, solverOp);
+        t_gasLedger = _gL.pack(); // Persist changes to transient storage
 
         uint256 _result = VERIFICATION.verifySolverOp(
             solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler, dConfig.callConfig.allowsTrustedOpHash()
         );
 
         _result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, _result);
-        (_result, _gasLimit) = _validateSolverOpGasAndValue(dConfig, solverOp, _gasWaterMark, _result);
+        (_result, _gasLimit) = _validateSolverOpGasAndValue(_gL, dConfig, solverOp, _gasWaterMark, _result);
         _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
         // Verify the transaction.
