@@ -243,11 +243,6 @@ abstract contract Escrow is AtlETH {
         // If we reach this point, the solver call did not execute successfully.
         ctx.solverOutcome = uint24(_result);
 
-        // Account for failed SolverOperation gas costs
-        _handleSolverFailAccounting(
-            solverOp, dConfig.solverGasLimit, gasWaterMark, _result, dConfig.callConfig.exPostBids()
-        );
-
         emit SolverTxResult(
             solverOp.solver,
             solverOp.from,
@@ -257,6 +252,11 @@ abstract contract Escrow is AtlETH {
             _result.executedWithError(),
             false,
             _result
+        );
+
+        // Account for failed SolverOperation gas costs
+        _handleSolverFailAccounting(
+            solverOp, dConfig.solverGasLimit, gasWaterMark, _result, dConfig.callConfig.exPostBids()
         );
 
         return 0;
