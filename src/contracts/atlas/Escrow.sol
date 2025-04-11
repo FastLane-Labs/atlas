@@ -334,6 +334,7 @@ abstract contract Escrow is AtlETH {
     /// @dev Performs a series of checks to ensure that a SolverOperation can be executed within the defined parameters
     /// and limits. This includes verifying that the operation is within the gas limit and that the solver has
     /// sufficient balance in escrow to cover the gas costs.
+    /// @param gL The GasLedger memory struct containing the current gas accounting state.
     /// @param dConfig DApp configuration data, including solver gas limits and operation parameters.
     /// @param solverOp The SolverOperation being validated.
     /// @param gasWaterMark The initial gas measurement before validation begins, used to ensure enough gas remains for
@@ -648,14 +649,15 @@ abstract contract Escrow is AtlETH {
         // Make sure there's enough value in Atlas for the Solver
         if (!_borrow(solverOp.value)) revert InsufficientEscrow();
 
-        // Load callConfig from transient storage once here, to be used twice below.
+        // Load callConfig from transient storage once here, to be used below.
         uint32 _callConfig = _activeCallConfig();
 
-        // In exPostBids mode, the solver contract should not be sent the solver's discovered bid as it could contain
-        // encoded info computed during bid-finding at the bundler's expense. We thus send a bidAmount of 0 if
-        // exPostBids = true, to incentivise the solver contract to behave in the exact same way in the real execution
-        // as it did in the bid-finding execution. If exPostBids = false, the bidAmount is sent to the solver.
-        if (_callConfig.exPostBids()) bidAmount = 0;
+        // NOTE: The solver's bidAmount is always sent to their solver contract during the solver call. In exPostBids
+        // mode, it is possible for a solver to encode some infomation calculated during the bid-finding process, which
+        // the bundler pays for as that gas cost is written off, in the least significant bits of their bidAmount. This
+        // information can be used to minimize the gas cost a solver is charged for during real execution. This is seen
+        // as a feature, because the decrease in gas cost paid by the solver should result in a higher bid they are able
+        // to make - a better outcome for the bid recipient.
 
         // Optimism's SafeCall lib allows us to limit how much returndata gets copied to memory, to prevent OOG attacks.
         _success = solverOp.solver.safeCall(

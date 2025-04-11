@@ -107,7 +107,7 @@ contract Atlas is Escrow, Factory {
                 );
         }
 
-        // First handle the ValidCallsResult
+        // Handle the ValidCallsResult
         if (_validCallsResult != ValidCallsResult.Valid) {
             if (_isSimulation) revert VerificationSimFail(_validCallsResult);
 
