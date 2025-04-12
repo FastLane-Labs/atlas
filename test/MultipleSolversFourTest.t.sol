@@ -16,6 +16,7 @@ import "../src/contracts/interfaces/IAtlas.sol";
 import "../src/contracts/libraries/GasAccLib.sol";
 import {Result} from "../src/contracts/interfaces/ISimulator.sol";
 import "forge-std/console.sol";
+
 /// @dev this test is used to illustrate and test the multiple successful solvers feature
 /// @dev MultipleSolversDAppControl serves as both the dapp and dAppControl contracts
 /// @dev It tracks an "accumulatedAuxillaryBid" which is the sum of all auxillary bids from all solvers
@@ -23,7 +24,6 @@ import "forge-std/console.sol";
 /// @dev been executed as expected in various scenarios.
 /// @dev Solvers also include an auxillary bid with their call, which is just a number (not paid) tracked by the dapp
 /// @dev control contract.
-
 contract MultipleSolversFourTest is BaseTest, AtlasErrors {
     MultipleSolversDAppControl control;
     MockSolver solver1;
@@ -356,10 +356,10 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         (bool solverCallsSuccess, Result solverCallsResult,) = simulator.simSolverCalls(userOp, solverOps, dappOp);
         assertTrue(solverCallsSuccess, "Solver calls simulation failed");
 
-        uint256 solverOneResult = solver1BidPattern.isRevertingBundlerFault ? (1 << uint256(SolverOutcome.InvalidSignature)) : (solver1BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers)));
-        uint256 solverTwoResult = solver2BidPattern.isRevertingBundlerFault ? (1 << uint256(SolverOutcome.InvalidSignature)) : (solver2BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers)));
-        uint256 solverThreeResult = solver3BidPattern.isRevertingBundlerFault ? (1 << uint256(SolverOutcome.InvalidSignature)) : (solver3BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers)));
-        uint256 solverFourResult = solver4BidPattern.isRevertingBundlerFault ? (1 << uint256(SolverOutcome.InvalidSignature)) : (solver4BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers)));
+        uint256 solverOneResult = solver1BidPattern.isRevertingBundlerFault ? (1 << uint256(SolverOutcome.InvalidSignature)) : (solver1BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : 0);
+        uint256 solverTwoResult = solver2BidPattern.isRevertingBundlerFault ? (1 << uint256(SolverOutcome.InvalidSignature)) : (solver2BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : 0);
+        uint256 solverThreeResult = solver3BidPattern.isRevertingBundlerFault ? (1 << uint256(SolverOutcome.InvalidSignature)) : (solver3BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : 0);
+        uint256 solverFourResult = solver4BidPattern.isRevertingBundlerFault ? (1 << uint256(SolverOutcome.InvalidSignature)) : (solver4BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : 0);
 
         uint256 mev = 0;
         // Only add to MEV if solver neither reverts nor has bundler fault
@@ -465,15 +465,10 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         uint256 solver3InitialBalance = atlas.balanceOfBonded(address(solverThreeEOA));
         uint256 solver4InitialBalance = atlas.balanceOfBonded(address(solverFourEOA));
 
-        vm.startPrank(bundler);
-        (bool success, bytes memory returnData) = address(atlas).call{gas: metacallGasLimit}(
-            abi.encodeWithSelector(atlas.metacall.selector, userOp, solverOps, dappOp, address(0))
-        );
+        vm.prank(bundler);
+        bool auctionWon = atlas.metacall{gas: metacallGasLimit}(userOp, solverOps, dappOp, address(0));
 
-        vm.stopPrank();
-
-        assertEq(success, true, "metacall failed");
-        assertEq(abi.decode(returnData, (bool)), false, "auctionWon should be false");
+        assertEq(auctionWon, false, "auctionWon should be false");
 
         assertEq(solver1.executed(), !solver1BidPattern.isReverting && !solver1BidPattern.isRevertingBundlerFault, "solver1 execution state wrong");
         assertEq(solver2.executed(), !solver2BidPattern.isReverting && !solver2BidPattern.isRevertingBundlerFault, "solver2 execution state wrong");

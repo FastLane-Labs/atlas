@@ -24,7 +24,7 @@ contract EscrowBitsTest is Test {
         );
 
         expectedBitMapString =
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001111111100000000000000000";
+            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000111111100000000000000000";
         assertEq(
             TestUtils.uint256ToBinaryString(EscrowBits._FULL_REFUND), expectedBitMapString, "_FULL_REFUND incorrect"
         );
@@ -103,8 +103,6 @@ contract EscrowBitsTest is Test {
         assertEq(invalid.executionSuccessful(), false);
         invalid = 1 << uint256(SolverOutcome.EVMError);
         assertEq(invalid.executionSuccessful(), false);
-        invalid = 1 << uint256(SolverOutcome.MultipleSolvers);
-        assertEq(invalid.executionSuccessful(), false);
     }
 
     function testExecutedWithError() public pure {
@@ -122,8 +120,6 @@ contract EscrowBitsTest is Test {
         valid = 1 << uint256(SolverOutcome.CallbackNotCalled);
         assertEq(valid.executedWithError(), true);
         valid = 1 << uint256(SolverOutcome.EVMError);
-        assertEq(valid.executedWithError(), true);
-        valid = 1 << uint256(SolverOutcome.MultipleSolvers);
         assertEq(valid.executedWithError(), true);
 
         // NO REFUND group
@@ -224,8 +220,6 @@ contract EscrowBitsTest is Test {
         invalid = 1 << uint256(SolverOutcome.CallbackNotCalled);
         assertEq(invalid.bundlersFault(), false);
         invalid = 1 << uint256(SolverOutcome.EVMError);
-        assertEq(invalid.bundlersFault(), false);
-        invalid = 1 << uint256(SolverOutcome.MultipleSolvers);
         assertEq(invalid.bundlersFault(), false);
     }
 }
