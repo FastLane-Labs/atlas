@@ -26,7 +26,7 @@ import { IDAppControl } from "../interfaces/IDAppControl.sol";
 contract Atlas is Escrow, Factory {
     using CallBits for uint32;
     using SafetyBits for Context;
-    using GasAccLib for uint256; // To load GasLedger from a transient uint265 var
+    using GasAccLib for uint256;
     using GasAccLib for GasLedger;
 
     constructor(
