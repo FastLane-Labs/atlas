@@ -106,7 +106,8 @@ contract Simulator is AtlasErrors, AtlasConstants {
         // In multipleSuccessfulSolvers mode, each solver only pays for their own gas usage
         if (dConfig.callConfig.multipleSuccessfulSolvers()) {
             // Calculate gas used exactly like handleSolverFailAccounting
-            uint256 _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, IAtlas(atlas).L2_GAS_CALCULATOR());
+            uint256 _calldataGas =
+                GasAccLib.solverOpCalldataGas(solverOp.data.length, IAtlas(atlas).L2_GAS_CALCULATOR());
             // Use solver's gas limit since we can't know actual execution gas beforehand
             totalGas = _calldataGas + (solverOp.gas + _SOLVER_BASE_GAS_USED);
         }

@@ -231,7 +231,7 @@ abstract contract Escrow is AtlETH {
 
                         // In multipleSuccessfulSolvers solvers must each pay a FULL_REFUND.
                         // exPostBids is not supported in multipleSuccessfulSolvers mode, so exPostBids = false here.
-                        _handleSolverFailAccounting(solverOp, dConfig.solverGasLimit, _gasWaterMark, _result, false);
+                        _handleSolverFailAccounting(solverOp, dConfig.solverGasLimit, gasWaterMark, _result, false);
                     } else {
                         // If not in multipleSuccessfulSolvers mode, end the auction with the first successful solver
                         // that paid what it bid
@@ -249,7 +249,7 @@ abstract contract Escrow is AtlETH {
                         true,
                         _result
                     );
-                    
+
                     ctx.solverOutcome = uint24(_result);
                     return _solverTracker.bidAmount;
                 }
