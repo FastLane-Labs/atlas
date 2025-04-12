@@ -22,7 +22,7 @@ abstract contract GasAccounting is SafetyLocks {
     using EscrowBits for uint256;
     using AccountingMath for uint256;
     using SafeCast for uint256;
-    using GasAccLib for uint256; // To load GasLedger from a transient uint265 var
+    using GasAccLib for uint256;
     using GasAccLib for GasLedger;
     using GasAccLib for BorrowsLedger;
     using FixedPointMathLib for uint256;
@@ -47,9 +47,13 @@ abstract contract GasAccounting is SafetyLocks {
         )
     { }
 
-    /// @notice Sets the initial gas accounting values for the metacall transaction.
-    /// @param gasMarker The gasMarker measurement at the start of the metacall, which includes Execution gas limits,
-    /// Calldata gas costs, and an additional buffer for safety.
+    /// @notice Sets the initial gas accounting values for the metacall transaction in transient storage.
+    /// @dev Resets `t_gasLedger`, `t_borrowsLedger`, `t_solverLock`, and `t_solverTo` at the start of each metacall.
+    ///      Initializes `remainingMaxGas` with the overall gas estimate and `unreachedSolverGas` with the precalculated
+    ///      gas for all potential solver operations. Sets initial `repays` based on `msg.value`.
+    /// @param gasMarker The gas measurement at the start of the metacall, which includes Execution gas limits, Calldata
+    /// gas costs, and an additional buffer for safety.
+    /// @param allSolverOpsGas The sum of (C + E) gas limits for all solverOps in the metacall.
     function _initializeAccountingValues(uint256 gasMarker, uint256 allSolverOpsGas) internal {
         t_gasLedger = GasLedger({
             remainingMaxGas: uint48(gasMarker),
@@ -209,6 +213,7 @@ abstract contract GasAccounting is SafetyLocks {
 
     /// @notice Takes AtlETH from the owner's bonded balance and, if necessary, from the owner's unbonding balance.
     /// @dev No GasLedger accounting changes are made in this function - should be done separately.
+    /// @param accountData The EscrowAccountAccessData memory struct of the account being charged.
     /// @param account The address of the account from which AtlETH is taken.
     /// @param amount The amount of AtlETH to be taken.
     /// @return deficit The amount of AtlETH that was not repaid, if any.
@@ -271,8 +276,10 @@ abstract contract GasAccounting is SafetyLocks {
     /// blamed for the failure) or by assigning the gas cost to the solver's bonded AtlETH balance (if the solver is
     /// blamed for the failure).
     /// @param solverOp The current SolverOperation for which to account.
+    /// @param dConfigSolverGasLimit The gas limit for the solver operation, as specified in the DAppConfig.
     /// @param gasWaterMark The `gasleft()` watermark taken at the start of executing the SolverOperation.
     /// @param result The result bitmap of the SolverOperation execution.
+    /// @param exPostBids A boolean indicating whether exPostBids is set to true in the current metacall.
     function _handleSolverFailAccounting(
         SolverOperation calldata solverOp,
         uint256 dConfigSolverGasLimit,
@@ -306,7 +313,7 @@ abstract contract GasAccounting is SafetyLocks {
         } else {
             // CASE: Solver failed, so we calculate what they owe.
             _gasUsed += _SOLVER_FAULT_OFFSET;
-            uint256 _gasValueWithSurcharges = (_gasUsed).withSurcharge(_bothSurchargeRates) * tx.gasprice;
+            uint256 _gasValueWithSurcharges = _gasUsed.withSurcharge(_bothSurchargeRates) * tx.gasprice;
 
             EscrowAccountAccessData memory _solverAccountData = S_accessData[solverOp.from];
 
@@ -322,13 +329,12 @@ abstract contract GasAccounting is SafetyLocks {
             // Persist the updated solver account data to storage
             S_accessData[solverOp.from] = _solverAccountData;
 
-            uint256 _gasWrittenOff;
             if (_assignDeficit > 0) {
                 // If any deficit, calculate the gas units unpaid for due to assign deficit.
                 // Gas units written off = gas used * (deficit / gas value with surcharges) ratio.
                 // `mulDivUp()` rounds in favor of writeoffs, so we don't overestimate gas that was actually paid for
                 // and end up reimbursing the bundler for more than was actually taken from the solvers.
-                _gasWrittenOff = _gasUsed.mulDivUp(_assignDeficit, _gasValueWithSurcharges);
+                uint256 _gasWrittenOff = _gasUsed.mulDivUp(_assignDeficit, _gasValueWithSurcharges);
 
                 // No risk of underflow in subtraction below, because:
                 // _assignDeficit is <= _gasValueWithSurcharges, so _gasWrittenOff is <= _gasUsed.
@@ -347,12 +353,31 @@ abstract contract GasAccounting is SafetyLocks {
         t_gasLedger = _gL.pack();
     }
 
+    /// @notice Records the gas used during the `bidFind` phase of exPostBids as a write-off.
+    /// @dev Gas used for `bidFind` is considered an overhead paid by the bundler (via reduced refund)
+    ///      and is not charged to any specific solver. It's added to `writeoffsGas` in the GasLedger.
+    /// @param gasUsed The amount of gas consumed during the `bidFind` phase.
     function _writeOffBidFindGas(uint256 gasUsed) internal {
         GasLedger memory _gL = t_gasLedger.toGasLedger();
         _gL.writeoffsGas += uint48(gasUsed);
         t_gasLedger = _gL.pack();
     }
 
+    /// @notice Charges solvers that were not reached during the metacall for the calldata gas cost of their solverOps.
+    /// @dev Iterates through `solverOps` starting from the index *after* `winningSolverIdx`. For each unreached
+    /// operation, `VERIFICATION.verifySolverOp` is called to determine fault.
+    ///      - If bundler fault: The calldata gas is added to `gL.writeoffsGas` (reducing bundler's refund).
+    ///      - If solver fault: Attempts to charge the solver's bonded `AtlETH` using `_assign` for the calldata
+    ///        gas cost (no surcharges added). Any deficit is added to `gL.writeoffsGas`.
+    ///      The gas cost of executing this loop is also added to `gL.writeoffsGas` to ensure the bundler pays for it.
+    /// @param solverOps The SolverOperation array containing the solvers' transaction data.
+    /// @param gL The GasLedger struct (memory); `gL.writeoffsGas` is updated within this function.
+    /// @param winningSolverIdx Index of the winning/last attempted solver; the loop starts after this index.
+    /// @param userOpHash Hash of the UserOperation, used for verification.
+    /// @param maxFeePerGas userOp.maxFeePerGas, used for verification.
+    /// @param bundler The metacall caller (msg.sender), used for verification.
+    /// @param allowsTrustedOpHash Flag indicating with trustedOpHash is enabled in the metacall.
+    /// @return unreachedCalldataValuePaid Total value successfully charged to unreached solvers (cost - deficits).
     function _chargeUnreachedSolversForCalldata(
         SolverOperation[] calldata solverOps,
         GasLedger memory gL,
@@ -404,6 +429,16 @@ abstract contract GasAccounting is SafetyLocks {
         gL.writeoffsGas += (_writeoffGasMarker - gasleft()).toUint48();
     }
 
+    /// @notice Finalizes gas accounting at the end of the metacall, settles balances, and pays refunds/surcharges.
+    /// @param ctx The context struct (memory), used for ctx.bundler and ctx.solverSuccessful.
+    /// @param gL The final state of the GasLedger struct (memory), used for gas calculations.
+    /// @param gasMarker The initial gas measurement taken at the start of the metacall.
+    /// @param gasRefundBeneficiary The address designated to receive the bundler's gas refund. Defaults to
+    /// `ctx.bundler`.
+    /// @param unreachedCalldataValuePaid The total value successfully collected from unreached solvers for their
+    /// calldata costs (from `_chargeUnreachedSolversForCalldata`).
+    /// @return claimsPaidToBundler The net amount of ETH transferred to the `gasRefundBeneficiary`.
+    /// @return netAtlasGasSurcharge The net amount of ETH taken as Atlas surcharge during the metacall.
     function _settle(
         Context memory ctx,
         GasLedger memory gL,
@@ -437,6 +472,8 @@ abstract contract GasAccounting is SafetyLocks {
 
         // NOTE: Trivial for bundler to run a different EOA for solver so no bundler == solver carveout.
         if (ctx.solverSuccessful) {
+            // CASE: Winning solver.
+
             // Winning solver should pay for:
             // - Gas (C + E) used by their solverOp
             // - Gas (C + E) used by userOp, dapp hooks, and other metacall overhead
