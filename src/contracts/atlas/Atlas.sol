@@ -385,6 +385,8 @@ contract Atlas is Escrow, Factory {
 
             SolverOperation calldata solverOp = solverOps[ctx.solverIndex];
 
+            // if multipleSuccessfulSolvers = true, solver bids are summed here. Otherwise, 0 bids are returned on
+            // solverOp failure, and only the first successful solver's bid is added to `_bidAmount`.
             _bidAmount += _executeSolverOperation(
                 ctx, dConfig, userOp, solverOp, solverOp.bidAmount, _gasWaterMark, false, returnData
             );
@@ -397,12 +399,12 @@ contract Atlas is Escrow, Factory {
 
         // If no winning solver, but multipleSuccessfulSolvers is true, return the sum of solver bid amounts
         if (dConfig.callConfig.multipleSuccessfulSolvers()) {
-            if (
-                ctx.isSimulation && solverOpsLen == 1
-                    && ctx.solverOutcome != uint24(1 << uint24(SolverOutcome.MultipleSolvers))
-            ) {
+            // Considered a fail for simulation purposes when only one solverOp in the metacall, and it fails. If more
+            // than 1 solverOp, any of them could fail and simulation could still be successful.
+            if (ctx.isSimulation && solverOpsLen == 1 && ctx.solverOutcome != 0) {
                 revert SolverSimFail(uint256(ctx.solverOutcome));
             }
+
             return _bidAmount;
         }
 

@@ -183,8 +183,8 @@ contract MultipleSolversTest is BaseTest, AtlasErrors {
         bytes32 callChainHash = CallVerification.getCallChainHash(userOp, solverOps);
         DAppOperation memory dappOp = buildDAppOperation(userOpHash, callChainHash, bundler);
 
-        uint256 solverOneResult = solver1BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers));
-        uint256 solverTwoResult = solver2BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : (1 << uint256(SolverOutcome.MultipleSolvers));
+        uint256 solverOneResult = solver1BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : 0;
+        uint256 solverTwoResult = solver2BidPattern.isReverting ? (1 << uint256(SolverOutcome.SolverOpReverted)) : 0;
         
         uint256 mev = 0;
         if (!solver1BidPattern.isReverting) {
