@@ -57,6 +57,5 @@ enum SolverOutcome {
     InvertedBidExceedsCeiling,
     BalanceNotReconciled,
     CallbackNotCalled,
-    EVMError,
-    MultipleSolvers
+    EVMError
 }

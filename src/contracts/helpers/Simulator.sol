@@ -82,35 +82,39 @@ contract Simulator is AtlasErrors, AtlasConstants {
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
         uint256 bundlerSurchargeRate = IAtlas(atlas).bundlerSurchargeRate();
         uint256 atlasSurchargeRate = IAtlas(atlas).atlasSurchargeRate();
+        uint256 totalGas;
 
-        // In exPostBid mode, solvers do not pay for calldata gas, and these calldata gas vars will be excluded.
-        // In normal bid mode, solvers each pay for their own solverOp calldata gas, and the winning solver pays for the
-        // other non-solver calldata gas as well. In this calculation, there's only 1 solverOp so no need to subtract
-        // calldata of other solverOps as they aren't any.
-        uint256 metacallCalldataLength = (_SOLVER_OP_BASE_CALLDATA + solverOp.data.length)
-            + (USER_OP_STATIC_LENGTH + userOp.data.length) + DAPP_OP_LENGTH + _EXTRA_CALLDATA_LENGTH;
-
-        uint256 metacallCalldataGas =
-            GasAccLib.metacallCalldataGas(metacallCalldataLength, IAtlas(atlas).L2_GAS_CALCULATOR());
-
-        uint256 metacallExecutionGas =
-            _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOp.gas + userOp.dappGasLimit + solverOp.gas;
-
-        uint256 totalGas = metacallExecutionGas;
-
-        // Only add calldata costs if NOT in exPostBids mode
-        if (!dConfig.callConfig.exPostBids()) {
-            totalGas += metacallCalldataGas;
-        }
-
-        // In multipleSuccessfulSolvers mode, each solver only pays for their own gas usage
         if (dConfig.callConfig.multipleSuccessfulSolvers()) {
+            // If multipleSuccessfulSolvers = true, each solver only pays for their own gas usage.
+
             // Calculate solver gas obligation as if expecting a solver fault in handleSolverFailAccounting()
             uint256 _calldataGas =
                 GasAccLib.solverOpCalldataGas(solverOp.data.length, IAtlas(atlas).L2_GAS_CALCULATOR());
 
             // Use solver's gas limit since we can't know actual execution gas beforehand
             totalGas = _calldataGas + solverOp.gas + _SOLVER_FAULT_OFFSET;
+        } else {
+            // If multipleSuccessfulSolvers = false, the winning solver pays for their own gas + the non-solver gas.
+
+            // In exPostBid mode, solvers do not pay for calldata gas, and these calldata gas vars will be excluded.
+            // In normal bid mode, solvers each pay for their own solverOp calldata gas, and the winning solver pays for
+            // the other non-solver calldata gas as well. In this calculation, there's only 1 solverOp so no need to
+            // subtract calldata of other solverOps as they aren't any.
+            uint256 metacallCalldataLength = (_SOLVER_OP_BASE_CALLDATA + solverOp.data.length)
+                + (USER_OP_STATIC_LENGTH + userOp.data.length) + DAPP_OP_LENGTH + _EXTRA_CALLDATA_LENGTH;
+
+            uint256 metacallCalldataGas =
+                GasAccLib.metacallCalldataGas(metacallCalldataLength, IAtlas(atlas).L2_GAS_CALCULATOR());
+
+            uint256 metacallExecutionGas =
+                _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOp.gas + userOp.dappGasLimit + solverOp.gas;
+
+            totalGas = metacallExecutionGas;
+
+            // Only add calldata costs if NOT in exPostBids mode
+            if (!dConfig.callConfig.exPostBids()) {
+                totalGas += metacallCalldataGas;
+            }
         }
 
         // NOTE: In exPostBids mode, the bid-finding solverOp execution gas is written off. So no need to add here.
@@ -251,6 +255,9 @@ contract Simulator is AtlasErrors, AtlasConstants {
         if (msg.sender != address(this)) revert InvalidEntryFunction();
         bool auctionWon =
             IAtlas(atlas).metacall{ value: msg.value, gas: estGasLimit }(userOp, solverOps, dAppOp, address(0));
+
+        // If multipleSuccessfulSolvers = true, metacall always returns auctionWon = false, even if there were some
+        // successful solvers. So we always revert with SimulationPassed here if multipleSuccessfulSolvers = true.
         if (!auctionWon && !userOp.callConfig.multipleSuccessfulSolvers()) {
             revert NoAuctionWinner(); // should be unreachable
         }
