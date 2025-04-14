@@ -167,6 +167,8 @@ abstract contract Escrow is AtlETH {
     /// @param userOp UserOperation struct containing the user's transaction data relevant to this SolverOperation.
     /// @param solverOp SolverOperation struct containing the solver's bid and execution data.
     /// @param bidAmount The amount of bid submitted by the solver for this operation.
+    /// @param gasWaterMark The gas left at the start of the current solverOp's execution, to be used to charge/write
+    /// off solverOp gas.
     /// @param prevalidated Boolean flag indicating if the solverOp has been prevalidated in bidFind (exPostBids).
     /// @param returnData Data returned from UserOp execution, used as input if necessary.
     /// @return bidAmount The determined bid amount for the SolverOperation if all validations pass and the operation is
@@ -177,14 +179,13 @@ abstract contract Escrow is AtlETH {
         UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         uint256 bidAmount,
+        uint256 gasWaterMark,
         bool prevalidated,
         bytes memory returnData
     )
         internal
         returns (uint256)
     {
-        // Set the gas baseline
-        uint256 _gasWaterMark = gasleft();
         uint256 _result;
         if (!prevalidated) {
             _result = VERIFICATION.verifySolverOp(
@@ -197,7 +198,7 @@ abstract contract Escrow is AtlETH {
         if (_result.canExecute()) {
             uint256 _gasLimit;
             // Verify gasLimit again
-            (_result, _gasLimit) = _validateSolverOpGasAndValue(dConfig, solverOp, _gasWaterMark, _result);
+            (_result, _gasLimit) = _validateSolverOpGasAndValue(dConfig, solverOp, gasWaterMark, _result);
             _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
             // Check for trusted operation hash
@@ -216,7 +217,14 @@ abstract contract Escrow is AtlETH {
                 if (_result.executionSuccessful()) {
                     // First successful solver call that paid what it bid
                     emit SolverTxResult(
-                        solverOp.solver, solverOp.from, dConfig.to, solverOp.bidToken, bidAmount, true, true, _result
+                        solverOp.solver,
+                        solverOp.from,
+                        dConfig.to,
+                        solverOp.bidToken,
+                        _solverTracker.bidAmount,
+                        true,
+                        true,
+                        _result
                     );
 
                     ctx.solverSuccessful = true;
@@ -231,7 +239,7 @@ abstract contract Escrow is AtlETH {
 
         // Account for failed SolverOperation gas costs
         _handleSolverFailAccounting(
-            solverOp, dConfig.solverGasLimit, _gasWaterMark, _result, dConfig.callConfig.exPostBids()
+            solverOp, dConfig.solverGasLimit, gasWaterMark, _result, dConfig.callConfig.exPostBids()
         );
 
         emit SolverTxResult(
@@ -613,6 +621,16 @@ abstract contract Escrow is AtlETH {
         // Make sure there's enough value in Atlas for the Solver
         if (!_borrow(solverOp.value)) revert InsufficientEscrow();
 
+        // Load callConfig from transient storage once here, to be used twice below.
+        uint32 _callConfig = _activeCallConfig();
+
+        // In exPostBids mode, the solver contract should not be sent the solver's discovered bid as it could contain
+        // encoded info computed during bid-finding at the bundler's expense. We thus send a bidAmount of 0 if
+        // exPostBids = true AND ctx.bidFind = false, to incentivise the solver contract to behave in the exact same way
+        // in the real execution as it did in the bid-finding execution. In all other scenarios the bidAmount is sent to
+        // the solver.
+        if (_callConfig.exPostBids() && !ctx.bidFind) bidAmount = 0;
+
         // Optimism's SafeCall lib allows us to limit how much returndata gets copied to memory, to prevent OOG attacks.
         _success = solverOp.solver.safeCall(
             gasleft(),
@@ -626,7 +644,7 @@ abstract contract Escrow is AtlETH {
                     bidAmount,
                     solverOp.data,
                     // Only pass the returnData (either from userOp or preOps) if the dApp requires it
-                    _activeCallConfig().forwardReturnData() ? returnData : new bytes(0)
+                    _callConfig.forwardReturnData() ? returnData : new bytes(0)
                 )
             )
         );
