@@ -26,7 +26,7 @@ import { IDAppControl } from "../interfaces/IDAppControl.sol";
 contract Atlas is Escrow, Factory {
     using CallBits for uint32;
     using SafetyBits for Context;
-    using GasAccLib for uint256; // To load GasLedger from a transient uint265 var
+    using GasAccLib for uint256;
     using GasAccLib for GasLedger;
 
     constructor(
@@ -107,7 +107,7 @@ contract Atlas is Escrow, Factory {
                 );
         }
 
-        // First handle the ValidCallsResult
+        // Handle the ValidCallsResult
         if (_validCallsResult != ValidCallsResult.Valid) {
             if (_isSimulation) revert VerificationSimFail(_validCallsResult);
 
@@ -280,6 +280,15 @@ contract Atlas is Escrow, Factory {
 
         for (uint256 i; i < solverOpsLength; ++i) {
             _bidAmountFound = _getBidAmount(ctx, dConfig, userOp, solverOps[i], returnData);
+
+            // In `_getBidAmount()` above, unreachedSolverGas is decreased while remainingMaxGas does not change, as it
+            // is normally decreased in `_handleSolverFailAccounting()` which is not called in a bid-finding context. To
+            // adjust for this difference so GasLedger.solverGasLiability() still works, we have to decrease
+            // remainingMaxGas separately here. This decrease does not include calldata gas as solvers are not charged
+            // for calldata gas in exPostBids mode.
+            GasLedger memory _gL = t_gasLedger.toGasLedger();
+            _gL.remainingMaxGas -= uint48(dConfig.solverGasLimit);
+            t_gasLedger = _gL.pack();
 
             // skip zero and overflow bid's
             if (_bidAmountFound != 0 && _bidAmountFound <= type(uint240).max) {
