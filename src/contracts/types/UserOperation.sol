@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 // Default UserOperation typehash
 bytes32 constant USER_TYPEHASH_DEFAULT = keccak256(
-    "UserOperation(address from,address to,uint256 value,uint256 gas,uint256 maxFeePerGas,uint256 nonce,uint256 deadline,address dapp,address control,uint32 callConfig,uint32 dappGasLimit,uint128 bundlerSurchargeRate,address sessionKey,bytes data)"
+    "UserOperation(address from,address to,uint256 value,uint256 gas,uint256 maxFeePerGas,uint256 nonce,uint256 deadline,address dapp,address control,uint32 callConfig,uint32 dappGasLimit,uint24 bundlerSurchargeRate,address sessionKey,bytes data)"
 );
 
 // Trusted UserOperation typehash
@@ -12,7 +12,7 @@ bytes32 constant USER_TYPEHASH_DEFAULT = keccak256(
 // prior to seeing the UserOperation or its hash. In this scenario, the Solvers should trust the signer of the
 // UserOperation.
 bytes32 constant USER_TYPEHASH_TRUSTED = keccak256(
-    "UserOperation(address from,address to,address dapp,address control,uint32 callConfig,uint32 dappGasLimit,uint128 bundlerSurchargeRate,address sessionKey)"
+    "UserOperation(address from,address to,address dapp,address control,uint32 callConfig,uint32 dappGasLimit,uint24 bundlerSurchargeRate,address sessionKey)"
 );
 
 // Length of UserOperation in hex chars, assuming empty signature field, excluding the dynamic userOp.data field.
@@ -30,7 +30,7 @@ struct UserOperation {
     address control; // Address of the DAppControl contract
     uint32 callConfig; // Call configuration expected by user, refer to `src/contracts/types/ConfigTypes.sol`
     uint32 dappGasLimit; // Gas limit set by the DAppControl for preOps, allocateValue, and postOps hook execution
-    uint128 bundlerSurchargeRate; // Bundler surcharge rate, set by the DAppControl
+    uint24 bundlerSurchargeRate; // Bundler surcharge rate, set by the DAppControl
     address sessionKey; // Address of the temporary session key which is used to sign the DappOperation
     bytes data; // User operation calldata (used in `data` field of the user call)
     bytes signature; // User operation signature signed by UserOperation.from

@@ -29,7 +29,9 @@ contract GasAccLibTest is Test {
             writeoffsGas: 2,
             solverFaultFailureGas: 3,
             unreachedSolverGas: 4,
-            maxApprovedGasSpend: 5
+            maxApprovedGasSpend: 5,
+            atlasSurchargeRate: 6,
+            bundlerSurchargeRate: 7
         });
 
         uint256 packed = before.pack();
@@ -40,6 +42,8 @@ contract GasAccLibTest is Test {
         assertEq(unpacked.solverFaultFailureGas, before.solverFaultFailureGas, "solverFaultFailureGas mismatch");
         assertEq(unpacked.unreachedSolverGas, before.unreachedSolverGas, "unreachedSolverGas mismatch");
         assertEq(unpacked.maxApprovedGasSpend, before.maxApprovedGasSpend, "maxApprovedGasSpend mismatch");
+        assertEq(unpacked.atlasSurchargeRate, before.atlasSurchargeRate, "atlasSurchargeRate mismatch");
+        assertEq(unpacked.bundlerSurchargeRate, before.bundlerSurchargeRate, "bundlerSurchargeRate mismatch");
     }
 
     function test_GasAccLib_BorrowsLedger_packAndUnpack() public pure {
@@ -71,21 +75,23 @@ contract GasAccLibTest is Test {
     }
 
     function test_GasAccLib_solverGasLiability() public {
-        uint256 totalSurchargeRate = 20_000_000; // 200%
+        uint256 totalSurchargeRate = 8_000; // 80%
 
         GasLedger memory gL = GasLedger({
             remainingMaxGas: 10_000,
             writeoffsGas: 0,
             solverFaultFailureGas: 0,
             unreachedSolverGas: 5_000,
-            maxApprovedGasSpend: 0
+            maxApprovedGasSpend: 0,
+            atlasSurchargeRate: 3_000, // 30%
+            bundlerSurchargeRate: 5_000 // 50%
         });
 
         vm.txGasPrice(5);
 
-        // Should be: (10_000 - 5_000) * (100% + 200%) * 5 = 5000 * 3 * 5 = 75_000
+        // Should be: (10_000 - 5_000) * (100% + 80%) * 5 = 5_000 * 1.8 * 5 = 45_000
         uint256 expected = uint256(gL.remainingMaxGas - gL.unreachedSolverGas).withSurcharge(totalSurchargeRate) * tx.gasprice;
-        assertEq(gL.solverGasLiability(totalSurchargeRate), expected, "solverGasLiability unexpected");
+        assertEq(gL.solverGasLiability(), expected, "solverGasLiability unexpected");
     }
 
     function test_GasAccLib_solverOpCalldataGas() public view {

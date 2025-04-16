@@ -111,14 +111,16 @@ contract Atlas is Escrow, Factory {
             revert ValidCalls(_validCallsResult);
         }
 
-        // Set the bundler surcharge rate to value set by the DAppControl (checked in `validateCalls()` above)
-        _setBundlerSurchargeRate(userOp.bundlerSurchargeRate);
-
         // Initialize the environment lock and accounting values
         _setEnvironmentLock(_dConfig, _executionEnvironment);
 
         // _gasMarker - _bidFindOverhead = estimated winning solver gas liability (not charged for bid-find gas)
-        _initializeAccountingValues(_gasMarker - _bidFindOverhead, _allSolversGasLimit);
+        // userOp.bundlerSurchargeRate is checked against the value set in the DAppControl in `validateCalls()` above
+        _initializeAccountingValues({
+            gasMarker: _gasMarker - _bidFindOverhead,
+            allSolverOpsGas: _allSolversGasLimit,
+            bundlerSurchargeRate: userOp.bundlerSurchargeRate
+        });
 
         // Calculate `execute` gas limit such that it can fail due to an OOG error caused by any of the hook calls, and
         // the metacall will still have enough gas to gracefully finish and return, storing any nonces required.
@@ -173,9 +175,8 @@ contract Atlas is Escrow, Factory {
             emit MetacallResult(msg.sender, userOp.from, false, 0, 0);
         }
 
-        // The bundler surcharge rate and environment lock are explicitly released here to allow multiple (sequential,
-        // not nested) metacalls in a single transaction.
-        _setBundlerSurchargeRate(0);
+        // The environment lock is explicitly released here to allow multiple (sequential, not nested) metacalls in a
+        // single transaction.
         _releaseLock();
     }
 
@@ -293,7 +294,7 @@ contract Atlas is Escrow, Factory {
             // Deduct solverOp.gas, with a max of dConfig.solverGasLimit, from remainingMaxGas
             _solverExecutionGas =
                 (solverOps[i].gas > dConfig.solverGasLimit) ? dConfig.solverGasLimit : solverOps[i].gas;
-            _gL.remainingMaxGas -= uint48(_solverExecutionGas);
+            _gL.remainingMaxGas -= uint40(_solverExecutionGas);
             t_gasLedger = _gL.pack();
 
             // skip zero and overflow bid's
