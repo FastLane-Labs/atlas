@@ -264,7 +264,26 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             // Max one of preOps or userOp return data can be tracked, not both
             return ValidCallsResult.InvalidCallConfig;
         }
-
+        if (callConfig.multipleSuccessfulSolvers() && callConfig.exPostBids()) {
+            // Max one of multipleSolvers or exPostBids can be used, not both
+            return ValidCallsResult.ExPostBidsAndMultipleSuccessfulSolversNotSupportedTogether;
+        }
+        if (callConfig.multipleSuccessfulSolvers() && callConfig.invertsBidValue()) {
+            // Max one of multipleSolvers or invertsBidValue can be used, not both
+            return ValidCallsResult.InvertsBidValueAndMultipleSuccessfulSolversNotSupportedTogether;
+        }
+        if (callConfig.multipleSuccessfulSolvers() && callConfig.allowsZeroSolvers()) {
+            // Max one of multipleSolvers or invertsBidValue can be used, not both
+            return ValidCallsResult.NeedSolversForMultipleSuccessfulSolvers;
+        }
+        if (callConfig.multipleSuccessfulSolvers() && callConfig.allowsSolverAuctioneer()) {
+            // Max one of multipleSolvers or invertsBidValue can be used, not both
+            return ValidCallsResult.SolverCannotBeAuctioneerForMultipleSuccessfulSolvers;
+        }
+        if (callConfig.multipleSuccessfulSolvers() && callConfig.needsFulfillment()) {
+            // Max one of multipleSolvers or invertsBidValue can be used, not both
+            return ValidCallsResult.CannotRequireFulfillmentForMultipleSuccessfulSolvers;
+        }
         if (callConfig.needsSequentialUserNonces() && callConfig.needsSequentialDAppNonces()) {
             // Max one of user or dapp nonces can be sequential, not both
             return ValidCallsResult.BothUserAndDAppNoncesCannotBeSequential;
@@ -324,7 +343,6 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         }
 
         if (dConfig.callConfig.allowsUnknownAuctioneer()) return (ValidCallsResult.Valid, true);
-
         return (ValidCallsResult.Valid, false);
     }
 
