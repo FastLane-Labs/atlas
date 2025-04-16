@@ -58,7 +58,6 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         tAtlas = new TestAtlasGasAcc(
             DEFAULT_ESCROW_DURATION,
             A_SURCHARGE,
-            B_SURCHARGE,
             expectedAtlasVerificationAddr,
             address(simulator),
             deployer,
@@ -79,6 +78,9 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         // Create a mock execution environment - the expected caller in many GasAcc functions
         executionEnvironment = makeAddr("ExecutionEnvironment");
+
+        // Usually set at start of metacall, so need to set it manually here for internal unit tests
+        tAtlas.setBundlerSurchargeRate(B_SURCHARGE);
     }
 
     function test_GasAccounting_initializeAccountingValues() public {
@@ -1267,7 +1269,6 @@ contract TestAtlasGasAcc is TestAtlas {
     constructor(
         uint256 _escrowDuration,
         uint256 _atlasSurchargeRate,
-        uint256 _bundlerSurchargeRate,
         address _verification,
         address _simulator,
         address _surchargeRecipient,
@@ -1277,7 +1278,6 @@ contract TestAtlasGasAcc is TestAtlas {
         TestAtlas(
             _escrowDuration,
             _atlasSurchargeRate,
-            _bundlerSurchargeRate,
             _verification,
             _simulator,
             _surchargeRecipient,

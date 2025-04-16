@@ -102,7 +102,6 @@ contract StorageTest is BaseTest {
         MockStorage mockStorage = new MockStorage(
             DEFAULT_ESCROW_DURATION,
             DEFAULT_ATLAS_SURCHARGE_RATE,
-            DEFAULT_BUNDLER_SURCHARGE_RATE,
             address(0),
             address(0),
             address(0),
@@ -118,7 +117,6 @@ contract StorageTest is BaseTest {
         MockStorage mockStorage = new MockStorage(
             DEFAULT_ESCROW_DURATION,
             DEFAULT_ATLAS_SURCHARGE_RATE,
-            DEFAULT_BUNDLER_SURCHARGE_RATE,
             address(0),
             address(0),
             address(0),
@@ -143,38 +141,26 @@ contract StorageTest is BaseTest {
     function test_storage_view_atlasSurchargeRate() public {
         assertEq(atlas.atlasSurchargeRate(), DEFAULT_ATLAS_SURCHARGE_RATE, "atlasSurchargeRate set incorrectly");
         vm.prank(deployer);
-        atlas.setSurchargeRates(100, 200);
+        atlas.setAtlasSurchargeRate(100);
         assertEq(atlas.atlasSurchargeRate(), 100, "atlasSurchargeRate set incorrectly");
-    }
-
-    function test_storage_view_bundlerSurchargeRate() public {
-        assertEq(atlas.bundlerSurchargeRate(), DEFAULT_BUNDLER_SURCHARGE_RATE, "bundlerSurchargeRate set incorrectly");
-        vm.prank(deployer);
-        atlas.setSurchargeRates(100, 200);
-        assertEq(atlas.bundlerSurchargeRate(), 200, "bundlerSurchargeRate set incorrectly");
     }
 
     // Storage Setters
 
-    function test_storage_setSurchargeRates() public {
+    function test_storage_setAtlasSurchargeRate() public {
         uint256 tooHigh = uint256(type(uint128).max) + 1;
 
         vm.prank(deployer);
         vm.expectRevert(AtlasErrors.SurchargeRateTooHigh.selector);
-        atlas.setSurchargeRates(tooHigh, 456);
-
-        vm.prank(deployer);
-        vm.expectRevert(AtlasErrors.SurchargeRateTooHigh.selector);
-        atlas.setSurchargeRates(123, tooHigh);
+        atlas.setAtlasSurchargeRate(tooHigh);
 
         vm.prank(userEOA);
         vm.expectRevert(AtlasErrors.InvalidAccess.selector);
-        atlas.setSurchargeRates(123, 456);
+        atlas.setAtlasSurchargeRate(123);
 
         vm.prank(deployer);
-        atlas.setSurchargeRates(123, 456);
+        atlas.setAtlasSurchargeRate(123);
         assertEq(atlas.atlasSurchargeRate(), 123, "atlasSurchargeRate set incorrectly");
-        assertEq(atlas.bundlerSurchargeRate(), 456, "bundlerSurchargeRate set incorrectly");
     }
 
     // Transient Storage Getters and Setters
@@ -216,7 +202,6 @@ contract StorageTest is BaseTest {
         MockStorage mockStorage = new MockStorage(
             DEFAULT_ESCROW_DURATION,
             DEFAULT_ATLAS_SURCHARGE_RATE,
-            DEFAULT_BUNDLER_SURCHARGE_RATE,
             address(0),
             address(0),
             address(0),
@@ -265,7 +250,6 @@ contract StorageTest is BaseTest {
         MockStorage mockStorage = new MockStorage(
             DEFAULT_ESCROW_DURATION,
             DEFAULT_ATLAS_SURCHARGE_RATE,
-            DEFAULT_BUNDLER_SURCHARGE_RATE,
             address(0),
             address(0),
             address(0),
@@ -284,7 +268,6 @@ contract StorageTest is BaseTest {
         MockStorage mockStorage = new MockStorage(
             DEFAULT_ESCROW_DURATION,
             DEFAULT_ATLAS_SURCHARGE_RATE,
-            DEFAULT_BUNDLER_SURCHARGE_RATE,
             address(0),
             address(0),
             address(0),
@@ -303,7 +286,6 @@ contract StorageTest is BaseTest {
         MockStorage mockStorage = new MockStorage(
             DEFAULT_ESCROW_DURATION,
             DEFAULT_ATLAS_SURCHARGE_RATE,
-            DEFAULT_BUNDLER_SURCHARGE_RATE,
             address(0),
             address(0),
             address(0),
@@ -322,7 +304,6 @@ contract StorageTest is BaseTest {
         MockStorage mockStorage = new MockStorage(
             DEFAULT_ESCROW_DURATION,
             DEFAULT_ATLAS_SURCHARGE_RATE,
-            DEFAULT_BUNDLER_SURCHARGE_RATE,
             address(0),
             address(0),
             address(0),
@@ -347,7 +328,6 @@ contract MockStorage is Storage {
     constructor(
         uint256 escrowDuration,
         uint256 atlasSurchargeRate,
-        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
@@ -356,7 +336,6 @@ contract MockStorage is Storage {
         Storage(
             escrowDuration,
             atlasSurchargeRate,
-            bundlerSurchargeRate,
             verification,
             simulator,
             initialSurchargeRecipient,

@@ -28,7 +28,6 @@ abstract contract Permit69 is GasAccounting {
     constructor(
         uint256 escrowDuration,
         uint256 atlasSurchargeRate,
-        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
@@ -37,7 +36,6 @@ abstract contract Permit69 is GasAccounting {
         GasAccounting(
             escrowDuration,
             atlasSurchargeRate,
-            bundlerSurchargeRate,
             verification,
             simulator,
             initialSurchargeRecipient,

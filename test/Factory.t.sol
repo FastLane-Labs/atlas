@@ -81,7 +81,6 @@ contract FactoryTest is Test {
         atlas = new Atlas({
             escrowDuration: 64,
             atlasSurchargeRate: DEFAULT_ATLAS_SURCHARGE_RATE,
-            bundlerSurchargeRate: DEFAULT_BUNDLER_SURCHARGE_RATE,
             verification: expectedAtlasVerificationAddr,
             simulator: address(0),
             factoryLib: address(factoryLib),

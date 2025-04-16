@@ -103,6 +103,11 @@ contract UserOperationBuilder is Test {
         return this;
     }
 
+    function withBundlerSurchargeRate(uint128 bundlerSurchargeRate) public returns (UserOperationBuilder) {
+        userOperation.bundlerSurchargeRate = bundlerSurchargeRate;
+        return this;
+    }
+
     function withSessionKey(address sessionKey) public returns (UserOperationBuilder) {
         userOperation.sessionKey = sessionKey;
         return this;

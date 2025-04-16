@@ -93,6 +93,7 @@ contract AtlasVerificationBase is BaseTest {
             .withControl(address(dAppControl))
             .withCallConfig(dAppControl.CALL_CONFIG())
             .withDAppGasLimit(dAppControl.getDAppGasLimit())
+            .withBundlerSurchargeRate(dAppControl.getBundlerSurchargeRate())
             .withSessionKey(address(0))
             .withData("")
             .sign(address(atlasVerification), userPK);
@@ -1674,6 +1675,27 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.DAppGasLimitMismatch);
+    }
+
+    // BundlerSurchargeRateMismatch cases
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    //     where the userOp.bundlerSurchargeRate does not match the value returned by getBundlerSurchargeRate in the dapp control
+    // when validCalls is called from the userEOA
+    // then it should return BundlerSurchargeRateMismatch
+    //
+    function test_validCalls_BundlerSurchargeRateMismatch() public {
+        defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation().withBundlerSurchargeRate(1).signAndBuild(address(atlasVerification), userPK);
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.BundlerSurchargeRateMismatch);
     }
 
     // Prune invalid solverOps cases

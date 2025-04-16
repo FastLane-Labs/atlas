@@ -32,22 +32,13 @@ contract Atlas is Escrow, Factory {
     constructor(
         uint256 escrowDuration,
         uint256 atlasSurchargeRate,
-        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator,
         address factoryLib
     )
-        Escrow(
-            escrowDuration,
-            atlasSurchargeRate,
-            bundlerSurchargeRate,
-            verification,
-            simulator,
-            initialSurchargeRecipient,
-            l2GasCalculator
-        )
+        Escrow(escrowDuration, atlasSurchargeRate, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
         Factory(factoryLib)
     { }
 
@@ -120,6 +111,9 @@ contract Atlas is Escrow, Factory {
             revert ValidCalls(_validCallsResult);
         }
 
+        // Set the bundler surcharge rate to value set by the DAppControl (checked in `validateCalls()` above)
+        _setBundlerSurchargeRate(userOp.bundlerSurchargeRate);
+
         // Initialize the environment lock and accounting values
         _setEnvironmentLock(_dConfig, _executionEnvironment);
 
@@ -179,7 +173,9 @@ contract Atlas is Escrow, Factory {
             emit MetacallResult(msg.sender, userOp.from, false, 0, 0);
         }
 
-        // The environment lock is explicitly released here to allow multiple metacalls in a single transaction.
+        // The bundler surcharge rate and environment lock are explicitly released here to allow multiple (sequential,
+        // not nested) metacalls in a single transaction.
+        _setBundlerSurchargeRate(0);
         _releaseLock();
     }
 

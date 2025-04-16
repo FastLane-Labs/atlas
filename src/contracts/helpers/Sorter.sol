@@ -143,7 +143,7 @@ contract Sorter is AtlasConstants {
     {
         address bidToken = IDAppControl(dConfig.to).getBidFormat(userOp);
 
-        uint256 totalSurchargeRate = ATLAS.atlasSurchargeRate() + ATLAS.bundlerSurchargeRate();
+        uint256 totalSurchargeRate = ATLAS.atlasSurchargeRate() + userOp.bundlerSurchargeRate;
 
         SortingData[] memory sortingData = new SortingData[](count);
 
