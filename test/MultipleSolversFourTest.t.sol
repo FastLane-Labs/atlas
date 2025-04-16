@@ -94,6 +94,7 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
             control: address(control),
             callConfig: control.CALL_CONFIG(),
             dappGasLimit: 2_000_000,
+            bundlerSurchargeRate: 1_000_000,
             sessionKey: auctioneer,
             data: abi.encodeWithSelector(control.initiateAuction.selector),
             signature: new bytes(0)
