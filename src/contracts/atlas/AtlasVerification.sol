@@ -428,15 +428,15 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         if (allowUnapprovedDAppSignatories) return ValidCallsResult.Valid;
 
         // Check actual bundler matches the dApp's intended `dAppOp.bundler`
-        // If bundler and auctioneer are the same address, this check is skipped
         if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler && !isSimulation) {
             if (!_isDAppSignatory(dAppOp.control, msgSender)) {
                 return ValidCallsResult.InvalidBundler;
             }
         }
 
-        // Make sure the signer is currently enabled by dapp owner
-        if (!_skipDAppOpChecks && !_isDAppSignatory(dAppOp.control, dAppOp.from)) {
+        // Make sure the signer is currently enabled by dapp owner. Only need to check if msgSender != dAppOp.from (i.e.
+        // _bypassSignature == false), because msgSender checked above.
+        if (!_skipDAppOpChecks && !_bypassSignature && !_isDAppSignatory(dAppOp.control, dAppOp.from)) {
             return ValidCallsResult.DAppNotEnabled;
         }
 
