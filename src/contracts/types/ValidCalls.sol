@@ -42,5 +42,10 @@ enum ValidCallsResult {
     MetacallGasLimitTooLow,
     MetacallGasLimitTooHigh,
     DAppGasLimitMismatch,
-    BundlerSurchargeRateMismatch
+    BundlerSurchargeRateMismatch,
+    ExPostBidsAndMultipleSuccessfulSolversNotSupportedTogether,
+    InvertsBidValueAndMultipleSuccessfulSolversNotSupportedTogether,
+    NeedSolversForMultipleSuccessfulSolvers,
+    SolverCannotBeAuctioneerForMultipleSuccessfulSolvers,
+    CannotRequireFulfillmentForMultipleSuccessfulSolvers
 }

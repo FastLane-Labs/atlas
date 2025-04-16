@@ -208,11 +208,11 @@ abstract contract Escrow is AtlETH {
                 // Execute the solver call
                 (_result, _solverTracker) = _solverOpWrapper(ctx, solverOp, bidAmount, _gasLimit, returnData);
 
-                // NOTE: we intentionally do not change GasLedger here as we have found a winning solver and don't need
-                // it anymore
-
+                // First successful solver call that paid what it bid
                 if (_result.executionSuccessful()) {
-                    // First successful solver call that paid what it bid
+                    // Logic done above `_handleSolverFailAccounting()` is to charge solver for gas used here
+                    ctx.solverOutcome = uint24(_result);
+
                     emit SolverTxResult(
                         solverOp.solver,
                         solverOp.from,
@@ -224,8 +224,22 @@ abstract contract Escrow is AtlETH {
                         _result
                     );
 
-                    ctx.solverSuccessful = true;
-                    ctx.solverOutcome = uint24(_result);
+                    // Keep executing solvers without ending the auction if multipleSuccessfulSolvers is set
+                    if (dConfig.callConfig.multipleSuccessfulSolvers()) {
+                        // multipleSuccessfulSolvers mode:
+                        // - `ctx.solverSuccessful` is implicitly left as false
+                        // - `_result` should be 0 (successful) below, which should charge the solver for their own
+                        //   gas + surcharges, as 0 is not captured in the bundler fault block.
+                        // - exPostBids is not supported in multipleSuccessfulSolvers mode, so exPostBids = false here.
+                        _handleSolverFailAccounting(solverOp, dConfig.solverGasLimit, gasWaterMark, _result, false);
+                    } else {
+                        // If not in multipleSuccessfulSolvers mode, end the auction with the first successful solver
+                        // that paid what it bid.
+                        // We intentionally do not change GasLedger here as we have found a winning solver and don't
+                        // need it anymore
+                        ctx.solverSuccessful = true;
+                    }
+
                     return _solverTracker.bidAmount;
                 }
             }

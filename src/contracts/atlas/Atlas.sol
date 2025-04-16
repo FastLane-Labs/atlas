@@ -146,9 +146,15 @@ contract Atlas is Escrow, Factory {
                 );
             }
 
-            // Gas Refund to sender only if execution is successful
-            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) =
-                _settle(ctx, _gL, _gasMarker, gasRefundBeneficiary, _unreachedCalldataValuePaid);
+            // Gas Refund to sender only if execution is successful, or if multipleSuccessfulSolvers
+            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) = _settle(
+                ctx,
+                _gL,
+                _gasMarker,
+                gasRefundBeneficiary,
+                _unreachedCalldataValuePaid,
+                _dConfig.callConfig.multipleSuccessfulSolvers()
+            );
 
             auctionWon = ctx.solverSuccessful;
             emit MetacallResult(msg.sender, userOp.from, auctionWon, _ethPaidToBundler, _netGasSurcharge);
@@ -374,14 +380,29 @@ contract Atlas is Escrow, Factory {
 
             SolverOperation calldata solverOp = solverOps[ctx.solverIndex];
 
-            _bidAmount = _executeSolverOperation(
+            // if multipleSuccessfulSolvers = true, solver bids are summed here. Otherwise, 0 bids are returned on
+            // solverOp failure, and only the first successful solver's bid is added to `_bidAmount`.
+            _bidAmount += _executeSolverOperation(
                 ctx, dConfig, userOp, solverOp, solverOp.bidAmount, _gasWaterMark, false, returnData
             );
 
+            // If a winning solver is found, stop iterating through the solverOps and return the winning bid
             if (ctx.solverSuccessful) {
                 return _bidAmount;
             }
         }
+
+        // If no winning solver, but multipleSuccessfulSolvers is true, return the sum of solver bid amounts
+        if (dConfig.callConfig.multipleSuccessfulSolvers()) {
+            // Considered a fail for simulation purposes when only one solverOp in the metacall, and it fails. If more
+            // than 1 solverOp, any of them could fail and simulation could still be successful.
+            if (ctx.isSimulation && solverOpsLen == 1 && ctx.solverOutcome != 0) {
+                revert SolverSimFail(uint256(ctx.solverOutcome));
+            }
+
+            return _bidAmount;
+        }
+
         if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));
         if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
         return 0;
