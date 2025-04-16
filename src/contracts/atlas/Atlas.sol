@@ -260,6 +260,7 @@ contract Atlas is Escrow, Factory {
 
         uint256[] memory _bidsAndIndices = new uint256[](solverOpsLength);
         uint256 _bidAmountFound;
+        uint256 _solverExecutionGas;
         uint256 _bidsAndIndicesLastIndex = solverOpsLength - 1; // Start from the last index
 
         // Get a snapshot of the GasLedger from transient storage, to reset to after bid-finding below
@@ -289,7 +290,10 @@ contract Atlas is Escrow, Factory {
             // remainingMaxGas separately here. This decrease does not include calldata gas as solvers are not charged
             // for calldata gas in exPostBids mode.
             GasLedger memory _gL = t_gasLedger.toGasLedger();
-            _gL.remainingMaxGas -= uint48(dConfig.solverGasLimit);
+            // Deduct solverOp.gas, with a max of dConfig.solverGasLimit, from remainingMaxGas
+            _solverExecutionGas =
+                (solverOps[i].gas > dConfig.solverGasLimit) ? dConfig.solverGasLimit : solverOps[i].gas;
+            _gL.remainingMaxGas -= uint48(_solverExecutionGas);
             t_gasLedger = _gL.pack();
 
             // skip zero and overflow bid's

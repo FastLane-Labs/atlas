@@ -74,46 +74,22 @@ library GasAccLib {
         return uint256(gL.remainingMaxGas - gL.unreachedSolverGas).withSurcharge(totalSurchargeRate) * tx.gasprice;
     }
 
-    function solverOpCalldataGas(
-        uint256 calldataLength,
-        address l2GasCalculator
-    )
-        internal
-        view
-        returns (uint256 calldataGas)
-    {
+    function solverOpCalldataGas(uint256 calldataLength, address l2GasCalculator) internal view returns (uint256 gas) {
         if (l2GasCalculator == address(0)) {
             // Default to using mainnet gas calculations
             // _SOLVER_OP_BASE_CALLDATA = SolverOperation calldata length excluding solverOp.data
-            calldataGas = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED;
+            gas = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED;
         } else {
-            calldataGas = IL2GasCalculator(l2GasCalculator).getCalldataGas(calldataLength + _SOLVER_OP_BASE_CALLDATA);
+            gas = IL2GasCalculator(l2GasCalculator).getCalldataGas(calldataLength + _SOLVER_OP_BASE_CALLDATA);
         }
     }
 
-    function sumSolverOpsCalldataGas(
-        SolverOperation[] calldata solverOps,
-        address l2GasCalculator
-    )
-        internal
-        view
-        returns (uint256 sumCalldataGas)
-    {
-        uint256 solverOpsLength = solverOps.length;
-        uint256 sumDataLengths;
-
-        if (solverOpsLength == 0) return 0;
-
-        for (uint256 i = 0; i < solverOpsLength; ++i) {
-            sumDataLengths += solverOps[i].data.length;
-        }
-
-        uint256 sumSolverOpsCalldata = solverOpsLength * _SOLVER_OP_BASE_CALLDATA + sumDataLengths;
-
+    function calldataGas(uint256 calldataLength, address l2GasCalculator) internal view returns (uint256 gas) {
         if (l2GasCalculator == address(0)) {
-            sumCalldataGas = sumSolverOpsCalldata * _CALLDATA_LENGTH_PREMIUM_HALVED;
+            // Default to using mainnet gas calculations
+            gas = calldataLength * _CALLDATA_LENGTH_PREMIUM_HALVED;
         } else {
-            sumCalldataGas = IL2GasCalculator(l2GasCalculator).getCalldataGas(sumSolverOpsCalldata);
+            gas = IL2GasCalculator(l2GasCalculator).getCalldataGas(calldataLength);
         }
     }
 

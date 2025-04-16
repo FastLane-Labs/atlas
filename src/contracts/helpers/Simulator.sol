@@ -18,10 +18,12 @@ import { CallBits } from "../libraries/CallBits.sol";
 import { Result } from "../interfaces/ISimulator.sol";
 import { IAtlas } from "../interfaces/IAtlas.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
+import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 
 contract Simulator is AtlasErrors, AtlasConstants {
     using CallBits for uint32;
     using AccountingMath for uint256;
+    using GasAccLib for SolverOperation[];
 
     uint256 internal constant _SIM_GAS_SUGGESTED_BUFFER = 30_000;
     uint256 internal constant _SIM_GAS_BEFORE_METACALL = 10_000;
@@ -49,17 +51,30 @@ contract Simulator is AtlasErrors, AtlasConstants {
         returns (uint256)
     {
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
-        uint256 metacallCalldataLength = msg.data.length + DAPP_OP_LENGTH + 28;
-        // Additional 28 length accounts for the missing address param
+        address l2GasCalculator = IAtlas(atlas).L2_GAS_CALCULATOR();
+        uint256 nonSolverCalldataLength =
+            userOp.data.length + USER_OP_STATIC_LENGTH + DAPP_OP_LENGTH + _EXTRA_CALLDATA_LENGTH;
+        uint256 solverOpsLen = solverOps.length;
+        uint256 solverDataLenSum; // Calculated as sum of solverOps[i].data.length below
+        uint256 allSolversExecutionGas; // Calculated as sum of solverOps[i].gas below
 
-        uint256 metacallCalldataGas =
-            GasAccLib.metacallCalldataGas(metacallCalldataLength, IAtlas(atlas).L2_GAS_CALCULATOR());
+        for (uint256 i = 0; i < solverOpsLen; ++i) {
+            // Sum calldata length of all solverOp.data fields in the array
+            solverDataLenSum += solverOps[i].data.length;
+            // Sum all solverOp.gas values in the array, each with a max of dConfig.solverGasLimit
+            allSolversExecutionGas +=
+                (solverOps[i].gas > dConfig.solverGasLimit) ? dConfig.solverGasLimit : solverOps[i].gas;
+        }
+
+        uint256 metacallCalldataGas = (_SOLVER_OP_BASE_CALLDATA * solverOpsLen)
+            + GasAccLib.calldataGas(solverDataLenSum, l2GasCalculator)
+            + GasAccLib.metacallCalldataGas(nonSolverCalldataLength, l2GasCalculator);
 
         uint256 metacallExecutionGas = _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOp.gas
-            + dConfig.dappGasLimit + solverOps.length * dConfig.solverGasLimit;
+            + dConfig.dappGasLimit + allSolversExecutionGas;
 
         if (dConfig.callConfig.exPostBids()) {
-            metacallExecutionGas += solverOps.length * (_BID_FIND_OVERHEAD + dConfig.solverGasLimit);
+            metacallExecutionGas += (solverOpsLen * _BID_FIND_OVERHEAD) + allSolversExecutionGas;
         }
 
         return metacallCalldataGas + metacallExecutionGas;

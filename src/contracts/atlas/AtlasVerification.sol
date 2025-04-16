@@ -654,10 +654,21 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             uint256 bidFindOverhead
         )
     {
-        allSolversCalldataGas = solverOps.sumSolverOpsCalldataGas(L2_GAS_CALCULATOR);
         uint256 solverOpsLen = solverOps.length;
         uint256 dConfigSolverGasLimit = dConfig.solverGasLimit;
-        uint256 allSolversExecutionGas = solverOpsLen * dConfigSolverGasLimit;
+        uint256 solverDataLenSum; // Calculated as sum of solverOps[i].data.length below
+        uint256 allSolversExecutionGas; // Calculated as sum of solverOps[i].gas below
+
+        for (uint256 i = 0; i < solverOpsLen; ++i) {
+            // Sum calldata length of all solverOp.data fields in the array
+            solverDataLenSum += solverOps[i].data.length;
+            // Sum all solverOp.gas values in the array, each with a max of dConfig.solverGasLimit
+            allSolversExecutionGas +=
+                (solverOps[i].gas > dConfigSolverGasLimit) ? dConfigSolverGasLimit : solverOps[i].gas;
+        }
+
+        allSolversCalldataGas =
+            GasAccLib.calldataGas(solverDataLenSum + (_SOLVER_OP_BASE_CALLDATA * solverOps.length), L2_GAS_CALCULATOR);
 
         uint256 metacallExecutionGas = _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOpGas
             + dConfig.dappGasLimit + allSolversExecutionGas;
@@ -667,7 +678,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
 
         if (dConfig.callConfig.exPostBids()) {
             // Add extra execution gas for bid-finding loop of each solverOp
-            bidFindOverhead = solverOpsLen * (_BID_FIND_OVERHEAD + dConfigSolverGasLimit);
+            bidFindOverhead = (solverOpsLen * _BID_FIND_OVERHEAD) + allSolversExecutionGas;
             metacallExecutionGas += bidFindOverhead;
             // NOTE: allSolversGasLimit excludes calldata in exPostBids mode.
         } else {

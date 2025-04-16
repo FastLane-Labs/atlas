@@ -3,7 +3,6 @@ pragma solidity 0.8.28;
 
 library AccountingMath {
     uint256 internal constant _MAX_BUNDLER_REFUND_RATE = 8_000_000; // out of 10_000_000 = 80%
-    uint256 internal constant _SOLVER_GAS_LIMIT_BUFFER_PERCENTAGE = 500_000; // out of 10_000_000 = 5%
     uint256 internal constant _SCALE = 10_000_000; // 10_000_000 / 10_000_000 = 100%
     uint256 internal constant _FIXED_GAS_OFFSET = 150_000;
 
@@ -43,17 +42,5 @@ library AccountingMath {
     // Set to 80% of the metacall gas cost, because the remaining 20% can be collected through storage refunds.
     function maxBundlerRefund(uint256 metacallGasCost) internal pure returns (uint256 maxRefund) {
         maxRefund = metacallGasCost * _MAX_BUNDLER_REFUND_RATE / _SCALE;
-    }
-
-    function solverGasLimitScaledDown(
-        uint256 solverOpGasLimit,
-        uint256 dConfigGasLimit
-    )
-        internal
-        pure
-        returns (uint256 gasLimit)
-    {
-        gasLimit = (solverOpGasLimit < dConfigGasLimit ? solverOpGasLimit : dConfigGasLimit) * _SCALE
-            / (_SCALE + _SOLVER_GAS_LIMIT_BUFFER_PERCENTAGE);
     }
 }
