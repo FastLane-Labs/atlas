@@ -103,7 +103,7 @@ contract UserOperationBuilder is Test {
         return this;
     }
 
-    function withBundlerSurchargeRate(uint128 bundlerSurchargeRate) public returns (UserOperationBuilder) {
+    function withBundlerSurchargeRate(uint24 bundlerSurchargeRate) public returns (UserOperationBuilder) {
         userOperation.bundlerSurchargeRate = bundlerSurchargeRate;
         return this;
     }

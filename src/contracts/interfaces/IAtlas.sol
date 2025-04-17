@@ -103,5 +103,5 @@ interface IAtlas {
     function cumulativeSurcharge() external view returns (uint256);
     function surchargeRecipient() external view returns (address);
     function pendingSurchargeRecipient() external view returns (address);
-    function atlasSurchargeRate() external view returns (uint256);
+    function getAtlasSurchargeRate() external view returns (uint256);
 }

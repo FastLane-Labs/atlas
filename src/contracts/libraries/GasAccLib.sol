@@ -12,14 +12,16 @@ import { SolverOperation } from "../types/SolverOperation.sol";
 // remainingMaxGas and unreachedSolverGas measure max gas limits (C + E).
 // writeoffsGas and solverFaultFailureGas measure actual gas used (C + E).
 // Only stores base gas values. Does not include the surcharges or gasprice components.
-// type(uint48).max ~= 2.8 x 10^14, plenty even for gigagas (10^9) blocks
+// type(uint40).max ~= 1.09 x 10^12, plenty even for gigagas (10^9) blocks
 struct GasLedger {
-    uint48 remainingMaxGas; // Measured at start, decreased by solverOp gas limits when reached
-    uint48 writeoffsGas; // Gas used for solverOps but written off due to bundler fault
-    uint48 solverFaultFailureGas; // Gas used by solverOps that failed due to solver fault
-    uint48 unreachedSolverGas; // Sum of gas limits of solverOps not yet reached in the current metacall
-    uint48 maxApprovedGasSpend; // Max gas units approved by current solver to be spent from their bonded atlETH
-        // NOTE: 16 bits unused. Could hold totalSurchargeRate if SCALE = 10_000 in future
+    uint40 remainingMaxGas; // Measured at start, decreased by solverOp gas limits when reached
+    uint40 writeoffsGas; // Gas used for solverOps but written off due to bundler fault
+    uint40 solverFaultFailureGas; // Gas used by solverOps that failed due to solver fault
+    uint40 unreachedSolverGas; // Sum of gas limits of solverOps not yet reached in the current metacall
+    uint40 maxApprovedGasSpend; // Max gas units approved by current solver to be spent from their bonded atlETH
+    uint24 atlasSurchargeRate; // Scale is 10_000 (100%) --> max atlas surcharge rate ~= 167.77x or 16777%
+    uint24 bundlerSurchargeRate; // Scale is 10_000 (100%) --> max bundler surcharge rate ~= 167.77x or 16777%
+        // NOTE: 8 bits unused.
 }
 
 // All BorrowsLedger vars are measured in units of native token (wei).
@@ -36,9 +38,10 @@ library GasAccLib {
     uint256 internal constant _CALLDATA_LENGTH_PREMIUM_HALVED = 8;
 
     function pack(GasLedger memory gasLedger) internal pure returns (uint256) {
-        return uint256(gasLedger.remainingMaxGas) | (uint256(gasLedger.writeoffsGas) << 48)
-            | (uint256(gasLedger.solverFaultFailureGas) << 96) | (uint256(gasLedger.unreachedSolverGas) << 144)
-            | (uint256(gasLedger.maxApprovedGasSpend) << 192);
+        return uint256(gasLedger.remainingMaxGas) | (uint256(gasLedger.writeoffsGas) << 40)
+            | (uint256(gasLedger.solverFaultFailureGas) << 80) | (uint256(gasLedger.unreachedSolverGas) << 120)
+            | (uint256(gasLedger.maxApprovedGasSpend) << 160) | (uint256(gasLedger.atlasSurchargeRate) << 200)
+            | (uint256(gasLedger.bundlerSurchargeRate) << 224);
     }
 
     function pack(BorrowsLedger memory borrowsLedger) internal pure returns (uint256) {
@@ -47,11 +50,13 @@ library GasAccLib {
 
     function toGasLedger(uint256 gasLedgerPacked) internal pure returns (GasLedger memory) {
         return GasLedger({
-            remainingMaxGas: uint48(gasLedgerPacked),
-            writeoffsGas: uint48(gasLedgerPacked >> 48),
-            solverFaultFailureGas: uint48(gasLedgerPacked >> 96),
-            unreachedSolverGas: uint48(gasLedgerPacked >> 144),
-            maxApprovedGasSpend: uint48(gasLedgerPacked >> 192)
+            remainingMaxGas: uint40(gasLedgerPacked),
+            writeoffsGas: uint40(gasLedgerPacked >> 40),
+            solverFaultFailureGas: uint40(gasLedgerPacked >> 80),
+            unreachedSolverGas: uint40(gasLedgerPacked >> 120),
+            maxApprovedGasSpend: uint40(gasLedgerPacked >> 160),
+            atlasSurchargeRate: uint24(gasLedgerPacked >> 200),
+            bundlerSurchargeRate: uint24(gasLedgerPacked >> 224)
         });
     }
 
@@ -70,8 +75,16 @@ library GasAccLib {
     // subtracted at the start of its execution, before bonded balance check.
     // Thus `remainingMaxGas - unreachedSolverGas` is the max gas the current solver might need to pay for if they win,
     // including dApp hook gas limits and userOp gas limit.
-    function solverGasLiability(GasLedger memory gL, uint256 totalSurchargeRate) internal view returns (uint256) {
-        return uint256(gL.remainingMaxGas - gL.unreachedSolverGas).withSurcharge(totalSurchargeRate) * tx.gasprice;
+    function solverGasLiability(GasLedger memory gL) internal view returns (uint256) {
+        return uint256(gL.remainingMaxGas - gL.unreachedSolverGas).withSurcharge(
+            uint256(gL.atlasSurchargeRate + gL.bundlerSurchargeRate)
+        ) * tx.gasprice;
+    }
+
+    // Returns the sum of the Atlas and bundler surcharge rates.
+    // Scale of the returned value is 10_000 (100%).
+    function totalSurchargeRate(GasLedger memory gL) internal pure returns (uint256) {
+        return uint256(gL.atlasSurchargeRate + gL.bundlerSurchargeRate);
     }
 
     function solverOpCalldataGas(uint256 calldataLength, address l2GasCalculator) internal view returns (uint256 gas) {

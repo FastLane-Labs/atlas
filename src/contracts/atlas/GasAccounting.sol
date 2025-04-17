@@ -45,13 +45,21 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param gasMarker The gas measurement at the start of the metacall, which includes Execution gas limits, Calldata
     /// gas costs, and an additional buffer for safety.
     /// @param allSolverOpsGas The sum of (C + E) gas limits for all solverOps in the metacall.
-    function _initializeAccountingValues(uint256 gasMarker, uint256 allSolverOpsGas) internal {
+    function _initializeAccountingValues(
+        uint256 gasMarker,
+        uint256 allSolverOpsGas,
+        uint24 bundlerSurchargeRate
+    )
+        internal
+    {
         t_gasLedger = GasLedger({
-            remainingMaxGas: uint48(gasMarker),
+            remainingMaxGas: uint40(gasMarker),
             writeoffsGas: 0,
             solverFaultFailureGas: 0,
-            unreachedSolverGas: uint48(allSolverOpsGas),
-            maxApprovedGasSpend: 0
+            unreachedSolverGas: uint40(allSolverOpsGas),
+            maxApprovedGasSpend: 0,
+            atlasSurchargeRate: _atlasSurchargeRate(),
+            bundlerSurchargeRate: bundlerSurchargeRate
         }).pack();
 
         // If any native token sent in the metacall, add to the repays account
@@ -100,7 +108,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// balance or native token.
     /// @return borrowLiability The total value of ETH borrowed but not yet repaid, only repayable using native token.
     function shortfall() external view returns (uint256 gasLiability, uint256 borrowLiability) {
-        gasLiability = t_gasLedger.toGasLedger().solverGasLiability(_totalSurchargeRate());
+        gasLiability = t_gasLedger.toGasLedger().solverGasLiability();
 
         BorrowsLedger memory _bL = t_borrowsLedger.toBorrowsLedger();
         borrowLiability = (_bL.borrows < _bL.repays) ? 0 : _bL.borrows - _bL.repays;
@@ -140,7 +148,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         uint256 _borrows = _bL.borrows; // total native borrows
         uint256 _repays = _bL.repays; // total native repayments of borrows
-        uint256 _maxGasLiability = _gL.solverGasLiability(_totalSurchargeRate()); // max gas liability of winning solver
+        uint256 _maxGasLiability = _gL.solverGasLiability(); // max gas liability of winning solver
 
         // Store update to repays in t_borrowLedger, if any msg.value sent
         if (msg.value > 0) {
@@ -152,7 +160,7 @@ abstract contract GasAccounting is SafetyLocks {
         // Store solver's maxApprovedGasSpend for use in the _isBalanceReconciled() check
         if (maxApprovedGasSpend > 0) {
             // Convert maxApprovedGasSpend from wei (native token) units to gas units
-            _gL.maxApprovedGasSpend = uint48(maxApprovedGasSpend / tx.gasprice);
+            _gL.maxApprovedGasSpend = uint40(maxApprovedGasSpend / tx.gasprice);
             t_gasLedger = _gL.pack();
         }
 
@@ -281,7 +289,6 @@ abstract contract GasAccounting is SafetyLocks {
         internal
     {
         GasLedger memory _gL = t_gasLedger.toGasLedger();
-        uint256 _bothSurchargeRates = _totalSurchargeRate();
 
         // Solvers do not pay for calldata gas in exPostBids mode.
         uint256 _calldataGas;
@@ -293,7 +300,7 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _executionMaxGas = (solverOp.gas > dConfigSolverGasLimit) ? dConfigSolverGasLimit : solverOp.gas;
 
         // Deduct solver's max (C + E) gas from remainingMaxGas, for future solver gas liability calculations
-        _gL.remainingMaxGas -= uint48(_executionMaxGas + _calldataGas);
+        _gL.remainingMaxGas -= uint40(_executionMaxGas + _calldataGas);
 
         uint256 _gasUsed = _calldataGas + (gasWaterMark - gasleft());
 
@@ -303,11 +310,11 @@ abstract contract GasAccounting is SafetyLocks {
             // CASE: Solver is not responsible for the failure of their operation, so we blame the bundler
             // and reduce the total amount refunded to the bundler
             _gasUsed += _BUNDLER_FAULT_OFFSET;
-            _gL.writeoffsGas += uint48(_gasUsed);
+            _gL.writeoffsGas += uint40(_gasUsed);
         } else {
             // CASE: Solver failed, so we calculate what they owe.
             _gasUsed += _SOLVER_FAULT_OFFSET;
-            uint256 _gasValueWithSurcharges = _gasUsed.withSurcharge(_bothSurchargeRates) * tx.gasprice;
+            uint256 _gasValueWithSurcharges = _gasUsed.withSurcharge(_gL.totalSurchargeRate()) * tx.gasprice;
 
             EscrowAccountAccessData memory _solverAccountData = S_accessData[solverOp.from];
 
@@ -335,12 +342,12 @@ abstract contract GasAccounting is SafetyLocks {
 
                 // Deduct gas written off from gas tracked as "paid for" by failed solver
                 _gasUsed -= _gasWrittenOff;
-                _gL.writeoffsGas += uint48(_gasWrittenOff); // add to writeoffs in gasLedger
+                _gL.writeoffsGas += uint40(_gasWrittenOff); // add to writeoffs in gasLedger
             }
 
             // The gas paid for here by failed solver, and gas written off due to shortfall in `_assign()`, will offset
             // what the winning solver owes in `_settle()`.
-            _gL.solverFaultFailureGas += uint48(_gasUsed);
+            _gL.solverFaultFailureGas += uint40(_gasUsed);
         }
 
         // Persist the updated gas ledger to transient storage
@@ -353,7 +360,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param gasUsed The amount of gas consumed during the `bidFind` phase.
     function _writeOffBidFindGas(uint256 gasUsed) internal {
         GasLedger memory _gL = t_gasLedger.toGasLedger();
-        _gL.writeoffsGas += uint48(gasUsed);
+        _gL.writeoffsGas += uint40(gasUsed);
         t_gasLedger = _gL.pack();
     }
 
@@ -397,7 +404,7 @@ abstract contract GasAccounting is SafetyLocks {
                 VERIFICATION.verifySolverOp(solverOps[i], userOpHash, maxFeePerGas, bundler, allowsTrustedOpHash);
 
             if (_result.bundlersFault()) {
-                gL.writeoffsGas += _calldataGasCost.divUp(tx.gasprice).toUint48();
+                gL.writeoffsGas += _calldataGasCost.divUp(tx.gasprice).toUint40();
                 continue;
             }
 
@@ -415,12 +422,12 @@ abstract contract GasAccounting is SafetyLocks {
 
             // Any deficits from the `_assign()` operations are converted to gas units and written off so as not to
             // charge the winning solver for calldata that is not their responsibility, in `_settle()`.
-            if (_deficit > 0) gL.writeoffsGas += _deficit.divUp(tx.gasprice).toUint48();
+            if (_deficit > 0) gL.writeoffsGas += _deficit.divUp(tx.gasprice).toUint40();
         }
 
         // The gas cost of this loop is always paid by the bundler so as not to charge the winning solver for an
         // excessive number of loops and SSTOREs via `_assign()`. This gas is therefore added to writeoffs.
-        gL.writeoffsGas += (_writeoffGasMarker - gasleft()).toUint48();
+        gL.writeoffsGas += (_writeoffGasMarker - gasleft()).toUint40();
     }
 
     /// @notice Finalizes gas accounting at the end of the metacall, settles balances, and pays refunds/surcharges.
@@ -446,7 +453,6 @@ abstract contract GasAccounting is SafetyLocks {
     {
         EscrowAccountAccessData memory _winningSolverData;
         BorrowsLedger memory _bL = t_borrowsLedger.toBorrowsLedger();
-        (uint256 _atlasSurchargeRate, uint256 _bundlerSurchargeRate) = _surchargeRates();
         (address _winningSolver,,) = _solverLockData();
 
         // No need to SLOAD bonded balance etc. if no winning solver
@@ -481,14 +487,14 @@ abstract contract GasAccounting is SafetyLocks {
 
             // Bundler gets base gas cost + bundler surcharge of (solver fault fails + winning solver charge)
             // Bundler also gets reimbursed for the calldata of unreached solvers (only base, no surcharge)
-            claimsPaidToBundler = (_surchargedGasPaidBySolvers.withSurcharge(_bundlerSurchargeRate) * tx.gasprice)
+            claimsPaidToBundler = (_surchargedGasPaidBySolvers.withSurcharge(gL.bundlerSurchargeRate) * tx.gasprice)
                 + unreachedCalldataValuePaid;
 
             // Atlas gets only the Atlas surcharge of (solver fault fails + winning solver charge)
-            netAtlasGasSurcharge = _surchargedGasPaidBySolvers.getSurcharge(_atlasSurchargeRate) * tx.gasprice;
+            netAtlasGasSurcharge = _surchargedGasPaidBySolvers.getSurcharge(gL.atlasSurchargeRate) * tx.gasprice;
 
             // Calculate what winning solver pays: add surcharges and multiply by gas price
-            _winnerGasCharge = _winnerGasCharge.withSurcharge(_atlasSurchargeRate + _bundlerSurchargeRate) * tx.gasprice;
+            _winnerGasCharge = _winnerGasCharge.withSurcharge(gL.totalSurchargeRate()) * tx.gasprice;
 
             uint256 _deficit; // Any shortfall that the winning solver is not able to repay from bonded balance
             if (_winnerGasCharge < uint256(_netRepayments)) {
@@ -529,11 +535,11 @@ abstract contract GasAccounting is SafetyLocks {
             // `unreachedCalldataValuePaid` is not added here as it should always be 0 when solverSuccessful = false,
             // because there should then be no unreached solvers.
             uint256 _bundlerCutBeforeLimit =
-                uint256(gL.solverFaultFailureGas).withSurcharge(_bundlerSurchargeRate) * tx.gasprice;
+                uint256(gL.solverFaultFailureGas).withSurcharge(gL.bundlerSurchargeRate) * tx.gasprice;
 
             // Atlas only keeps the Atlas surcharge of solver fault failures, and any gas due to bundler that exceeds
             // the 80% limit.
-            netAtlasGasSurcharge = uint256(gL.solverFaultFailureGas).getSurcharge(_atlasSurchargeRate) * tx.gasprice;
+            netAtlasGasSurcharge = uint256(gL.solverFaultFailureGas).getSurcharge(gL.atlasSurchargeRate) * tx.gasprice;
 
             if (_bundlerCutBeforeLimit > _maxRefund) {
                 // More than max gas refund was taken by failed/unreached solvers, excess goes to Atlas
@@ -596,7 +602,6 @@ abstract contract GasAccounting is SafetyLocks {
         // gL.maxApprovedGasSpend only stores the gas units, must be scaled by tx.gasprice
         uint256 _maxApprovedGasValue = gL.maxApprovedGasSpend * tx.gasprice;
 
-        return (bL.repays >= bL.borrows)
-            && (_maxApprovedGasValue + _netRepayments >= gL.solverGasLiability(_totalSurchargeRate()));
+        return (bL.repays >= bL.borrows) && (_maxApprovedGasValue + _netRepayments >= gL.solverGasLiability());
     }
 }

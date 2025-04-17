@@ -329,12 +329,12 @@ abstract contract Escrow is AtlETH {
 
         // Calldata gas is only included if NOT in exPostBids mode.
         if (!dConfig.callConfig.exPostBids()) {
-            _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR).toUint48();
+            _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR);
         }
 
         // Reset solver's max approved gas spend to 0 at start of each new solver execution
         gL.maxApprovedGasSpend = 0;
-        gL.unreachedSolverGas -= uint48(_executionGas + _calldataGas);
+        gL.unreachedSolverGas -= (_executionGas + _calldataGas).toUint40();
 
         // NOTE: GasLedger changes must be persisted to transient storage separately after this function call
     }
@@ -382,7 +382,7 @@ abstract contract Escrow is AtlETH {
         uint256 _solverBalance = S_accessData[solverOp.from].bonded;
 
         // Checks if solver's bonded balance is enough to cover the max charge should they win, including surcharges
-        if (_solverBalance < gL.solverGasLiability(_totalSurchargeRate())) {
+        if (_solverBalance < gL.solverGasLiability()) {
             result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
         }
 

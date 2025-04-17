@@ -5,8 +5,8 @@ import "forge-std/Test.sol";
 import "../src/contracts/libraries/AccountingMath.sol";
 
 contract AccountingMathTest is Test {
-    uint256 DEFAULT_ATLAS_SURCHARGE_RATE = 1_000_000; // 10%
-    uint256 DEFAULT_BUNDLER_SURCHARGE_RATE = 1_000_000; // 10%
+    uint256 DEFAULT_ATLAS_SURCHARGE_RATE = 1_000; // 10%
+    uint256 DEFAULT_BUNDLER_SURCHARGE_RATE = 1_000; // 10%
 
     /// forge-config: default.allow_internal_expect_revert = true
     function testWithBundlerSurcharge() public {

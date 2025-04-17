@@ -12,7 +12,7 @@ import { BaseTest } from "./base/BaseTest.t.sol";
 contract StorageTest is BaseTest {
     using stdStorage for StdStorage;
 
-    uint256 constant DEFAULT_SCALE = 10_000_000; // out of 10_000_000 = 100%
+    uint256 constant DEFAULT_SCALE = 10_000; // out of 10_000 = 100%
     uint256 constant DEFAULT_FIXED_GAS_OFFSET = 150_000;
 
     function setUp() public override {
@@ -138,11 +138,11 @@ contract StorageTest is BaseTest {
         assertEq(atlas.pendingSurchargeRecipient(), userEOA, "pendingSurchargeRecipient should be userEOA");
     }
 
-    function test_storage_view_atlasSurchargeRate() public {
-        assertEq(atlas.atlasSurchargeRate(), DEFAULT_ATLAS_SURCHARGE_RATE, "atlasSurchargeRate set incorrectly");
+    function test_storage_view_getAtlasSurchargeRate() public {
+        assertEq(atlas.getAtlasSurchargeRate(), DEFAULT_ATLAS_SURCHARGE_RATE, "atlasSurchargeRate set incorrectly");
         vm.prank(deployer);
         atlas.setAtlasSurchargeRate(100);
-        assertEq(atlas.atlasSurchargeRate(), 100, "atlasSurchargeRate set incorrectly");
+        assertEq(atlas.getAtlasSurchargeRate(), 100, "atlasSurchargeRate set incorrectly");
     }
 
     // Storage Setters
@@ -160,7 +160,7 @@ contract StorageTest is BaseTest {
 
         vm.prank(deployer);
         atlas.setAtlasSurchargeRate(123);
-        assertEq(atlas.atlasSurchargeRate(), 123, "atlasSurchargeRate set incorrectly");
+        assertEq(atlas.getAtlasSurchargeRate(), 123, "atlasSurchargeRate set incorrectly");
     }
 
     // Transient Storage Getters and Setters

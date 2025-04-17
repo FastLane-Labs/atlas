@@ -66,10 +66,6 @@ contract TestAtlas is Atlas {
         t_borrowsLedger = newBorrowsLedger;
     }
 
-    function setBundlerSurchargeRate(uint256 newBundlerSurchargeRate) public {
-        _setBundlerSurchargeRate(newBundlerSurchargeRate);
-    }
-
     // Transient Getters
 
     function getGasLedger() public view returns (GasLedger memory gL) {

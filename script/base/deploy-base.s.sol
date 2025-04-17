@@ -74,12 +74,12 @@ contract DeployBaseScript is Script {
         uint256 chainId = block.chainid;
         if (chainId == 137 || chainId == 80_002) {
             // POLYGON and AMOY
-            atlasSurchargeRate = 500_000; // 5%
-            bundlerSurchargeRate = 2_000_000; // 20%
+            atlasSurchargeRate = 500; // 5%
+            bundlerSurchargeRate = 2000; // 20%
         } else {
             // Default - for all other chains
-            atlasSurchargeRate = 1_000_000; // 10%
-            bundlerSurchargeRate = 1_000_000; // 10%
+            atlasSurchargeRate = 1000; // 10%
+            bundlerSurchargeRate = 1000; // 10%
         }
     }
 

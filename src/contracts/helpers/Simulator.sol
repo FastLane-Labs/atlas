@@ -96,7 +96,7 @@ contract Simulator is AtlasErrors, AtlasConstants {
     {
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
         uint256 bundlerSurchargeRate = userOp.bundlerSurchargeRate;
-        uint256 atlasSurchargeRate = IAtlas(atlas).atlasSurchargeRate();
+        uint256 atlasSurchargeRate = IAtlas(atlas).getAtlasSurchargeRate();
         uint256 totalGas;
 
         if (dConfig.callConfig.multipleSuccessfulSolvers()) {
