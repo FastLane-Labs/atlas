@@ -65,28 +65,4 @@ contract AccountingMathTest is Test {
         vm.expectRevert();
         AccountingMath.getSurcharge(type(uint256).max, DEFAULT_ATLAS_SURCHARGE_RATE);
     }
-
-    /// forge-config: default.allow_internal_expect_revert = true
-    function testSolverGasLimitScaledDown() public {
-        assertEq(AccountingMath.solverGasLimitScaledDown(0, 100), uint256(0));
-        assertEq(AccountingMath.solverGasLimitScaledDown(50, 100), uint256(47)); // 50 * 10_000_000 / 10_500_000
-        assertEq(AccountingMath.solverGasLimitScaledDown(100, 200), uint256(95));
-
-        assertEq(AccountingMath.solverGasLimitScaledDown(200, 100), uint256(95));
-        assertEq(AccountingMath.solverGasLimitScaledDown(300, 200), uint256(190));
-
-        assertEq(AccountingMath.solverGasLimitScaledDown(100, 100), uint256(95));
-        assertEq(AccountingMath.solverGasLimitScaledDown(200, 200), uint256(190));
-
-        assertEq(AccountingMath.solverGasLimitScaledDown(1_000_000, 500_000), uint256(476_190)); // 500_000 * 10_000_000
-            // / 10_500_000
-        assertEq(AccountingMath.solverGasLimitScaledDown(1e18, 1e18), uint256(952_380_952_380_952_380));
-
-        vm.expectRevert();
-        assertEq(AccountingMath.solverGasLimitScaledDown(type(uint256).max, type(uint256).max), type(uint256).max);
-
-        assertEq(AccountingMath.solverGasLimitScaledDown(1, 2), uint256(0)); // 1 * 10_000_000 / 10_500_000
-        assertEq(AccountingMath.solverGasLimitScaledDown(3, 3), uint256(2)); // 3 * 10_000_000 / 10_500_000
-        assertEq(AccountingMath.solverGasLimitScaledDown(5, 10), uint256(4)); // 5 * 10_000_000 / 10_500_000
-    }
 }

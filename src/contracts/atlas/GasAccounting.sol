@@ -289,8 +289,11 @@ abstract contract GasAccounting is SafetyLocks {
             _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR);
         }
 
+        // Solver execution max gas is calculated as solverOp.gas, with a max of dConfig.solverGasLimit
+        uint256 _executionMaxGas = (solverOp.gas > dConfigSolverGasLimit) ? dConfigSolverGasLimit : solverOp.gas;
+
         // Deduct solver's max (C + E) gas from remainingMaxGas, for future solver gas liability calculations
-        _gL.remainingMaxGas -= uint48(dConfigSolverGasLimit + _calldataGas);
+        _gL.remainingMaxGas -= uint48(_executionMaxGas + _calldataGas);
 
         uint256 _gasUsed = _calldataGas + (gasWaterMark - gasleft());
 

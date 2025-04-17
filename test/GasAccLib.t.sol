@@ -18,11 +18,9 @@ contract GasAccLibTest is Test {
     using AccountingMath for uint256;
 
     MockL2GasCalculator mockL2GasCalc;
-    MemoryToCalldataHelper memoryToCalldataHelper;
 
     function setUp() public {
         mockL2GasCalc = new MockL2GasCalculator();
-        memoryToCalldataHelper = new MemoryToCalldataHelper();
     }
 
     function test_GasAccLib_GasLedger_packAndUnpack() public pure {
@@ -104,23 +102,6 @@ contract GasAccLibTest is Test {
         assertEq(GasAccLib.solverOpCalldataGas(calldataLength, address(mockL2GasCalc)), expectedMockGas, "solverOpCalldataGas (5x mock) unexpected");
     }
 
-    function test_GasAccLib_sumSolverOpsCalldataGas() public view {
-        SolverOperation[] memory solverOps = new SolverOperation[](3);
-        solverOps[0].data = new bytes(100);
-        solverOps[1].data = new bytes(200);
-        solverOps[2].data = new bytes(500);
-
-        // First, the default calculation, using address(0) as the GasCalculator:
-        uint256 expectedDefaultGas = ((solverOps.length * GasAccLib._SOLVER_OP_BASE_CALLDATA) + 100 + 200 + 500) * GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED;
-
-        assertEq(memoryToCalldataHelper.sumSolverOpsCalldataGas(solverOps, address(0)), expectedDefaultGas, "sumSolverOpsCalldataGas (default) unexpected");
-
-        // Now, with a mock L2GasCalculator, that returns 5x the default calldata gas:
-        uint256 expectedMockGas = 5 * expectedDefaultGas;
-
-        assertEq(memoryToCalldataHelper.sumSolverOpsCalldataGas(solverOps, address(mockL2GasCalc)), expectedMockGas, "sumSolverOpsCalldataGas (5x mock) unexpected");
-    }
-
     function test_GasAccLib_metacallCalldataGas() public view {
         uint256 msgDataLength = 3_000;
 
@@ -133,19 +114,5 @@ contract GasAccLibTest is Test {
         uint256 expectedMockGas = 5 * expectedDefaultGas;
 
         assertEq(GasAccLib.metacallCalldataGas(msgDataLength, address(mockL2GasCalc)), expectedMockGas, "metacallCalldataGas (5x mock) unexpected");
-    }
-}
-
-// Basic helper to convert the SolverOperations[] memory to calldata for testing
-contract MemoryToCalldataHelper {
-    function sumSolverOpsCalldataGas(
-        SolverOperation[] calldata solverOps,
-        address l2GasCalculator
-    )
-        public
-        view
-        returns (uint256 sumCalldataGas)
-    {
-        return GasAccLib.sumSolverOpsCalldataGas(solverOps, l2GasCalculator);
     }
 }

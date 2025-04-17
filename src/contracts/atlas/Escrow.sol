@@ -319,9 +319,13 @@ abstract contract Escrow is AtlETH {
         SolverOperation calldata solverOp
     )
         internal
+        view
     {
         // Decrease unreachedSolverGas by the current solverOp's (C + E) max gas
         uint256 _calldataGas;
+
+        // Solver's execution gas is solverOp.gas with a max of dConfig.solverGasLimit
+        uint256 _executionGas = (solverOp.gas > dConfig.solverGasLimit) ? dConfig.solverGasLimit : solverOp.gas;
 
         // Calldata gas is only included if NOT in exPostBids mode.
         if (!dConfig.callConfig.exPostBids()) {
@@ -330,7 +334,7 @@ abstract contract Escrow is AtlETH {
 
         // Reset solver's max approved gas spend to 0 at start of each new solver execution
         gL.maxApprovedGasSpend = 0;
-        gL.unreachedSolverGas -= uint48(dConfig.solverGasLimit + _calldataGas);
+        gL.unreachedSolverGas -= uint48(_executionGas + _calldataGas);
 
         // NOTE: GasLedger changes must be persisted to transient storage separately after this function call
     }
@@ -357,12 +361,16 @@ abstract contract Escrow is AtlETH {
         uint256 result
     )
         internal
+        view
         returns (uint256, uint256 gasLimit)
     {
-        if (gasWaterMark < _VALIDATION_GAS_LIMIT + dConfig.solverGasLimit) {
+        // gasLimit is solverOp.gas, with a max of dConfig.solverGasLimit
+        gasLimit = (solverOp.gas > dConfig.solverGasLimit) ? dConfig.solverGasLimit : solverOp.gas;
+
+        if (gasWaterMark < _VALIDATION_GAS_LIMIT + gasLimit) {
             // Make sure to leave enough gas for dApp validation calls
             result |= 1 << uint256(SolverOutcome.UserOutOfGas);
-            return (result, gasLimit); // gasLimit = 0
+            return (result, gasLimit);
         }
 
         // Verify that we can lend the solver their tx value
@@ -377,8 +385,6 @@ abstract contract Escrow is AtlETH {
         if (_solverBalance < gL.solverGasLiability(_totalSurchargeRate())) {
             result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
         }
-
-        gasLimit = AccountingMath.solverGasLimitScaledDown(solverOp.gas, dConfig.solverGasLimit);
 
         return (result, gasLimit);
     }
