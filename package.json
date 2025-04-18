@@ -64,6 +64,7 @@
       "setup-demo": "npm run deploy-atlas-swap-intent-tx-builder && npm run deploy-solver && npm run solver-deposit",
 
       "deploy-gas-calculator-base": "source .env && forge script script/deploy-gas-calculator.s.sol:DeployGasCalculatorScript --rpc-url ${BASE_RPC_URL} --broadcast --etherscan-api-key ${BASESCAN_API_KEY} --verify",
+      "transfer-surcharge-recipient:sepolia": ". ./.env && forge script script/transfer-surcharge-recipient.s.sol:TransferSurchargeRecipientScript --rpc-url ${SEPOLIA_RPC_URL} --sig 'run(string)' --broadcast --non-interactive --slow",
 
       "atlas-addr": "echo 'ATLAS:' && jq -r '.ATLAS' deployments.json",
       "swap-intent-addr": "echo 'SWAP INTENT DAPP CONTROL:' && jq -r '.SWAP_INTENT_DAPP_CONTROL' deployments.json",
@@ -83,4 +84,3 @@
       "solc": "solc-select install 0.8.18 && solc-select use 0.8.18"
     }
   }
-  

@@ -5,7 +5,7 @@ You will need to make sure you have these packages installed:
 * foundry
 * lcov
 
-The you need to ensure your environment has these variables set:
+Then you need to ensure your environment has these variables set:
 
 ```
 MAINNET_RPC_URL=
