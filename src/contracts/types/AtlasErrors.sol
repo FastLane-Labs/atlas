@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
-import "src/contracts/types/ValidCalls.sol";
+import "./ValidCalls.sol";
 
 contract AtlasErrors {
     // Simulator
@@ -37,8 +37,8 @@ contract AtlasErrors {
     error UserOpSimFail();
     error SolverSimFail(uint256 solverOutcomeResult); // uint param is result returned in `verifySolverOp`
     error AllocateValueSimFail();
-    error PostOpsSimFail();
     error ValidCalls(ValidCallsResult);
+    error InsufficientGasForMetacallSimulation(uint256 estimatedMetacallGas, uint256 suggestedSimGas);
 
     // Execution Environment
     error InvalidUser();
@@ -48,8 +48,6 @@ contract AtlasErrors {
     error UserOpValueExceedsBalance();
     error UserWrapperDelegatecallFail();
     error UserWrapperCallFail();
-    error PostOpsDelegatecallFail();
-    error PostOpsDelegatecallReturnedFalse();
     error AllocateValueDelegatecallFail();
     error NotEnvironmentOwner();
     error ExecutionEnvironmentBalanceTooLow();
@@ -57,27 +55,17 @@ contract AtlasErrors {
     // Atlas
     error PreOpsFail();
     error UserOpFail();
-    // error SolverFail(); // Only sim version of err is used
     error AllocateValueFail();
-    error PostOpsFail();
     error InvalidAccess();
 
     // Escrow
     error UncoveredResult();
     error InvalidEscrowDuration();
+    error DAppGasLimitReached();
 
     // AtlETH
-    error InsufficientUnbondedBalance(uint256 balance, uint256 requested);
-    error InsufficientBondedBalance(uint256 balance, uint256 requested);
-    error PermitDeadlineExpired();
-    error InvalidSigner();
     error EscrowLockActive();
-    error InsufficientWithdrawableBalance(uint256 balance, uint256 requested);
-    error InsufficientAvailableBalance(uint256 balance, uint256 requested);
-    error InsufficientSurchargeBalance(uint256 balance, uint256 requested);
     error InsufficientBalanceForDeduction(uint256 balance, uint256 requested);
-    error ValueTooLarge();
-    error BidTooHigh(uint256 indexInSolverOps, uint256 bidAmount);
 
     // DAppIntegration
     error OnlyGovernance();
@@ -86,7 +74,6 @@ contract AtlasErrors {
     error InvalidDAppControl();
     error DAppNotEnabled();
     error AtlasLockActive();
-    error InvalidSignatory();
 
     // Permit69
     error InvalidEnvironment();
@@ -94,23 +81,18 @@ contract AtlasErrors {
     error InvalidLockState();
 
     // GasAccounting
-    error LedgerFinalized(uint8 id);
-    error LedgerBalancing(uint8 id);
-    error MissingFunds(uint8 id);
-    error InsufficientFunds();
-    error NoUnfilledRequests();
-    error SolverMustReconcile();
-    error DoubleReconcile();
     error InvalidExecutionEnvironment(address correctEnvironment);
-    error InvalidSolverFrom(address solverFrom);
-    error InsufficientSolverBalance(uint256 actual, uint256 msgValue, uint256 holds, uint256 needed);
     error InsufficientAtlETHBalance(uint256 actual, uint256 needed);
     error InsufficientTotalBalance(uint256 shortfall);
-    error UnbalancedAccounting();
+    error BorrowsNotRepaid(uint256 borrows, uint256 repays);
+    error AssignDeficitTooLarge(uint256 deficit, uint256 bundlerRefund);
 
     // SafetyLocks
     error NotInitialized();
     error AlreadyInitialized();
+
+    // Storage
+    error SurchargeRateTooHigh();
 
     // AtlasVerification
     error NoUnusedNonceInBitmap();

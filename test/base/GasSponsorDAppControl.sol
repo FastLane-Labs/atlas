@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
-import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
-import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
-import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
+import { DAppControl } from "../../src/contracts/dapp/DAppControl.sol";
+import { IAtlas } from "../../src/contracts/interfaces/IAtlas.sol";
+import { IExecutionEnvironment } from "../../src/contracts/interfaces/IExecutionEnvironment.sol";
 
-import "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/SolverOperation.sol";
+import "../../src/contracts/types/ConfigTypes.sol";
+import "../../src/contracts/types/UserOperation.sol";
+import "../../src/contracts/types/SolverOperation.sol";
 
 import "forge-std/Test.sol";
 
@@ -40,13 +40,6 @@ contract GasSponsorDAppControl is DAppControl {
         return data;
     }
 
-    function _postOpsCall(bool, bytes calldata data) internal pure virtual override {
-        if (data.length == 0) return;
-
-        (bool shouldRevert) = abi.decode(data, (bool));
-        require(!shouldRevert, "_postOpsCall revert requested");
-    }
-
     function _preSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure virtual override {
         if (returnData.length == 0) {
             return;
@@ -58,15 +51,19 @@ contract GasSponsorDAppControl is DAppControl {
     }
 
     function _postSolverCall(SolverOperation calldata, bytes calldata) internal virtual override {
-        uint256 _solverShortfall = IAtlas(ATLAS).shortfall();
+        (uint256 gasLiability, uint256 borrowLiability) = IAtlas(ATLAS).shortfall();
 
-        GasSponsorDAppControl(CONTROL).sponsorETHViaExecutionEnvironment(_solverShortfall);
+        uint256 totalETH = gasLiability + borrowLiability;
 
-        require(address(this).balance >= _solverShortfall, "Not enough ETH in DAppControl to pay solver shortfall");
-        IAtlas(ATLAS).contribute{ value: _solverShortfall }();
+        // Request gas liability + borrow liability from DAppControl contract (this is currently in EE context)
+        GasSponsorDAppControl(CONTROL).sponsorETHViaExecutionEnvironment(totalETH);
+
+        require(address(this).balance >= totalETH, "Not enough ETH in DAppControl to pay solver shortfall");
+        IAtlas(ATLAS).contribute{ value: totalETH }();
     }
 
     function _allocateValueCall(
+        bool solved,
         address bidToken,
         uint256 winningAmount,
         bytes calldata data

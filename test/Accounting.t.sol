@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
-import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
-import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
-import { UserOperation } from "src/contracts/types/UserOperation.sol";
-import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/DAppOperation.sol";
+import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
+import { SolverOperation } from "../src/contracts/types/SolverOperation.sol";
+import { UserOperation } from "../src/contracts/types/UserOperation.sol";
+import { DAppConfig } from "../src/contracts/types/ConfigTypes.sol";
+import "../src/contracts/types/DAppOperation.sol";
 
-import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
-import "src/contracts/types/LockTypes.sol";
+import { SafetyBits } from "../src/contracts/libraries/SafetyBits.sol";
+import "../src/contracts/types/LockTypes.sol";
 
 import { TestUtils } from "./base/TestUtils.sol";
 
@@ -21,9 +21,10 @@ import {
     SwapIntentDAppControl,
     SwapIntent,
     Condition
-} from "src/contracts/examples/intents-example/SwapIntentDAppControl.sol";
+} from "../src/contracts/examples/intents-example/SwapIntentDAppControl.sol";
 
-import { SolverBase } from "src/contracts/solver/SolverBase.sol";
+import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
+import { AtlasErrors } from "../src/contracts/types/AtlasErrors.sol";
 
 contract AccountingTest is BaseTest {
     SwapIntentDAppControl public swapIntentControl;
@@ -61,9 +62,13 @@ contract AccountingTest is BaseTest {
         vm.stopPrank();
 
         SolverOperation[] memory solverOps = _setupBorrowRepayTestUsingBasicSwapIntent(address(honestSolver));
+        uint256 gasLim = _gasLim(userOp, solverOps);
+
+        // Give solver contract enough ETH to pay bid (1 ETH)
+        vm.deal(address(honestSolver), solverOps[0].bidAmount);
 
         vm.startPrank(userEOA);
-        atlas.metacall{ value: 0 }({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
+        atlas.metacall{ value: 0, gas: gasLim }({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
         vm.stopPrank();
 
         // console.log("\nAFTER METACALL");
@@ -82,15 +87,16 @@ contract AccountingTest is BaseTest {
     function testSolverBorrowWithoutRepayingReverts_SkipCoverage() public {
         // Solver deploys the RFQ solver contract (defined at bottom of this file)
         vm.startPrank(solverOneEOA);
-        // TODO make evil solver
         HonestRFQSolver evilSolver = new HonestRFQSolver(WETH_ADDRESS, address(atlas));
         // atlas.deposit{value: gasCostCoverAmount}(solverOneEOA);
         vm.stopPrank();
 
         SolverOperation[] memory solverOps = _setupBorrowRepayTestUsingBasicSwapIntent(address(evilSolver));
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
         vm.startPrank(userEOA);
-        atlas.metacall{ value: 0 }({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
+        vm.expectRevert(AtlasErrors.UserNotFulfilled.selector);
+        atlas.metacall{ value: 0, gas: gasLim }({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
         vm.stopPrank();
     }
 
@@ -199,7 +205,7 @@ contract AccountingTest is BaseTest {
         vm.startPrank(userEOA);
 
         (bool simResult,,) = simulator.simUserOperation(userOp);
-        assertFalse(simResult, "metasimUserOperationcall tested true a");
+        assertFalse(simResult, "metasimUserOperationcall should have failed");
 
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 

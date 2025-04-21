@@ -1,30 +1,30 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { MockSafetyLocks } from "./SafetyLocks.t.sol";
 
-import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
-import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
+import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironment.sol";
+import { DAppControl } from "../src/contracts/dapp/DAppControl.sol";
 
-import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
+import { IAtlas } from "../src/contracts/interfaces/IAtlas.sol";
 
-import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
+import { SafetyBits } from "../src/contracts/libraries/SafetyBits.sol";
 
-import { SolverBase } from "src/contracts/solver/SolverBase.sol";
+import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
 
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { AtlasErrors } from "../src/contracts/types/AtlasErrors.sol";
 
-import "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/EscrowTypes.sol";
+import "../src/contracts/types/ConfigTypes.sol";
+import "../src/contracts/types/UserOperation.sol";
+import "../src/contracts/types/SolverOperation.sol";
+import "../src/contracts/types/LockTypes.sol";
+import "../src/contracts/types/EscrowTypes.sol";
 
-import "src/contracts/libraries/CallBits.sol";
+import "../src/contracts/libraries/CallBits.sol";
 
 /// @notice ExecutionEnvironmentTest tests deploy ExecutionEnvironment contracts through the factory. Because all calls
 /// are delegated through the mimic contract, the reported coverage is at 0%, but the actual coverage is close to 100%.
@@ -244,29 +244,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(userData);
     }
 
-    function test_postOpsWrapper_SkipCoverage() public {
-        bytes memory postOpsData;
-        bool status;
-
-        atlas.setLockPhase(ExecutionPhase.PostOps);
-
-        // Valid
-        ctx.solverCount = 4;
-        ctx.solverIndex = ctx.solverCount - 1;
-        postOpsData = abi.encodeCall(executionEnvironment.postOpsWrapper, (false, abi.encode(false)));
-        postOpsData = abi.encodePacked(postOpsData, ctx.setAndPack(ExecutionPhase.PostOps));
-        vm.prank(address(atlas));
-        (status,) = address(executionEnvironment).call(postOpsData);
-        assertTrue(status);
-
-        // DelegateRevert
-        postOpsData = abi.encodeCall(executionEnvironment.postOpsWrapper, (false, abi.encode(true)));
-        postOpsData = abi.encodePacked(postOpsData, ctx.setAndPack(ExecutionPhase.PostOps));
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.PostOpsDelegatecallFail.selector);
-        (status,) = address(executionEnvironment).call(postOpsData);
-    }
-
     function test_solverPreTryCatch_SkipCoverage() public {
         bytes memory preTryCatchMetaData;
         bool revertsAsExpected;
@@ -412,8 +389,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         atlas.setLockPhase(ExecutionPhase.AllocateValue);
 
         // Valid
-        allocateData = abi.encodeWithSelector(
-            executionEnvironment.allocateValue.selector, address(0), uint256(0), abi.encode(false)
+        allocateData = abi.encodeCall(
+            executionEnvironment.allocateValue, (false, address(0), uint256(0), abi.encode(false))
         );
         allocateData = abi.encodePacked(allocateData, ctx.setAndPack(ExecutionPhase.AllocateValue));
         vm.prank(address(atlas));
@@ -421,8 +398,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertTrue(status);
 
         // DelegateRevert
-        allocateData = abi.encodeWithSelector(
-            executionEnvironment.allocateValue.selector, address(0), uint256(0), abi.encode(true)
+        allocateData = abi.encodeCall(
+            executionEnvironment.allocateValue, (false, address(0), uint256(0), abi.encode(true))
         );
         allocateData = abi.encodePacked(allocateData, ctx.setAndPack(ExecutionPhase.AllocateValue));
         vm.prank(address(atlas));
@@ -551,13 +528,6 @@ contract MockDAppControl is DAppControl {
         return new bytes(0);
     }
 
-    function _postOpsCall(bool, bytes calldata data) internal view override {
-        console.log("before decode");
-        bool shouldRevert = abi.decode(data, (bool));
-        console.log("after decode");
-        require(!shouldRevert, "_postSolverCall revert requested");
-    }
-
     function _preSolverCall(
         SolverOperation calldata,
         bytes calldata returnData
@@ -584,7 +554,7 @@ contract MockDAppControl is DAppControl {
         if (!returnValue) revert("_postSolverCall returned false");
     }
 
-    function _allocateValueCall(address, uint256, bytes calldata data) internal virtual override {
+    function _allocateValueCall(bool solved, address, uint256, bytes calldata data) internal virtual override {
         (bool shouldRevert) = abi.decode(data, (bool));
         require(!shouldRevert, "_allocateValueCall revert requested");
     }

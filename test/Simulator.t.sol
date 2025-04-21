@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
-import { Result } from "src/contracts/helpers/Simulator.sol";
-import { DAppConfig, CallConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/DAppOperation.sol";
-import { UserOperation } from "src/contracts/types/UserOperation.sol";
-import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
-import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import { ValidCallsResult } from "src/contracts/types/ValidCalls.sol";
-import { SolverOutcome } from "src/contracts/types/EscrowTypes.sol";
-import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
+import { Result } from "../src/contracts/helpers/Simulator.sol";
+import { DAppConfig, CallConfig } from "../src/contracts/types/ConfigTypes.sol";
+import "../src/contracts/types/DAppOperation.sol";
+import { UserOperation } from "../src/contracts/types/UserOperation.sol";
+import { SolverOperation } from "../src/contracts/types/SolverOperation.sol";
+import { AtlasEvents } from "../src/contracts/types/AtlasEvents.sol";
+import { AtlasErrors } from "../src/contracts/types/AtlasErrors.sol";
+import { ValidCallsResult } from "../src/contracts/types/ValidCalls.sol";
+import { SolverOutcome } from "../src/contracts/types/EscrowTypes.sol";
+import { CallVerification } from "../src/contracts/libraries/CallVerification.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
@@ -22,8 +22,9 @@ import { CallConfigBuilder } from "./helpers/CallConfigBuilder.sol";
 import { DummyDAppControlBuilder } from "./helpers/DummyDAppControlBuilder.sol";
 
 import { DummyDAppControl } from "./base/DummyDAppControl.sol";
-import { SolverBase } from "src/contracts/solver/SolverBase.sol";
+import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
 
+// TODO add tests for Simulator changes in big Gas Acc refactor
 
 contract SimulatorTest is BaseTest {
     uint256 simBalanceBefore;
@@ -33,6 +34,7 @@ contract SimulatorTest is BaseTest {
         UserOperation userOp;
         SolverOperation[] solverOps;
         DAppOperation dAppOp;
+        uint256 metacallGasLeft;
         uint256 msgValue;
         address msgSender;
         bool isSimulation;
@@ -70,6 +72,7 @@ contract SimulatorTest is BaseTest {
 
     function test_simUserOperation_fail_bubblesUpValidCallsResult() public {
         UserOperation memory userOp = validUserOperation().withMaxFeePerGas(1).signAndBuild(address(atlasVerification), userPK);
+
         (bool success, Result result, uint256 validCallsResult) = simulator.simUserOperation(userOp);
 
         assertEq(success, false);
@@ -94,9 +97,9 @@ contract SimulatorTest is BaseTest {
 
         (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
 
-        assertEq(success, true);
-        assertEq(uint(result), uint(Result.SimulationPassed));
-        assertEq(solverOutcomeResult, 0);
+        assertEq(success, true, "call should succeed");
+        assertEq(uint(result), uint(Result.SimulationPassed), "result should be SimulationPassed");
+        assertEq(solverOutcomeResult, 0, "solverOutcomeResult should be 0");
         assertEq(address(simulator).balance, simBalanceBefore, "Balance should not change");
     }
 
@@ -130,6 +133,7 @@ contract SimulatorTest is BaseTest {
         // atlas.bond(1e18); - DO NOT BOND - Triggers InsufficientEscrow error
         vm.stopPrank();
 
+        
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         solverOps[0] = validSolverOperation(userOp)
@@ -140,9 +144,9 @@ contract SimulatorTest is BaseTest {
 
         (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
 
-        assertEq(success, false);
-        assertEq(uint(result), uint(Result.SolverSimFail));
-        assertEq(solverOutcomeResult, 1 << uint256(SolverOutcome.InsufficientEscrow));
+        assertEq(success, false, "call should fail");
+        assertEq(uint(result), uint(Result.SolverSimFail), "result should be SolverSimFail");
+        assertEq(solverOutcomeResult, 1 << uint256(SolverOutcome.InsufficientEscrow), "solverOutcomeResult should be InsufficientEscrow");
         assertEq(address(simulator).balance, simBalanceBefore, "Balance should not change");
     }
 
@@ -281,6 +285,8 @@ contract SimulatorTest is BaseTest {
             .withNonce(address(atlasVerification), userEOA)
             .withDeadline(block.number + 2)
             .withControl(address(dAppControl))
+            .withCallConfig(dAppControl.CALL_CONFIG())
+            .withDAppGasLimit(dAppControl.getDAppGasLimit())
             .withSessionKey(address(0))
             .withData("")
             .sign(address(atlasVerification), userPK);

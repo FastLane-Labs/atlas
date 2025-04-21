@@ -1,13 +1,13 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
-import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/SolverOperation.sol";
+import { DAppControl } from "../../dapp/DAppControl.sol";
+import { CallConfig } from "../../types/ConfigTypes.sol";
+import "../../types/UserOperation.sol";
+import "../../types/SolverOperation.sol";
 
 struct SwapTokenInfo {
     address inputToken;
@@ -43,7 +43,6 @@ contract TrebleSwapDAppControl is DAppControl {
                 delegateUser: false,
                 requirePreSolver: false,
                 requirePostSolver: false,
-                requirePostOps: true,
                 zeroSolvers: true,
                 reuseUserOp: true,
                 userAuctioneer: true,
@@ -54,8 +53,7 @@ contract TrebleSwapDAppControl is DAppControl {
                 requireFulfillment: false,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: false,
-                allowAllocateValueFailure: false
+                exPostBids: false
             })
         )
     { }
@@ -85,27 +83,24 @@ contract TrebleSwapDAppControl is DAppControl {
         return swapData; // return SwapTokenInfo in bytes format, to be used in allocateValue.
     }
 
-    function _allocateValueCall(address, uint256 bidAmount, bytes calldata data) internal virtual override {
+    function _allocateValueCall(
+        bool solved,
+        address,
+        uint256 bidAmount,
+        bytes calldata data
+    )
+        internal
+        virtual
+        override
+    {
         SwapTokenInfo memory _swapInfo = abi.decode(data, (SwapTokenInfo));
         uint256 _outputTokenBalance = _balanceOf(_swapInfo.outputToken);
         uint256 _inputTokenBalance = _balanceOf(_swapInfo.inputToken);
 
         if (_outputTokenBalance < _swapInfo.outputMin) revert InsufficientOutputBalance();
 
-        // Burn TREB bid
-        SafeTransferLib.safeTransfer(TREB, _BURN, bidAmount);
-
-        _transferUserTokens(_swapInfo, _outputTokenBalance, _inputTokenBalance);
-    }
-
-    function _postOpsCall(bool solved, bytes calldata data) internal virtual override {
-        if (solved) return; // token distribution already handled in allocateValue hook
-
-        SwapTokenInfo memory _swapInfo = abi.decode(data, (SwapTokenInfo));
-        uint256 _outputTokenBalance = _balanceOf(_swapInfo.outputToken);
-        uint256 _inputTokenBalance = _balanceOf(_swapInfo.inputToken);
-
-        if (_outputTokenBalance < _swapInfo.outputMin) revert InsufficientOutputBalance();
+        // Burn TREB bid if a solver won
+        if (solved) SafeTransferLib.safeTransfer(TREB, _BURN, bidAmount);
 
         _transferUserTokens(_swapInfo, _outputTokenBalance, _inputTokenBalance);
     }

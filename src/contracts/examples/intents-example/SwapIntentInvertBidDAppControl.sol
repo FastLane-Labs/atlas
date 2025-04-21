@@ -6,15 +6,15 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Base Imports
-import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
+import { IAtlas } from "../../interfaces/IAtlas.sol";
 
-import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/LockTypes.sol";
+import { CallConfig } from "../../types/ConfigTypes.sol";
+import "../../types/UserOperation.sol";
+import "../../types/SolverOperation.sol";
+import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
-import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
+import { DAppControl } from "../../dapp/DAppControl.sol";
 
 import "forge-std/Test.sol";
 
@@ -54,7 +54,6 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
                 delegateUser: true,
                 requirePreSolver: true,
                 requirePostSolver: true,
-                requirePostOps: false,
                 zeroSolvers: false,
                 reuseUserOp: true,
                 userAuctioneer: false,
@@ -65,8 +64,7 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: true,
                 invertBidValue: true,
-                exPostBids: false,
-                allowAllocateValueFailure: true
+                exPostBids: false
             })
         )
     {
@@ -157,7 +155,8 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
     * @param bidAmount The winning bid amount
     * @param _
     */
-    function _allocateValueCall(address bidToken, uint256, bytes calldata) internal override {
+    function _allocateValueCall(bool solved, address bidToken, uint256, bytes calldata) internal override {
+        if (!solved) return;
         if (bidToken == address(0)) {
             SafeTransferLib.safeTransferETH(_user(), address(this).balance);
         } else {

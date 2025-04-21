@@ -1,17 +1,18 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/DAppOperation.sol";
-import "src/contracts/types/LockTypes.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
+import "../types/DAppOperation.sol";
+import "../types/LockTypes.sol";
 
 interface IAtlas {
     // Atlas.sol
     function metacall(
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
-        DAppOperation calldata dAppOp
+        DAppOperation calldata dAppOp,
+        address gasRefundBeneficiary
     )
         external
         payable
@@ -44,9 +45,11 @@ interface IAtlas {
     function depositAndBond(uint256 amountToBond) external payable;
     function unbond(uint256 amount) external;
     function redeem(uint256 amount) external;
+
     function withdrawSurcharge() external;
     function transferSurchargeRecipient(address newRecipient) external;
     function becomeSurchargeRecipient() external;
+    function setSurchargeRates(uint128 newAtlasRate, uint128 newBundlerRate) external;
 
     // Permit69.sol
     function transferUserERC20(
@@ -69,7 +72,7 @@ interface IAtlas {
     // GasAccounting.sol
     function contribute() external payable;
     function borrow(uint256 amount) external payable;
-    function shortfall() external view returns (uint256);
+    function shortfall() external view returns (uint256 gasLiability, uint256 borrowLiability);
     function reconcile(uint256 maxApprovedGasSpend) external payable returns (uint256 owed);
 
     // SafetyLocks.sol
@@ -100,4 +103,6 @@ interface IAtlas {
     function cumulativeSurcharge() external view returns (uint256);
     function surchargeRecipient() external view returns (address);
     function pendingSurchargeRecipient() external view returns (address);
+    function atlasSurchargeRate() external view returns (uint256);
+    function bundlerSurchargeRate() external view returns (uint256);
 }

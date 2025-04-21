@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 struct Context {
     bytes32 userOpHash; // not packed
@@ -10,10 +10,10 @@ struct Context {
     uint8 callDepth;
     uint8 phase;
     bool solverSuccessful;
-    bool paymentsSuccessful;
     bool bidFind;
     bool isSimulation;
     address bundler;
+    uint32 dappGasLeft; // Gas used on preOps, allocateValue, and postOps hooks
 }
 
 enum ExecutionPhase {
@@ -24,6 +24,5 @@ enum ExecutionPhase {
     SolverOperation,
     PostSolver,
     AllocateValue,
-    PostOps,
     FullyLocked
 }

@@ -1,18 +1,29 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
+import { FactoryLib } from "../../src/contracts/atlas/FactoryLib.sol";
 import { TestAtlas } from "./TestAtlas.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
-import { Sorter } from "src/contracts/helpers/Sorter.sol";
-import { Simulator } from "src/contracts/helpers/Simulator.sol";
-import { GovernanceBurner } from "src/contracts/helpers/GovernanceBurner.sol";
+import { AtlasVerification } from "../../src/contracts/atlas/AtlasVerification.sol";
+import { ExecutionEnvironment } from "../../src/contracts/common/ExecutionEnvironment.sol";
+import { Sorter } from "../../src/contracts/helpers/Sorter.sol";
+import { Simulator } from "../../src/contracts/helpers/Simulator.sol";
+import { GovernanceBurner } from "../../src/contracts/helpers/GovernanceBurner.sol";
+
+import { UserOperation } from "../../src/contracts/types/UserOperation.sol";
+import { SolverOperation } from "../../src/contracts/types/SolverOperation.sol";
+import { DAppOperation } from "../../src/contracts/types/DAppOperation.sol";
+import { DAppConfig } from "../../src/contracts/types/ConfigTypes.sol";
+import { AtlasConstants } from "../../src/contracts/types/AtlasConstants.sol";
+import { IDAppControl } from "../../src/contracts/interfaces/IDAppControl.sol";
+import { CallBits } from "../../src/contracts/libraries/CallBits.sol";
 
 contract BaseTest is Test {
+    using CallBits for uint32;
+
     struct Sig {
         uint8 v;
         bytes32 r;
@@ -51,6 +62,8 @@ contract BaseTest is Test {
     IERC20 DAI = IERC20(DAI_ADDRESS);
 
     uint256 DEFAULT_ESCROW_DURATION = 64;
+    uint256 DEFAULT_ATLAS_SURCHARGE_RATE = 1_000_000; // 10%
+    uint256 DEFAULT_BUNDLER_SURCHARGE_RATE = 1_000_000; // 10%
     uint256 MAINNET_FORK_BLOCK = 17_441_786;
 
     function setUp() public virtual {
@@ -74,19 +87,41 @@ contract BaseTest is Test {
         simulator = new Simulator();
 
         // Computes the addresses at which AtlasVerification will be deployed
-        address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
-        address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
+        address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
+        address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
+
+        // Deploy FactoryLib using precompile from Atlas v1.3 - avoids adjusting Mimic assembly.
+        // The conditional logic below handles local Atlas repo, and another repo importing Atlas as a lib.
+        FactoryLib factoryLib;
+        string memory pathInAtlasRepo = "src/contracts/precompiles/FactoryLib.sol/FactoryLib.json";
+        // TODO change 'atlas-certora' to 'atlas' once merged back to original Atlas repo
+        string memory pathInImporterRepo = "lib/atlas-certora/src/contracts/precompiles/FactoryLib.sol/FactoryLib.json";
+        if (vm.exists(pathInImporterRepo) && vm.isFile(pathInImporterRepo)) {
+            console.log("Context seems to be importer repo");
+            factoryLib = FactoryLib(
+                deployCode(pathInImporterRepo, abi.encode(address(execEnvTemplate)))
+            );
+        } else {
+            factoryLib = FactoryLib(
+                deployCode(pathInAtlasRepo, abi.encode(address(execEnvTemplate)))
+            );
+        }
 
         atlas = new TestAtlas({
             escrowDuration: DEFAULT_ESCROW_DURATION,
+            atlasSurchargeRate: DEFAULT_ATLAS_SURCHARGE_RATE,
+            bundlerSurchargeRate: DEFAULT_BUNDLER_SURCHARGE_RATE,
             verification: expectedAtlasVerificationAddr,
             simulator: address(simulator),
-            executionTemplate: address(execEnvTemplate),
+            factoryLib: address(factoryLib),
             initialSurchargeRecipient: deployer,
             l2GasCalculator: address(0)
         });
-        atlasVerification = new AtlasVerification(address(atlas));
+        atlasVerification = new AtlasVerification({
+            atlas: expectedAtlasAddr,
+            l2GasCalculator: address(0)
+        });
         simulator.setAtlas(address(atlas));
         sorter = new Sorter(address(atlas));
         govBurner = new GovernanceBurner();
@@ -111,5 +146,24 @@ contract BaseTest is Test {
         atlas.deposit{ value: 1e18 }();
         hoax(solverFourEOA, 100e18);
         atlas.deposit{ value: 1e18 }();
+    }
+
+    // ---------------------------------------------------- //
+    //              Metacall Gas Limit Helpers              //
+    // ---------------------------------------------------- //
+
+    function _gasLim(UserOperation memory userOp) internal view returns (uint256) {
+        return _gasLim(userOp, new SolverOperation[](0));
+    }
+
+    function _gasLim(
+        UserOperation memory userOp,
+        SolverOperation[] memory solverOps
+    )
+        internal
+        view
+        returns (uint256)
+    {
+        return simulator.estimateMetacallGasLimit(userOp, solverOps);
     }
 }

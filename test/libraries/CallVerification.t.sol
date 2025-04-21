@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
-import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
-import "src/contracts/types/UserOperation.sol";
-import "test/base/TestUtils.sol";
+import { CallVerification } from "../../src/contracts/libraries/CallVerification.sol";
+import "../../src/contracts/types/UserOperation.sol";
+import "../base/TestUtils.sol";
 
 contract CallVerificationTest is Test {
     using CallVerification for UserOperation;
@@ -22,6 +22,7 @@ contract CallVerificationTest is Test {
             dapp: address(0x2),
             control: address(0x3),
             callConfig: 321,
+            dappGasLimit: 654,
             sessionKey: address(0),
             data: "data",
             signature: "signature"
@@ -47,7 +48,6 @@ contract CallVerificationTest is Test {
     }
 
     function testGetCallChainHash() public view {
-        DAppConfig memory dConfig = DAppConfig({ to: address(0x1), callConfig: 1, bidToken: address(0), solverGasLimit: 1_000_000 });
         UserOperation memory userOp = buildUserOperation();
         SolverOperation[] memory solverOps = new SolverOperation[](2);
         solverOps[0] = builderSolverOperation();
@@ -55,12 +55,7 @@ contract CallVerificationTest is Test {
         this._testGetCallChainHash(userOp, solverOps);
     }
 
-    function _testGetCallChainHash(
-        UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps
-    )
-        external pure
-    {
+    function _testGetCallChainHash(UserOperation calldata userOp, SolverOperation[] calldata solverOps) external pure {
         bytes32 callChainHash = CallVerification.getCallChainHash(userOp, solverOps);
         assertEq(
             callChainHash,

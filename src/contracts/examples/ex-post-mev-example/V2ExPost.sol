@@ -1,22 +1,22 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 // Base Imports
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Base Imports
-import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
+import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.sol";
 
-import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
+import { SafetyBits } from "../../libraries/SafetyBits.sol";
 
-import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/LockTypes.sol";
+import { CallConfig } from "../../types/ConfigTypes.sol";
+import "../../types/UserOperation.sol";
+import "../../types/SolverOperation.sol";
+import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
-import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
+import { DAppControl } from "../../dapp/DAppControl.sol";
 
 // Uni V2 Imports
 import { IUniswapV2Pair } from "./interfaces/IUniswapV2Pair.sol";
@@ -50,7 +50,6 @@ contract V2ExPost is DAppControl {
                 delegateUser: false,
                 requirePreSolver: false,
                 requirePostSolver: false,
-                requirePostOps: false,
                 zeroSolvers: true,
                 reuseUserOp: false,
                 userAuctioneer: true,
@@ -61,8 +60,7 @@ contract V2ExPost is DAppControl {
                 requireFulfillment: false,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: true,
-                allowAllocateValueFailure: false
+                exPostBids: true
             })
         )
     { }
@@ -114,7 +112,7 @@ contract V2ExPost is DAppControl {
     * @param bidAmount The winning bid amount
     * @param _
     */
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueCall(bool solved, address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow

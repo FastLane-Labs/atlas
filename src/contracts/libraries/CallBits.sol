@@ -1,9 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
-import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
-import "src/contracts/types/ConfigTypes.sol";
+import "../types/ConfigTypes.sol";
 
 library CallBits {
     uint32 internal constant _ONE = uint32(1);
@@ -36,9 +36,6 @@ library CallBits {
         }
         if (callConfig.requirePostSolver) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequirePostSolver);
-        }
-        if (callConfig.requirePostOps) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequirePostOpsCall);
         }
         if (callConfig.zeroSolvers) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ZeroSolvers);
@@ -73,35 +70,28 @@ library CallBits {
         if (callConfig.exPostBids) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ExPostBids);
         }
-        if (callConfig.allowAllocateValueFailure) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.AllowAllocateValueFailure);
-        }
     }
 
     function decodeCallConfig(uint32 encodedCallConfig) internal pure returns (CallConfig memory callConfig) {
-        callConfig = CallConfig({
-            userNoncesSequential: needsSequentialUserNonces(encodedCallConfig),
-            dappNoncesSequential: needsSequentialDAppNonces(encodedCallConfig),
-            requirePreOps: needsPreOpsCall(encodedCallConfig),
-            trackPreOpsReturnData: needsPreOpsReturnData(encodedCallConfig),
-            trackUserReturnData: needsUserReturnData(encodedCallConfig),
-            delegateUser: needsDelegateUser(encodedCallConfig),
-            requirePreSolver: needsPreSolverCall(encodedCallConfig),
-            requirePostSolver: needsPostSolverCall(encodedCallConfig),
-            requirePostOps: needsPostOpsCall(encodedCallConfig),
-            zeroSolvers: allowsZeroSolvers(encodedCallConfig),
-            reuseUserOp: allowsReuseUserOps(encodedCallConfig),
-            userAuctioneer: allowsUserAuctioneer(encodedCallConfig),
-            solverAuctioneer: allowsSolverAuctioneer(encodedCallConfig),
-            unknownAuctioneer: allowsUnknownAuctioneer(encodedCallConfig),
-            verifyCallChainHash: verifyCallChainHash(encodedCallConfig),
-            forwardReturnData: forwardReturnData(encodedCallConfig),
-            requireFulfillment: needsFulfillment(encodedCallConfig),
-            trustedOpHash: allowsTrustedOpHash(encodedCallConfig),
-            invertBidValue: invertsBidValue(encodedCallConfig),
-            exPostBids: exPostBids(encodedCallConfig),
-            allowAllocateValueFailure: allowAllocateValueFailure(encodedCallConfig)
-        });
+        callConfig.userNoncesSequential = needsSequentialUserNonces(encodedCallConfig);
+        callConfig.dappNoncesSequential = needsSequentialDAppNonces(encodedCallConfig);
+        callConfig.requirePreOps = needsPreOpsCall(encodedCallConfig);
+        callConfig.trackPreOpsReturnData = needsPreOpsReturnData(encodedCallConfig);
+        callConfig.trackUserReturnData = needsUserReturnData(encodedCallConfig);
+        callConfig.delegateUser = needsDelegateUser(encodedCallConfig);
+        callConfig.requirePreSolver = needsPreSolverCall(encodedCallConfig);
+        callConfig.requirePostSolver = needsPostSolverCall(encodedCallConfig);
+        callConfig.zeroSolvers = allowsZeroSolvers(encodedCallConfig);
+        callConfig.reuseUserOp = allowsReuseUserOps(encodedCallConfig);
+        callConfig.userAuctioneer = allowsUserAuctioneer(encodedCallConfig);
+        callConfig.solverAuctioneer = allowsSolverAuctioneer(encodedCallConfig);
+        callConfig.unknownAuctioneer = allowsUnknownAuctioneer(encodedCallConfig);
+        callConfig.verifyCallChainHash = verifyCallChainHash(encodedCallConfig);
+        callConfig.forwardReturnData = forwardReturnData(encodedCallConfig);
+        callConfig.requireFulfillment = needsFulfillment(encodedCallConfig);
+        callConfig.trustedOpHash = allowsTrustedOpHash(encodedCallConfig);
+        callConfig.invertBidValue = invertsBidValue(encodedCallConfig);
+        callConfig.exPostBids = exPostBids(encodedCallConfig);
     }
 
     function needsSequentialUserNonces(uint32 callConfig) internal pure returns (bool sequential) {
@@ -134,10 +124,6 @@ library CallBits {
 
     function needsPostSolverCall(uint32 callConfig) internal pure returns (bool needsPostSolver) {
         needsPostSolver = callConfig & (1 << uint32(CallConfigIndex.RequirePostSolver)) != 0;
-    }
-
-    function needsPostOpsCall(uint32 callConfig) internal pure returns (bool needsPostOps) {
-        needsPostOps = callConfig & (1 << uint32(CallConfigIndex.RequirePostOpsCall)) != 0;
     }
 
     function allowsZeroSolvers(uint32 callConfig) internal pure returns (bool zeroSolvers) {
@@ -182,9 +168,5 @@ library CallBits {
 
     function exPostBids(uint32 callConfig) internal pure returns (bool) {
         return callConfig & (1 << uint32(CallConfigIndex.ExPostBids)) != 0;
-    }
-
-    function allowAllocateValueFailure(uint32 callConfig) internal pure returns (bool) {
-        return callConfig & (1 << uint32(CallConfigIndex.AllowAllocateValueFailure)) != 0;
     }
 }

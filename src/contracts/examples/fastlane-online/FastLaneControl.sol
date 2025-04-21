@@ -1,21 +1,21 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 // Base Imports
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Imports
-import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
-import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/LockTypes.sol";
-import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
+import { DAppControl } from "../../dapp/DAppControl.sol";
+import { CallConfig } from "../../types/ConfigTypes.sol";
+import "../../types/UserOperation.sol";
+import "../../types/SolverOperation.sol";
+import "../../types/LockTypes.sol";
+import { IAtlas } from "../../interfaces/IAtlas.sol";
 
-import { SwapIntent, BaselineCall } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
-import { FastLaneOnlineErrors } from "src/contracts/examples/fastlane-online/FastLaneOnlineErrors.sol";
-import { IFastLaneOnline } from "src/contracts/examples/fastlane-online/IFastLaneOnline.sol";
+import { SwapIntent, BaselineCall } from "./FastLaneTypes.sol";
+import { FastLaneOnlineErrors } from "./FastLaneOnlineErrors.sol";
+import { IFastLaneOnline } from "./IFastLaneOnline.sol";
 
 interface ISolverGateway {
     function getBidAmount(bytes32 solverOpHash) external view returns (uint256 bidAmount);
@@ -37,7 +37,6 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
                 delegateUser: true,
                 requirePreSolver: true,
                 requirePostSolver: false,
-                requirePostOps: true,
                 zeroSolvers: true,
                 reuseUserOp: true,
                 userAuctioneer: true,
@@ -48,8 +47,7 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
                 requireFulfillment: false,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: false,
-                allowAllocateValueFailure: false
+                exPostBids: false
             })
         )
     { }
@@ -101,14 +99,12 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
     * @param _
     * @param _
     */
-    function _allocateValueCall(address, uint256, bytes calldata returnData) internal override {
-        (SwapIntent memory _swapIntent,) = abi.decode(returnData, (SwapIntent, BaselineCall));
-        _sendTokensToUser(_swapIntent);
-    }
-
-    function _postOpsCall(bool solved, bytes calldata returnData) internal override {
+    function _allocateValueCall(bool solved, address, uint256, bytes calldata returnData) internal override {
         // If a solver beat the baseline and the amountOutMin, return early
         if (solved) {
+            (SwapIntent memory _swapIntent,) = abi.decode(returnData, (SwapIntent, BaselineCall));
+            _sendTokensToUser(_swapIntent);
+
             (address _winningSolver,,) = IAtlas(ATLAS).solverLockData();
             IFastLaneOnline(CONTROL).setWinningSolver(_winningSolver);
             return;
@@ -122,7 +118,7 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
 
         // Verify that it exceeds the minAmountOut
         if (_buyTokensReceived < _swapIntent.minAmountUserBuys) {
-            revert FLOnlineControl_PostOpsCall_InsufficientBaseline();
+            revert FLOnlineControl_AllocateValue_InsufficientBaseline();
         }
 
         // Undo the token approval, if not native token.

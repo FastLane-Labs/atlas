@@ -60,13 +60,12 @@ The DAppControl contract may define which entities are permitted to act as the B
 The DAppControl contract *must* define the following functions:
 1. **BidFormat**: This function defines the base currency (or currencies) of the auction. 
 2. **BidValue**: This function defines how to rank bids so that they may be sorted by the auctioneer.
-3. **AllocateValue***: After a Solver's operation is executed successfully, this function is called to allocate any value that has accrued to the Execution Environment. 
+3. **AllocateValue***: This function defines how to allocate the bid from the winning solver (if any). It may also serve as a place for the DApp to execute any final logic before the transaction is finalized, as it is the last function called by the Atlas contract.
 
 The DAppControl contract has the option to define functions that execute at the following stages:	
 1. **PreOps***: This function is executed before the User's operation
-2. **PreSolver***: This function is executed after the User's operation but before a Solver's operation. It occurs inside of a try/catch; if it reverts, the current Solver's solution will fail and the next Solver's solution will begin. If the Solver's operation or the PostSolver function reverts, anything accomplished by the PreSolver function will also be reverted. 
+2. **PreSolver***: This function is executed after the User's operation but before a Solver's operation. It occurs inside of a try/catch; if it reverts, the current Solver's solution will fail and the next Solver's solution will begin. If the Solver's operation or the PostSolver function revert, anything accomplished by the PreSolver function will also be reverted. 
 3. **PostSolver***: This function is executed after the User's operation and after a Solver's operation. It occurs inside of a try/catch; if it reverts, the PreSolver function, and the current Solver's operation will also be reverted and the next Solver's solution will begin.
-4. **PostOps***: This function is executed after the successful execution of a Solver's operation and the allocation of their solution's value. If this function reverts, the User's operation will also be reverted. 
 
 *These functions are executed by the Execution Environment via "delegatecall."
 
@@ -81,7 +80,7 @@ _availableFundsERC20() is used to check the approved balance of users and dapps 
 
 _transferDAppERC20() and _transferUserERC20() are functions that can be implemented by Atlas module developers in DappControl to access the user or dapp funds referenced in _availableFundsERC20().
 
-Module developers can access useful information about the atlas transaction by initializing an ctx struct in their DappControl and accessing these fields: bundler, solverSuccessful, paymentsSuccessful, solverIndex, solverCount, phase, solverOutcome, bidFind, isSimulation.
+Module developers can access useful information about the atlas transaction by initializing an ctx struct in their DappControl and accessing these fields: bundler, solverSuccessful, solverIndex, solverCount, phase, solverOutcome, bidFind, isSimulation.
 
 The _contribute() function allows actors to sponsor the gas of the transaction by donating ETH to the Atlas Escrow balance. This contribution to the balance is available first to bundlers, with the surplus going to solvers.
 

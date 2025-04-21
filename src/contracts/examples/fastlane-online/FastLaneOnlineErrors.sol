@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 contract FastLaneOnlineErrors {
     // FastLaneControl.sol
@@ -7,7 +7,7 @@ contract FastLaneOnlineErrors {
     error FLOnlineControl_PreSolver_SellTokenMismatch();
     error FLOnlineControl_PreSolver_BidBelowReserve();
 
-    error FLOnlineControl_PostOpsCall_InsufficientBaseline();
+    error FLOnlineControl_AllocateValue_InsufficientBaseline();
 
     error FLOnlineControl_BaselineSwap_BaselineCallFail();
     error FLOnlineControl_BaselineSwap_NoBalanceIncrease();
@@ -35,6 +35,7 @@ contract FastLaneOnlineErrors {
 
     // FLOnlineOuter.sol
     error FLOnlineOuter_FastOnlineSwap_NoFulfillment();
+    error FLOnlineOuter_FastOnlineSwap_GasLimitTooLow();
 
     error FLOnlineOuter_ValidateSwap_InvalidSender();
     error FLOnlineOuter_ValidateSwap_TxGasTooHigh();

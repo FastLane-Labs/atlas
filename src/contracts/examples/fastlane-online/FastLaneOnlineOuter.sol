@@ -1,31 +1,37 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 // Base Imports
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Imports
-import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
-import { DAppOperation } from "src/contracts/types/DAppOperation.sol";
-import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/LockTypes.sol";
+import { DAppControl } from "../../dapp/DAppControl.sol";
+import { DAppOperation } from "../../types/DAppOperation.sol";
+import { CallConfig } from "../../types/ConfigTypes.sol";
+import "../../types/UserOperation.sol";
+import "../../types/SolverOperation.sol";
+import "../../types/LockTypes.sol";
 
 // Interface Import
-import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
-import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
-import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
+import { IAtlasVerification } from "../../interfaces/IAtlasVerification.sol";
+import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.sol";
+import { IAtlas } from "../../interfaces/IAtlas.sol";
+import { ISimulator } from "../../interfaces/ISimulator.sol";
 
-import { FastLaneOnlineControl } from "src/contracts/examples/fastlane-online/FastLaneControl.sol";
-import { FastLaneOnlineInner } from "src/contracts/examples/fastlane-online/FastLaneOnlineInner.sol";
-import { SolverGateway } from "src/contracts/examples/fastlane-online/SolverGateway.sol";
+import { FastLaneOnlineControl } from "./FastLaneControl.sol";
+import { FastLaneOnlineInner } from "./FastLaneOnlineInner.sol";
+import { SolverGateway } from "./SolverGateway.sol";
 
-import { SwapIntent, BaselineCall } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
+import { SwapIntent, BaselineCall } from "./FastLaneTypes.sol";
 
 contract FastLaneOnlineOuter is SolverGateway {
-    constructor(address atlas, address protocolGuildWallet) SolverGateway(atlas, protocolGuildWallet) { }
+    uint256 internal constant _FL_ONLINE_SWAP_GAS_BUFFER = 100_000;
+    uint256 internal immutable _BASE_METACALL_GAS_LIM;
+
+    constructor(address atlas, address protocolGuildWallet) SolverGateway(atlas, protocolGuildWallet) {
+        _BASE_METACALL_GAS_LIM = getDAppGasLimit();
+    }
 
     //////////////////////////////////////////////
     // THIS IS WHAT THE USER INTERACTS THROUGH.
@@ -50,9 +56,12 @@ contract FastLaneOnlineOuter is SolverGateway {
         // Build dApp operation
         DAppOperation memory _dAppOp = _getDAppOp(_userOpHash, userOp.deadline);
 
+        // Call Simulator to get the metacall gas limit to set in the call below
+        uint256 _metacallGasLimit = _metacallGasLimit(userOp, _solverOps);
+
         // Atlas call
-        (bool _success,) = ATLAS.call{ value: msg.value, gas: _metacallGasLimit(_gasReserved, userOp.gas, gasleft()) }(
-            abi.encodeCall(IAtlas.metacall, (userOp, _solverOps, _dAppOp))
+        (bool _success,) = ATLAS.call{ value: msg.value, gas: _metacallGasLimit }(
+            abi.encodeCall(IAtlas.metacall, (userOp, _solverOps, _dAppOp, address(0)))
         );
 
         // Revert if the metacall failed - neither solvers nor baseline call fulfilled swap intent
@@ -71,6 +80,21 @@ contract FastLaneOnlineOuter is SolverGateway {
         if (_gasRefundTracker > 0) SafeTransferLib.safeTransferETH(msg.sender, _gasRefundTracker);
     }
 
+    function _metacallGasLimit(
+        UserOperation calldata userOp,
+        SolverOperation[] memory solverOps
+    )
+        internal
+        view
+        returns (uint256 metacallGasLim)
+    {
+        metacallGasLim = ISimulator(SIMULATOR).estimateMetacallGasLimit(userOp, solverOps);
+
+        if (gasleft() < metacallGasLim + _FL_ONLINE_SWAP_GAS_BUFFER) {
+            revert FLOnlineOuter_FastOnlineSwap_GasLimitTooLow();
+        }
+    }
+
     function _validateSwap(UserOperation calldata userOp) internal {
         if (msg.sender != userOp.from) revert FLOnlineOuter_ValidateSwap_InvalidSender();
 
@@ -87,26 +111,6 @@ contract FastLaneOnlineOuter is SolverGateway {
             if (userOp.value < _swapIntent.amountUserSells) revert FLOnlineOuter_ValidateSwap_UserOpValueTooLow();
             if (userOp.value != _baselineCall.value) revert FLOnlineOuter_ValidateSwap_UserOpBaselineValueMismatch();
         }
-    }
-
-    function _metacallGasLimit(
-        uint256 cumulativeGasReserved,
-        uint256 totalGas,
-        uint256 gasLeft
-    )
-        internal
-        pure
-        returns (uint256 metacallGasLimit)
-    {
-        // Reduce any unnecessary gas to avoid Atlas's excessive gas bundler penalty
-
-        // About 850k gas extra required to pass Atlas internal checks
-        cumulativeGasReserved += 850_000;
-
-        // Sets metacallGasLimit to the minimum of {totalGas, gasLeft, cumulativeGasReserved}
-        metacallGasLimit = totalGas > gasLeft
-            ? (gasLeft > cumulativeGasReserved ? cumulativeGasReserved : gasLeft)
-            : (totalGas > cumulativeGasReserved ? cumulativeGasReserved : totalGas);
     }
 
     fallback() external payable { }

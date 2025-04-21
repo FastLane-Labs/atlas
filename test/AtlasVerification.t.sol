@@ -1,20 +1,22 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
-import { AtlasVerification, USER_TYPEHASH_DEFAULT, USER_TYPEHASH_TRUSTED } from "src/contracts/atlas/AtlasVerification.sol";
-import { DAppConfig, CallConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/DAppOperation.sol";
-import { UserOperation } from "src/contracts/types/UserOperation.sol";
-import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
-import { ValidCallsResult } from "src/contracts/types/ValidCalls.sol";
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { Atlas } from "../src/contracts/atlas/Atlas.sol";
+import { AtlasVerification, USER_TYPEHASH_DEFAULT, USER_TYPEHASH_TRUSTED } from "../src/contracts/atlas/AtlasVerification.sol";
+import { TestAtlasVerification } from "./base/TestAtlasVerification.sol";
+import { DAppConfig, CallConfig } from "../src/contracts/types/ConfigTypes.sol";
+import "../src/contracts/types/DAppOperation.sol";
+import { UserOperation } from "../src/contracts/types/UserOperation.sol";
+import { SolverOperation } from "../src/contracts/types/SolverOperation.sol";
+import { ValidCallsResult } from "../src/contracts/types/ValidCalls.sol";
+import { AtlasErrors } from "../src/contracts/types/AtlasErrors.sol";
 import { DummyDAppControl } from "./base/DummyDAppControl.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
-import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
-import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import { SolverOutcome } from "src/contracts/types/EscrowTypes.sol";
+import { CallVerification } from "../src/contracts/libraries/CallVerification.sol";
+import { CallBits } from "../src/contracts/libraries/CallBits.sol";
+import { SolverOutcome } from "../src/contracts/types/EscrowTypes.sol";
 import { DummyDAppControlBuilder } from "./helpers/DummyDAppControlBuilder.sol";
 import { CallConfigBuilder } from "./helpers/CallConfigBuilder.sol";
 import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
@@ -27,6 +29,11 @@ import { DAppOperationBuilder } from "./base/builders/DAppOperationBuilder.sol";
 // - Scroll down for the actual tests - //
 //
 
+
+// TODO add tests for the gasLimitSum stuff
+
+
+
 contract DummyNotSmartWallet {
 }
 
@@ -38,7 +45,6 @@ contract DummySmartWallet {
         bytes32,
         bytes memory
     ) public view returns (bytes4) {
-        console.log("DummySmartWallet.isValidSignature called, isValidResult: ", isValidResult);
         if (isValidResult) {
             return EIP1271_MAGIC_VALUE;
         } else {
@@ -58,6 +64,7 @@ contract AtlasVerificationBase is BaseTest {
         UserOperation userOp;
         SolverOperation[] solverOps;
         DAppOperation dAppOp;
+        uint256 metacallGasLeft;
         uint256 msgValue;
         address msgSender;
         bool isSimulation;
@@ -85,6 +92,7 @@ contract AtlasVerificationBase is BaseTest {
             .withDeadline(block.number + 2)
             .withControl(address(dAppControl))
             .withCallConfig(dAppControl.CALL_CONFIG())
+            .withDAppGasLimit(dAppControl.getDAppGasLimit())
             .withSessionKey(address(0))
             .withData("")
             .sign(address(atlasVerification), userPK);
@@ -137,14 +145,25 @@ contract AtlasVerificationBase is BaseTest {
             .sign(address(atlasVerification), governancePK);
     }
 
-    function doValidateCalls(ValidCallsCall memory call) public returns (ValidCallsResult result) {
+    // TODO update tests to check allSolversGasLimit, allSolversCalldataGas, bidFindOverhead return values
+    function doValidateCalls(ValidCallsCall memory call) public returns (
+        uint256 allSolversGasLimit,
+        uint256 allSolversCalldataGas,
+        uint256 bidFindOverhead,
+        ValidCallsResult result
+    ) {
         DAppConfig memory config = dAppControl.getDAppConfig(call.userOp);
+
+        // set to just under expected exec gas limit
+        call.metacallGasLeft = _gasLim(call.userOp, call.solverOps) - 10_000; 
+
         vm.startPrank(address(atlas));
-        result = atlasVerification.validateCalls(
+        (allSolversGasLimit,  allSolversCalldataGas, bidFindOverhead, result) = atlasVerification.validateCalls(
             config,
             call.userOp,
             call.solverOps,
             call.dAppOp,
+            call.metacallGasLeft,
             call.msgValue,
             call.msgSender,
             call.isSimulation);
@@ -159,7 +178,8 @@ contract AtlasVerificationBase is BaseTest {
 
     function callAndAssert(ValidCallsCall memory call, ValidCallsResult expected) public {
         ValidCallsResult result;
-        result = doValidateCalls(call);
+        // TODO add tests for new return values
+        (,,, result) = doValidateCalls(call);
         assertValidCallsResult(result, expected);
     }
 
@@ -333,7 +353,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         );
         assertEq(result, 0, "Expected No Errors 2"); // 0 = No SolverOutcome errors
     }
-    }
+}
 
 //
 // ---- VALID CALLS TESTS BEGIN HERE ---- //
@@ -352,7 +372,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -373,7 +393,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
         ), ValidCallsResult.UserSignatureInvalid);
     }
 
@@ -394,7 +414,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -417,7 +437,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: true}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: solverOneEOA, isSimulation: true}
         ), ValidCallsResult.Valid);
     }
 
@@ -441,7 +461,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: true}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: solverOneEOA, isSimulation: true}
         ), ValidCallsResult.UserSignatureInvalid);
     }
 
@@ -471,7 +491,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
             DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
             callAndAssert(ValidCallsCall({
-                userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+                userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
             ), ValidCallsResult.UserFromInvalid);
         }
     }
@@ -502,7 +522,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
         vm.expectRevert();
         doValidateCalls(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
         ));
     }
 
@@ -531,7 +551,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
         ), ValidCallsResult.UserSignatureInvalid);
     }
 
@@ -558,7 +578,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -586,13 +606,13 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
 
         dappOp = validDAppOperation(userOp, solverOps).build(); // increment dappOp so we can hit _verifyUser
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
         ), ValidCallsResult.UserNonceInvalid);
     }
 
@@ -607,7 +627,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         solverOps[0] = validSolverOperation(userOp).withUserOpHash(atlasVerification.getUserOperationHash(userOp)).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.InvalidAuctioneer);
     }
 
@@ -630,7 +650,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -645,8 +665,28 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         // If msgSender in _validCalls is neither dAppOp.from nor userOp.from,
         // and trustedOpHash is true --> return InvalidBundler
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
         ), ValidCallsResult.InvalidBundler);
+    }
+
+    // This error isn't triggered by a userOpHash mismatch, as its caught before that point.
+    function test_validCalls_trustedOpHash_dappGasLimitChanged_DAppGasLimitMismatch() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withTrustedOpHash(true).build());
+
+        UserOperation memory userOp = validUserOperation().withSessionKey(governanceEOA).sign(address(atlasVerification), userPK).build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+
+        userOp.dappGasLimit = 10_000_000; // increase dappGasLimit to price out solver
+
+        // User signs userOp again
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPK, atlasVerification.getUserOperationPayload(userOp));
+        userOp.signature = abi.encodePacked(r, s, v);
+
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.DAppGasLimitMismatch);
     }
 
     // Valid cases
@@ -665,7 +705,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -680,7 +720,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withUserOpHash(bytes32(0)).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.OpHashMismatch);
     }
 
@@ -701,8 +741,9 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         DAppConfig memory config = dAppControl.getDAppConfig(userOp);
+        uint256 gasLimit = _gasLim(userOp, solverOps);
         vm.expectRevert(AtlasErrors.InvalidCaller.selector);
-        atlasVerification.validateCalls(config, userOp, solverOps, dappOp, 0, userEOA, false);
+        atlasVerification.validateCalls{gas: gasLimit}(config, userOp, solverOps, dappOp, 0, 0, userEOA, false);
     }
 
     //
@@ -724,7 +765,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -746,7 +787,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
             .signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.InvalidCallChainHash);
     }
 
@@ -769,7 +810,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
             .signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: true}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: true}
         ), ValidCallsResult.Valid);
     }
 
@@ -790,7 +831,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withSignature(bytes("")).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.DAppSignatureInvalid);
     }
 
@@ -810,7 +851,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), userPK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: true}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: true}
         ), ValidCallsResult.DAppSignatureInvalid);
     }
 
@@ -833,7 +874,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -856,7 +897,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withFrom(solverOneEOA).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -880,7 +921,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withFrom(solverOneEOA).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
         ), ValidCallsResult.TooManySolverOps);
     }
 
@@ -903,7 +944,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -925,7 +966,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.DAppNotEnabled);
     }
 
@@ -944,7 +985,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withControl(address(0)).signAndBuild(address(atlasVerification), governancePK);
         
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.InvalidControl);
     }
 
@@ -965,7 +1006,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(0).signAndBuild(address(atlasVerification), governancePK);
 
         doValidateCalls(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
         ));
     }
 
@@ -986,7 +1027,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(0).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.InvalidDAppNonce);
     }
 
@@ -1009,7 +1050,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(0).build();
 
         doValidateCalls(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: true}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: true}
         ));
     }
 
@@ -1031,7 +1072,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(0).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: true}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: true}
         ), ValidCallsResult.InvalidDAppNonce);
     }
 
@@ -1052,7 +1093,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(1).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -1074,7 +1115,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(1).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -1096,7 +1137,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(2).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.InvalidDAppNonce);
     }
 
@@ -1127,7 +1168,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
         doValidateCalls(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
 
         // this is the actual testcase
@@ -1136,7 +1177,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         dappOp = validDAppOperation(userOp, solverOps).withNonce(2).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -1159,7 +1200,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
         doValidateCalls(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
 
         // this is the actual testcase
@@ -1168,7 +1209,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         dappOp = validDAppOperation(userOp, solverOps).withNonce(3).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.InvalidDAppNonce);
     }
 
@@ -1194,7 +1235,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
         ), ValidCallsResult.UserSignatureInvalid);
     }
 
@@ -1214,7 +1255,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
         ), ValidCallsResult.UserSignatureInvalid);
     }
 
@@ -1234,7 +1275,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -1255,7 +1296,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: true}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: governanceEOA, isSimulation: true}
         ), ValidCallsResult.Valid);
     }
 
@@ -1277,7 +1318,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withControl(address(dAppControl)).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: true}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: governanceEOA, isSimulation: true}
         ), ValidCallsResult.ControlMismatch);
     }
     
@@ -1297,7 +1338,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.UserNonceInvalid);
     }
 
@@ -1318,7 +1359,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: true}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: true}
         ), ValidCallsResult.UserNonceInvalid);
     }
 
@@ -1338,7 +1379,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -1360,7 +1401,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -1390,7 +1431,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.UserNonceInvalid);
     }
 
@@ -1413,7 +1454,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
         doValidateCalls(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
         ));
 
         // this is the actual testcase
@@ -1422,7 +1463,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         dappOp = validDAppOperation(userOp, solverOps).withNonce(2).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -1453,7 +1494,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
         doValidateCalls(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
         ));
 
         // this is the actual testcase
@@ -1462,7 +1503,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         dappOp = validDAppOperation(userOp, solverOps).withNonce(2).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.UserNonceInvalid);
     }
 
@@ -1494,7 +1535,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.TooManySolverOps);
     }
 
@@ -1516,7 +1557,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.UserDeadlineReached);
     }
 
@@ -1538,7 +1579,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withDeadline(block.number - 1).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.DAppDeadlineReached);
     }
 
@@ -1566,7 +1607,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withBundler(address(1)).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.InvalidBundler);
     }
 
@@ -1588,7 +1629,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.GasPriceHigherThanMax);
     }
 
@@ -1610,8 +1651,29 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.TxValueLowerThanCallValue);
+    }
+
+    // DAppGasLimitMismatch cases
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    //     where the userOp.dappGasLimit does not match the value returned by getDAppGasLimit in the dapp control
+    // when validCalls is called from the userEOA
+    // then it should return DAppGasLimitMismatch
+    //
+    function test_validCalls_DAppGasLimitMismatch() public {
+        defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation().withDAppGasLimit(1).signAndBuild(address(atlasVerification), userPK);
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.DAppGasLimitMismatch);
     }
 
     // Prune invalid solverOps cases
@@ -1642,7 +1704,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -1663,7 +1725,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: true}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: true}
         ), ValidCallsResult.Valid);
     }
 
@@ -1684,7 +1746,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -1704,7 +1766,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.NoSolverOp);
     }
 
@@ -1727,7 +1789,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.NoSolverOp);
 
         // Should return NoSolverOp in the `if (dConfig.callConfig.needsFulfillment())` branch
@@ -1738,13 +1800,13 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.NoSolverOp);
     }
 
     function testGetDomainSeparatorInAtlasVerification() public view {
         bytes32 hashedName = keccak256(bytes("AtlasVerification"));
-        bytes32 hashedVersion = keccak256(bytes("1.0"));
+        bytes32 hashedVersion = keccak256(bytes("1.5"));
         bytes32 typeHash = keccak256(
             "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
         );

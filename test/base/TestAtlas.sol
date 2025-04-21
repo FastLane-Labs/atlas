@@ -1,35 +1,48 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
-import "src/contracts/atlas/Atlas.sol";
+import "../../src/contracts/atlas/Atlas.sol";
+import { GasAccLib, GasLedger, BorrowsLedger } from "../../src/contracts/libraries/GasAccLib.sol";
 
 /// @title TestAtlas
 /// @author FastLane Labs
 /// @notice A test version of the Atlas contract that just exposes internal transient storage helpers.
 contract TestAtlas is Atlas {
+    using GasAccLib for uint256;
+
     constructor(
         uint256 escrowDuration,
+        uint256 atlasSurchargeRate,
+        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator,
-        address executionTemplate
+        address factoryLib
     )
-        Atlas(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator, executionTemplate)
+        Atlas(
+            escrowDuration,
+            atlasSurchargeRate,
+            bundlerSurchargeRate,
+            verification,
+            simulator,
+            initialSurchargeRecipient,
+            l2GasCalculator,
+            factoryLib
+        )
     { }
 
     // Public functions to expose internal transient helpers for testing
 
     function clearTransientStorage() public {
         _setLock(address(0), 0, 0);
-        _setSolverLock(0);
-        _setSolverTo(address(0));
-        _setClaims(0);
-        _setFees(0);
-        _setWriteoffs(0);
-        _setWithdrawals(0);
-        _setDeposits(0);
+        t_solverLock = 0;
+        t_solverTo = address(0);
+        t_gasLedger = 0;
+        t_borrowsLedger = 0;
     }
+
+    // Transient Setters
 
     function setLock(address activeEnvironment, uint32 callConfig, uint8 phase) public {
         _setLock(activeEnvironment, callConfig, phase);
@@ -40,52 +53,36 @@ contract TestAtlas is Atlas {
     }
 
     function setSolverLock(uint256 newSolverLock) public {
-        _setSolverLock(newSolverLock);
+        t_solverLock = newSolverLock;
     }
 
     function setSolverTo(address newSolverTo) public {
-        _setSolverTo(newSolverTo);
+        t_solverTo = newSolverTo;
     }
 
-    function setClaims(uint256 newClaims) public {
-        _setClaims(newClaims);
+    function setGasLedger(uint256 newGasLedger) public {
+        t_gasLedger = newGasLedger;
     }
 
-    function setFees(uint256 newFees) public {
-        _setFees(newFees);
+    function setBorrowsLedger(uint256 newBorrowsLedger) public {
+        t_borrowsLedger = newBorrowsLedger;
     }
 
-    function setWriteoffs(uint256 newWriteoffs) public {
-        _setWriteoffs(newWriteoffs);
+    // Transient Getters
+
+    function getGasLedger() public view returns (GasLedger memory gL) {
+        return t_gasLedger.toGasLedger();
     }
 
-    function setWithdrawals(uint256 newWithdrawals) public {
-        _setWithdrawals(newWithdrawals);
+    function getBorrowsLedger() public view returns (BorrowsLedger memory bL) {
+        return t_borrowsLedger.toBorrowsLedger();
     }
 
-    function setDeposits(uint256 newDeposits) public {
-        _setDeposits(newDeposits);
+    function getSolverLock() public view returns (uint256) {
+        return t_solverLock;
     }
 
-    // View functions
-
-    function getClaims() external view returns (uint256) {
-        return claims();
-    }
-
-    function getFees() external view returns (uint256) {
-        return fees();
-    }
-
-    function getWriteoffs() external view returns (uint256) {
-        return writeoffs();
-    }
-
-    function getWithdrawals() external view returns (uint256) {
-        return withdrawals();
-    }
-
-    function getDeposits() external view returns (uint256) {
-        return deposits();
+    function getPhase() public view returns (uint8) {
+        return _phase();
     }
 }

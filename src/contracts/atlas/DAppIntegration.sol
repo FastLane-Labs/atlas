@@ -1,11 +1,11 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
-import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
-import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
-import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
+import { IAtlas } from "../interfaces/IAtlas.sol";
+import { CallBits } from "../libraries/CallBits.sol";
+import { AtlasErrors } from "../types/AtlasErrors.sol";
+import { AtlasEvents } from "../types/AtlasEvents.sol";
 
 /// @title DAppIntegration
 /// @author FastLane Labs
@@ -14,6 +14,7 @@ contract DAppIntegration {
     using CallBits for uint32;
 
     address public immutable ATLAS;
+    address public immutable L2_GAS_CALCULATOR;
 
     // map for tracking which accounts are approved for a given dApp
     // keccak256(governance, signor)  => enabled
@@ -23,8 +24,9 @@ contract DAppIntegration {
     // DAppControl => signatories
     mapping(address => address[]) internal S_dAppSignatories;
 
-    constructor(address atlas) {
+    constructor(address atlas, address l2GasCalculator) {
         ATLAS = atlas;
+        L2_GAS_CALCULATOR = l2GasCalculator;
     }
 
     // ---------------------------------------------------- //
@@ -128,13 +130,17 @@ contract DAppIntegration {
     }
 
     /// @notice Removes a signatory from a dApp's list of approved signatories.
+    /// @dev If the signatory is not actually registered as a signatory of the DAppControl contract, this function
+    /// should not revert, but also should not make any changes to state. This prevents it from blocking the transfer of
+    /// governance triggered by the acceptGovernance function on a DAppControl contract, when the old governance address
+    /// has already been removed as a signatory.
     /// @param control The address of the DAppControl contract.
     /// @param signatory The address of the signatory to be removed.
     function _removeSignatory(address control, address signatory) internal {
-        bytes32 _signatoryKey = keccak256(abi.encodePacked(control, signatory));
+        // NOTE: If the signatory is not actually registered as a signatory of the DAppControl contract, this function
+        // should not revert, but also should not make any changes to state.
 
-        // Check if the signatory exists
-        if (!S_signatories[_signatoryKey]) revert AtlasErrors.InvalidSignatory();
+        bytes32 _signatoryKey = keccak256(abi.encodePacked(control, signatory));
 
         // Remove the signatory from the mapping
         delete S_signatories[_signatoryKey];
@@ -148,9 +154,6 @@ contract DAppIntegration {
                 return;
             }
         }
-
-        // Revert if the signatory was not found in the list
-        revert AtlasErrors.InvalidSignatory();
     }
 
     /// @notice Checks if the Atlas protocol is in an unlocked state. Will revert if not.

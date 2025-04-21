@@ -1,13 +1,13 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import { Storage } from "./Storage.sol";
-import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/EscrowTypes.sol";
-import "src/contracts/types/LockTypes.sol";
+import { CallBits } from "../libraries/CallBits.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
+import "../types/ConfigTypes.sol";
+import "../types/EscrowTypes.sol";
+import "../types/LockTypes.sol";
 
 /// @title SafetyLocks
 /// @author FastLane Labs
@@ -18,12 +18,22 @@ abstract contract SafetyLocks is Storage {
 
     constructor(
         uint256 escrowDuration,
+        uint256 atlasSurchargeRate,
+        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator
     )
-        Storage(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
+        Storage(
+            escrowDuration,
+            atlasSurchargeRate,
+            bundlerSurchargeRate,
+            verification,
+            simulator,
+            initialSurchargeRecipient,
+            l2GasCalculator
+        )
     { }
 
     /// @notice Sets the Atlas lock to the specified execution environment.
@@ -47,16 +57,18 @@ abstract contract SafetyLocks is Storage {
 
     /// @notice Builds an Context struct with the specified parameters, called at the start of
     /// `_preOpsUserExecutionIteration`.
-    /// @param executionEnvironment The address of the current Execution Environment.
-    /// @param userOpHash The UserOperation hash.
+    /// @param userOpHash The hash of the UserOperation.
+    /// @param executionEnvironment The address of the execution environment.
     /// @param bundler The address of the bundler.
+    /// @param dappGasLimit The DAppControl's gas limit for preOps, allocateValue, and postOps hooks.
     /// @param solverOpCount The count of SolverOperations.
-    /// @param isSimulation Boolean indicating whether the call is a simulation or not.
+    /// @param isSimulation Whether the current execution is a simulation.
     /// @return An Context struct initialized with the provided parameters.
     function _buildContext(
-        address executionEnvironment,
         bytes32 userOpHash,
+        address executionEnvironment,
         address bundler,
+        uint32 dappGasLimit,
         uint8 solverOpCount,
         bool isSimulation
     )
@@ -69,14 +81,14 @@ abstract contract SafetyLocks is Storage {
             userOpHash: userOpHash,
             bundler: bundler,
             solverSuccessful: false,
-            paymentsSuccessful: false,
             solverIndex: 0,
             solverCount: solverOpCount,
             phase: uint8(ExecutionPhase.PreOps),
             solverOutcome: 0,
             bidFind: false,
             isSimulation: isSimulation,
-            callDepth: 0
+            callDepth: 0,
+            dappGasLeft: dappGasLimit
         });
     }
 }

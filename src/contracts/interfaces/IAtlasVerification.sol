@@ -1,12 +1,12 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/DAppOperation.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/EscrowTypes.sol";
-import "src/contracts/types/ValidCalls.sol";
+import "../types/UserOperation.sol";
+import "../types/ConfigTypes.sol";
+import "../types/DAppOperation.sol";
+import "../types/SolverOperation.sol";
+import "../types/EscrowTypes.sol";
+import "../types/ValidCalls.sol";
 
 interface IAtlasVerification {
     // AtlasVerification.sol
@@ -15,12 +15,18 @@ interface IAtlasVerification {
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         DAppOperation calldata dAppOp,
+        uint256 metacallGasLeft,
         uint256 msgValue,
         address msgSender,
         bool isSimulation
     )
         external
-        returns (ValidCallsResult);
+        returns (
+            uint256 allSolversGasLimit,
+            uint256 allSolversCalldataGas,
+            uint256 bidFindOverhead,
+            ValidCallsResult verifyCallsResult
+        );
     function verifySolverOp(
         SolverOperation calldata solverOp,
         bytes32 userOpHash,

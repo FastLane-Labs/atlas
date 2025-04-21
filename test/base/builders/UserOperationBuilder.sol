@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
-import { UserOperation } from "src/contracts/types/UserOperation.sol";
-import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
-import { CallBits } from "src/contracts/libraries/CallBits.sol";
+import { UserOperation } from "../../../src/contracts/types/UserOperation.sol";
+import { CallConfig } from "../../../src/contracts/types/ConfigTypes.sol";
+import { CallBits } from "../../../src/contracts/libraries/CallBits.sol";
 
-import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
+import { IAtlasVerification } from "../../../src/contracts/interfaces/IAtlasVerification.sol";
 
 contract UserOperationBuilder is Test {
     using CallBits for uint32;
@@ -95,6 +95,11 @@ contract UserOperationBuilder is Test {
 
     function withCallConfig(uint32 callConfig) public returns (UserOperationBuilder) {
         userOperation.callConfig = callConfig;
+        return this;
+    }
+
+    function withDAppGasLimit(uint32 dappGasLimit) public returns (UserOperationBuilder) {
+        userOperation.dappGasLimit = dappGasLimit;
         return this;
     }
 

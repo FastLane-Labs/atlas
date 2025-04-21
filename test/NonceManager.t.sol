@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
-import { NonceManager } from "src/contracts/atlas/NonceManager.sol";
-import { DAppConfig, CallConfig } from "src/contracts/types/ConfigTypes.sol";
-import { UserOperation } from "src/contracts/types/UserOperation.sol";
-import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
-import { DAppOperation } from "src/contracts/types/DAppOperation.sol";
-import { ValidCallsResult } from "src/contracts/types/ValidCalls.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
+import { NonceManager } from "../src/contracts/atlas/NonceManager.sol";
+import { DAppConfig, CallConfig } from "../src/contracts/types/ConfigTypes.sol";
+import { UserOperation } from "../src/contracts/types/UserOperation.sol";
+import { SolverOperation } from "../src/contracts/types/SolverOperation.sol";
+import { DAppOperation } from "../src/contracts/types/DAppOperation.sol";
+import { ValidCallsResult } from "../src/contracts/types/ValidCalls.sol";
+import { AtlasVerification } from "../src/contracts/atlas/AtlasVerification.sol";
 import { AtlasVerificationBase } from "./AtlasVerification.t.sol";
 
 contract MockNonceManager is NonceManager {
@@ -67,7 +67,7 @@ contract NonceManagerTest is AtlasVerificationBase {
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
         doValidateCalls(AtlasVerificationBase.ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
         assertEq(atlasVerification.getUserNextNonce(userEOA, true), 2, "User next seq nonce should now be 2");
         assertEq(atlasVerification.getUserNextNonce(userEOA, false), 1, "User next non-seq nonce should still be 1");
@@ -82,7 +82,7 @@ contract NonceManagerTest is AtlasVerificationBase {
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
         doValidateCalls(AtlasVerificationBase.ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
         assertEq(atlasVerification.getUserNextNonce(userEOA, true), 1, "User next seq nonce should still be 1");
         assertEq(atlasVerification.getUserNextNonce(userEOA, false), 2, "User next non-seq nonce should now be 2");
@@ -95,7 +95,7 @@ contract NonceManagerTest is AtlasVerificationBase {
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
         doValidateCalls(AtlasVerificationBase.ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
 
         // Fails with UserNonceInvalid due to re-used user nonce
@@ -103,7 +103,7 @@ contract NonceManagerTest is AtlasVerificationBase {
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.UserNonceInvalid);
     }
 
@@ -116,14 +116,14 @@ contract NonceManagerTest is AtlasVerificationBase {
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(1).signAndBuild(address(atlasVerification), governancePK);
         doValidateCalls(AtlasVerificationBase.ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
 
         userOp = validUserOperation().withNonce(2).build();
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(2).signAndBuild(address(atlasVerification), governancePK);
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
 
         // Set up DApp with non-seq user nonces
@@ -134,14 +134,14 @@ contract NonceManagerTest is AtlasVerificationBase {
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(3).signAndBuild(address(atlasVerification), governancePK);
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
 
         userOp = validUserOperation().withNonce(2).build();
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(4).signAndBuild(address(atlasVerification), governancePK);
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -152,7 +152,7 @@ contract NonceManagerTest is AtlasVerificationBase {
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(1).signAndBuild(address(atlasVerification), governancePK);
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
 
         // Fails with UserSignatureInvalid due to non-sequential user nonce
@@ -160,7 +160,7 @@ contract NonceManagerTest is AtlasVerificationBase {
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(2).signAndBuild(address(atlasVerification), governancePK);
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
         ), ValidCallsResult.UserSignatureInvalid);
 
         // Valid if using the sequential user nonce
@@ -168,7 +168,7 @@ contract NonceManagerTest is AtlasVerificationBase {
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(3).signAndBuild(address(atlasVerification), governancePK);
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
 
         // Fails with UserSignatureInvalid due to non-sequential user nonce
@@ -176,7 +176,7 @@ contract NonceManagerTest is AtlasVerificationBase {
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(4).signAndBuild(address(atlasVerification), governancePK);
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
         ), ValidCallsResult.UserSignatureInvalid);
 
         // Valid if using the sequential user nonce
@@ -184,7 +184,7 @@ contract NonceManagerTest is AtlasVerificationBase {
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(5).signAndBuild(address(atlasVerification), governancePK);
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 
@@ -195,7 +195,7 @@ contract NonceManagerTest is AtlasVerificationBase {
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(1).signAndBuild(address(atlasVerification), governancePK);
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
 
         // Valid if using the non-seq user nonce
@@ -203,7 +203,7 @@ contract NonceManagerTest is AtlasVerificationBase {
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(2).signAndBuild(address(atlasVerification), governancePK);
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, isSimulation: false, msgValue: 0, msgSender: userEOA}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, isSimulation: false, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA}
         ), ValidCallsResult.Valid);
 
         // Valid if using the non-seq user nonce
@@ -211,7 +211,7 @@ contract NonceManagerTest is AtlasVerificationBase {
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(3).signAndBuild(address(atlasVerification), governancePK);
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, isSimulation: false, msgValue: 0, msgSender: userEOA}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, isSimulation: false, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA}
         ), ValidCallsResult.Valid);
 
         // Valid if using the non-seq user nonce
@@ -219,7 +219,7 @@ contract NonceManagerTest is AtlasVerificationBase {
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(4).signAndBuild(address(atlasVerification), governancePK);
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, isSimulation: false, msgValue: 0, msgSender: userEOA}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, isSimulation: false, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA}
         ), ValidCallsResult.Valid);
     }
 
@@ -231,7 +231,7 @@ contract NonceManagerTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
         // First call initializes at nonce = 1
         doValidateCalls(AtlasVerificationBase.ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
 
         // Testing nonces 2 - 8
@@ -242,7 +242,7 @@ contract NonceManagerTest is AtlasVerificationBase {
             solverOps = validSolverOperations(userOp);
             dappOp = validDAppOperation(userOp, solverOps).withNonce(i).signAndBuild(address(atlasVerification), governancePK);
             callAndAssert(ValidCallsCall({
-                userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+                userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
             ), ValidCallsResult.Valid);
         }
 
@@ -257,7 +257,7 @@ contract NonceManagerTest is AtlasVerificationBase {
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
         doValidateCalls(AtlasVerificationBase.ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
 
         assertEq(atlasVerification.getUserNextNonSeqNonceAfter(userEOA, 0), 2, "User next non-seq nonce after 0 should be 2");
@@ -279,7 +279,7 @@ contract NonceManagerTest is AtlasVerificationBase {
         solverOps[0] = validSolverOperations(userOps[0]);
         dappOps[0] = validDAppOperation(userOps[0], solverOps[0]).withNonce(1).signAndBuild(address(atlasVerification), governancePK);
         doValidateCalls(AtlasVerificationBase.ValidCallsCall({
-            userOp: userOps[0], solverOps: solverOps[0], dAppOp: dappOps[0], msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOps[0], solverOps: solverOps[0], dAppOp: dappOps[0], metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
 
         uint256 refNonce = 252;
@@ -315,19 +315,19 @@ contract NonceManagerTest is AtlasVerificationBase {
 
         // Execute all 5 operations in random order
         doValidateCalls(AtlasVerificationBase.ValidCallsCall({
-            userOp: userOps[2], solverOps: solverOps[2], dAppOp: dappOps[2], msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOps[2], solverOps: solverOps[2], dAppOp: dappOps[2], metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         )); // Nonce 256
         doValidateCalls(AtlasVerificationBase.ValidCallsCall({
-            userOp: userOps[0], solverOps: solverOps[0], dAppOp: dappOps[0], msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOps[0], solverOps: solverOps[0], dAppOp: dappOps[0], metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         )); // Nonce 253
         doValidateCalls(AtlasVerificationBase.ValidCallsCall({
-            userOp: userOps[4], solverOps: solverOps[4], dAppOp: dappOps[4], msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOps[4], solverOps: solverOps[4], dAppOp: dappOps[4], metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         )); // Nonce 258
         doValidateCalls(AtlasVerificationBase.ValidCallsCall({
-            userOp: userOps[3], solverOps: solverOps[3], dAppOp: dappOps[3], msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOps[3], solverOps: solverOps[3], dAppOp: dappOps[3], metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         )); // Nonce 257
         doValidateCalls(AtlasVerificationBase.ValidCallsCall({
-            userOp: userOps[1], solverOps: solverOps[1], dAppOp: dappOps[1], msgValue: 0, msgSender: userEOA, isSimulation: false}
+            userOp: userOps[1], solverOps: solverOps[1], dAppOp: dappOps[1], metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
         )); // Nonce 255
 
         // Notice nonce 254 was skipped, the highest nonce used was 258 (in userOps[4])

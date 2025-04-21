@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 // Base Imports
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
@@ -7,24 +7,24 @@ import { LibSort } from "solady/utils/LibSort.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Imports
-import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
-import { DAppOperation } from "src/contracts/types/DAppOperation.sol";
-import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/EscrowTypes.sol";
+import { DAppControl } from "../../dapp/DAppControl.sol";
+import { DAppOperation } from "../../types/DAppOperation.sol";
+import { CallConfig } from "../../types/ConfigTypes.sol";
+import "../../types/UserOperation.sol";
+import "../../types/SolverOperation.sol";
+import "../../types/LockTypes.sol";
+import "../../types/EscrowTypes.sol";
 
 // Interface Import
-import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
-import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
-import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
-import { ISimulator } from "src/contracts/interfaces/ISimulator.sol";
+import { IAtlasVerification } from "../../interfaces/IAtlasVerification.sol";
+import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.sol";
+import { IAtlas } from "../../interfaces/IAtlas.sol";
+import { ISimulator } from "../../interfaces/ISimulator.sol";
 
-import { FastLaneOnlineControl } from "src/contracts/examples/fastlane-online/FastLaneControl.sol";
-import { FastLaneOnlineInner } from "src/contracts/examples/fastlane-online/FastLaneOnlineInner.sol";
+import { FastLaneOnlineControl } from "./FastLaneControl.sol";
+import { FastLaneOnlineInner } from "./FastLaneOnlineInner.sol";
 
-import { SwapIntent, BaselineCall, Reputation } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
+import { SwapIntent, BaselineCall, Reputation } from "./FastLaneTypes.sol";
 
 contract OuterHelpers is FastLaneOnlineInner {
     // NOTE: Any funds collected in excess of the therapy bills required for the Cardano engineering team
@@ -34,6 +34,7 @@ contract OuterHelpers is FastLaneOnlineInner {
     address public immutable SIMULATOR;
 
     uint256 internal constant _BITS_FOR_INDEX = 16;
+    uint256 internal constant _SOLVER_SIM_GAS_LIM = 4_800_000;
 
     constructor(address atlas, address protocolGuildWallet) FastLaneOnlineInner(atlas) {
         CARDANO_ENGINEER_THERAPY_FUND = msg.sender;
@@ -132,7 +133,7 @@ contract OuterHelpers is FastLaneOnlineInner {
         DAppOperation memory _dAppOp = _getDAppOp(solverOp.userOpHash, userOp.deadline);
 
         // NOTE: Valid is false when the solver fails even if postOps is successful
-        (valid,,) = ISimulator(SIMULATOR).simSolverCall(userOp, solverOp, _dAppOp);
+        (valid,,) = ISimulator(SIMULATOR).simSolverCall{ gas: _SOLVER_SIM_GAS_LIM }(userOp, solverOp, _dAppOp);
     }
 
     function _getUserOperation(
@@ -159,6 +160,7 @@ contract OuterHelpers is FastLaneOnlineInner {
             dapp: CONTROL,
             control: CONTROL,
             callConfig: CALL_CONFIG,
+            dappGasLimit: getDAppGasLimit(),
             sessionKey: address(0),
             data: abi.encodeCall(this.swap, (swapIntent, baselineCall)),
             signature: new bytes(0) // User must sign

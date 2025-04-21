@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 // Base Imports
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Base Imports
-import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
-import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
+import { IAtlas } from "../../interfaces/IAtlas.sol";
+import { SafetyBits } from "../../libraries/SafetyBits.sol";
 
-import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/LockTypes.sol";
+import { CallConfig } from "../../types/ConfigTypes.sol";
+import "../../types/SolverOperation.sol";
+import "../../types/UserOperation.sol";
+import "../../types/ConfigTypes.sol";
+import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
-import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
+import { DAppControl } from "../../dapp/DAppControl.sol";
 
 // V4 Imports
 import { IPoolManager } from "./IPoolManager.sol";
@@ -61,7 +61,6 @@ contract V4DAppControl is DAppControl {
                 delegateUser: false,
                 requirePreSolver: false,
                 requirePostSolver: false,
-                requirePostOps: true,
                 zeroSolvers: true,
                 reuseUserOp: false,
                 userAuctioneer: true,
@@ -72,8 +71,7 @@ contract V4DAppControl is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: false,
-                allowAllocateValueFailure: false
+                exPostBids: false
             })
         )
     {
@@ -142,8 +140,7 @@ contract V4DAppControl is DAppControl {
         } else {
             if (params.amountSpecified > 0) {
                 // Buying Pool's token0 with amountSpecified of User's token1
-            }
-            else {
+            } else {
                 // Buying amountSpecified of Pool's token0 with User's token1
             }
         }
@@ -154,10 +151,20 @@ contract V4DAppControl is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueCall(
+        bool solved,
+        address bidToken,
+        uint256 bidAmount,
+        bytes calldata data
+    )
+        internal
+        override
+    {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
+
+        if (!solved) revert();
 
         bool initialized;
         assembly {
@@ -181,14 +188,8 @@ contract V4DAppControl is DAppControl {
         );
 
         sequenceLock[sequenceKey] = true;
-    }
 
-    function _postOpsCall(bool solved, bytes calldata data) internal override {
-        // This function is delegatecalled
-        // address(this) = ExecutionEnvironment
-        // msg.sender = Escrow
-
-        if (!solved) revert();
+        // NOTE: The code below was previously in the postOps hook
 
         (bytes memory returnData) = abi.decode(data, (bytes));
 
@@ -235,7 +236,7 @@ contract V4DAppControl is DAppControl {
         // and that DAppControl supplied a valid signature
         require(address(this) == hook, "ERR-H20 InvalidCallee");
         require(hook == _control(), "ERR-H21 InvalidCaller");
-        require(_phase() == uint8(ExecutionPhase.PostOps), "ERR-H22 InvalidLockStage");
+        require(_phase() == uint8(ExecutionPhase.AllocateValue), "ERR-H22 InvalidLockStage");
 
         bytes32 hashLock;
         assembly {

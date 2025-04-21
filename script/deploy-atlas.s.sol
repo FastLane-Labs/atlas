@@ -1,19 +1,24 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 
-import { DeployBaseScript } from "script/base/deploy-base.s.sol";
+import { DeployBaseScript } from "./base/deploy-base.s.sol";
 
-import { Atlas } from "src/contracts/atlas/Atlas.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
-import { Simulator } from "src/contracts/helpers/Simulator.sol";
-import { Sorter } from "src/contracts/helpers/Sorter.sol";
-import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
+import { FactoryLib } from "../src/contracts/atlas/FactoryLib.sol";
+import { Atlas } from "../src/contracts/atlas/Atlas.sol";
+import { AtlasVerification } from "../src/contracts/atlas/AtlasVerification.sol";
+import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
+import { Simulator } from "../src/contracts/helpers/Simulator.sol";
+import { Sorter } from "../src/contracts/helpers/Sorter.sol";
+import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironment.sol";
 
 contract DeployAtlasScript is DeployBaseScript {
+    uint256 ESCROW_DURATION = 64;
+    uint256 ATLAS_SURCHARGE_RATE; // Set below
+    uint256 BUNDLER_SURCHARGE_RATE; // Set below
+
     function run() external {
         console.log("\n=== DEPLOYING Atlas ===\n");
 
@@ -22,32 +27,50 @@ contract DeployAtlasScript is DeployBaseScript {
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
-        // Computes the addresses at which AtlasVerification will be deployed
-        address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
-        address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
-        address expectedSimulatorAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
+        (ATLAS_SURCHARGE_RATE, BUNDLER_SURCHARGE_RATE) = _getSurchargeRates();
 
+        // Computes the addresses at which AtlasVerification will be deployed
+        address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
+        address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
+        address expectedSimulatorAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 4);
+
+        address prevAtlasAddr = _getAddressFromDeploymentsJson("ATLAS");
+        uint256 prevSurcharge = (prevAtlasAddr == address(0)) ? 0 : Atlas(payable(prevAtlasAddr)).cumulativeSurcharge();
         address prevSimAddr = _getAddressFromDeploymentsJson("SIMULATOR");
         uint256 prevSimBalance = (prevSimAddr == address(0)) ? 0 : prevSimAddr.balance;
 
         console.log("Deployer address: \t\t", deployer);
         console.log("Prev Simulator balance: \t", prevSimBalance);
+        console.log("Prev Atlas Gas Surcharge: \t", prevSurcharge);
 
         vm.startBroadcast(deployerPrivateKey);
 
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
+
+        // Deploy FactoryLib using precompile from Atlas v1.3 - avoids adjusting Mimic assembly
+        FactoryLib factoryLib = FactoryLib(
+            deployCode("src/contracts/precompiles/FactoryLib.sol/FactoryLib.json", abi.encode(address(execEnvTemplate)))
+        );
+
         atlas = new Atlas({
-            escrowDuration: 64,
+            escrowDuration: ESCROW_DURATION,
+            atlasSurchargeRate: ATLAS_SURCHARGE_RATE,
+            bundlerSurchargeRate: BUNDLER_SURCHARGE_RATE,
             verification: expectedAtlasVerificationAddr,
             simulator: expectedSimulatorAddr,
-            executionTemplate: address(execEnvTemplate),
+            factoryLib: address(factoryLib),
             initialSurchargeRecipient: deployer,
             l2GasCalculator: address(0)
         });
-        atlasVerification = new AtlasVerification(address(atlas));
+        atlasVerification = new AtlasVerification({ atlas: expectedAtlasAddr, l2GasCalculator: address(0) });
 
         simulator = new Simulator();
         simulator.setAtlas(address(atlas));
+
+        // If prev Atlas deployment has surcharge, withdraw it
+        if (prevAtlasAddr != address(0) && prevSurcharge > 0) {
+            Atlas(payable(prevAtlasAddr)).withdrawSurcharge();
+        }
 
         // If prev Simulator deployment has native assets, withdraw them to new Simulator
         if (prevSimBalance > 0) {
@@ -102,6 +125,16 @@ contract DeployAtlasScript is DeployBaseScript {
         // Check Sorter address set correctly everywhere
         if (address(sorter) == address(0)) {
             console.log("ERROR: Sorter deployment address is 0x0");
+            error = true;
+        }
+        // Check FactoryLib address set correctly in Atlas
+        if (address(factoryLib) != atlas.FACTORY_LIB()) {
+            console.log("ERROR: FactoryLib address not set correctly in Atlas");
+            error = true;
+        }
+        // Check ExecutionEnvironment address set correctly in FactoryLib
+        if (address(execEnvTemplate) != factoryLib.EXECUTION_ENV_TEMPLATE()) {
+            console.log("ERROR: ExecutionEnvironment address not set correctly in FactoryLib");
             error = true;
         }
         // Check ESCROW_DURATION was not set to 0

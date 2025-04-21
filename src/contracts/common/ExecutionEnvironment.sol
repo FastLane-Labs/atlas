@@ -1,19 +1,19 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import { Base } from "src/contracts/common/ExecutionBase.sol";
 
-import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
-import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
-import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
+import { Base } from "./ExecutionBase.sol";
 
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/EscrowTypes.sol";
+import { IAtlas } from "../interfaces/IAtlas.sol";
+import { ISolverContract } from "../interfaces/ISolverContract.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
+import { AtlasErrors } from "../types/AtlasErrors.sol";
+import { CallBits } from "../libraries/CallBits.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
+import "../types/EscrowTypes.sol";
 
 /// @title ExecutionEnvironment
 /// @author FastLane Labs
@@ -84,20 +84,6 @@ contract ExecutionEnvironment is Base {
             (_success, returnData) = userOp.dapp.call{ value: userOp.value }(_data);
             if (!_success) revert AtlasErrors.UserWrapperCallFail();
         }
-    }
-
-    /// @notice The postOpsWrapper function may be called by Atlas as the last phase of a `metacall` transaction.
-    /// @dev This contract is called by the Atlas contract, and delegatecalls the DAppControl contract via the
-    /// corresponding `postOpsCall` function.
-    /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
-    /// @param returnData Data returned from the previous call phase.
-    function postOpsWrapper(bool solved, bytes calldata returnData) external onlyAtlasEnvironment {
-        bytes memory _data = _forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
-
-        bool _success;
-        (_success,) = _control().delegatecall(_data);
-
-        if (!_success) revert AtlasErrors.PostOpsDelegatecallFail();
     }
 
     /// @notice The solverPreTryCatch function is called by Atlas to execute the preSolverCall part of each
@@ -226,29 +212,25 @@ contract ExecutionEnvironment is Base {
     /// @param bidToken The address of the token used for the winning SolverOperation's bid.
     /// @param bidAmount The winning bid amount.
     /// @param allocateData Data returned from the previous call phase.
-    /// @return allocateValueSucceeded Boolean indicating whether the allocateValue delegatecall succeeded (true) or
-    /// reverted (false). This is useful when allowAllocateValueFailure is set to true, the failure is caught here, but
-    /// we still need to communicate to Atlas that the hook did not succeed.
     function allocateValue(
+        bool solved,
         address bidToken,
         uint256 bidAmount,
         bytes memory allocateData
     )
         external
         onlyAtlasEnvironment
-        returns (bool allocateValueSucceeded)
     {
-        allocateData = _forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
+        allocateData =
+            _forward(abi.encodeCall(IDAppControl.allocateValueCall, (solved, bidToken, bidAmount, allocateData)));
 
         (bool _success,) = _control().delegatecall(allocateData);
-        if (!_success && !_config().allowAllocateValueFailure()) revert AtlasErrors.AllocateValueDelegatecallFail();
+        if (!_success) revert AtlasErrors.AllocateValueDelegatecallFail();
 
         uint256 _balance = address(this).balance;
         if (_balance > 0) {
             IAtlas(ATLAS).contribute{ value: _balance }();
         }
-
-        return _success;
     }
 
     ///////////////////////////////////////

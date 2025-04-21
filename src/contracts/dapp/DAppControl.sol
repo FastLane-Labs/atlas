@@ -1,18 +1,18 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import { DAppControlTemplate } from "./ControlTemplate.sol";
-import { ExecutionBase } from "src/contracts/common/ExecutionBase.sol";
-import { ExecutionPhase } from "src/contracts/types/LockTypes.sol";
-import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/ConfigTypes.sol";
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
-import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
-import { ValidCallsResult } from "src/contracts/types/ValidCalls.sol";
-import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
+import { ExecutionBase } from "../common/ExecutionBase.sol";
+import { ExecutionPhase } from "../types/LockTypes.sol";
+import { CallBits } from "../libraries/CallBits.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
+import "../types/ConfigTypes.sol";
+import { AtlasErrors } from "../types/AtlasErrors.sol";
+import { AtlasEvents } from "../types/AtlasEvents.sol";
+import { IAtlas } from "../interfaces/IAtlas.sol";
+import { ValidCallsResult } from "../types/ValidCalls.sol";
+import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 
 /// @title DAppControl
 /// @author FastLane Labs
@@ -118,6 +118,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     /// @param bidAmount The winning bid amount.
     /// @param data Data returned from the previous call phase.
     function allocateValueCall(
+        bool solved,
         address bidToken,
         uint256 bidAmount,
         bytes calldata data
@@ -127,24 +128,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         onlyAtlasEnvironment
         onlyPhase(ExecutionPhase.AllocateValue)
     {
-        _allocateValueCall(bidToken, bidAmount, data);
-    }
-
-    /// @notice The postOpsCall hook which may be called as the last phase of a `metacall` transaction.
-    /// @dev Should revert if any DApp-specific checks fail.
-    /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
-    /// @param data Data returned from the previous call phase.
-    function postOpsCall(
-        bool solved,
-        bytes calldata data
-    )
-        external
-        payable
-        validControl
-        onlyAtlasEnvironment
-        onlyPhase(ExecutionPhase.PostOps)
-    {
-        _postOpsCall(solved, data);
+        _allocateValueCall(solved, bidToken, bidAmount, data);
     }
 
     function userDelegated() external view returns (bool delegated) {
@@ -172,7 +156,8 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
             to: address(this),
             callConfig: CALL_CONFIG,
             bidToken: getBidFormat(userOp),
-            solverGasLimit: getSolverGasLimit()
+            solverGasLimit: getSolverGasLimit(),
+            dappGasLimit: getDAppGasLimit()
         });
     }
 

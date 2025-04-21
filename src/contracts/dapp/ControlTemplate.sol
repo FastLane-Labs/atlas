@@ -1,13 +1,14 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/ConfigTypes.sol";
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
+import "../types/ConfigTypes.sol";
+import { AtlasErrors } from "../types/AtlasErrors.sol";
 
 abstract contract DAppControlTemplate {
     uint32 internal constant DEFAULT_SOLVER_GAS_LIMIT = 1_000_000;
+    uint32 internal constant DEFAULT_DAPP_GAS_LIMIT = 2_000_000;
 
     constructor() { }
 
@@ -75,7 +76,14 @@ abstract contract DAppControlTemplate {
     //
     // DApp exposure: Trustless
     // User exposure: Trustless
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) internal virtual;
+    function _allocateValueCall(
+        bool solved,
+        address bidToken,
+        uint256 bidAmount,
+        bytes calldata data
+    )
+        internal
+        virtual;
 
     /////////////////////////////////////////////////////////
     //              INTENT FULFILLMENT                     //
@@ -129,26 +137,6 @@ abstract contract DAppControlTemplate {
     }
 
     /////////////////////////////////////////////////////////
-    //                  VERIFICATION                       //
-    /////////////////////////////////////////////////////////
-    //
-    // Data should be decoded as:
-    //
-    //    bytes memory returnData
-    //
-
-    // _postOpsCall
-    // Details:
-    //  verification/delegatecall =
-    //      Inputs: User's return data + preOps call's returnData
-    //      Function: Executing the function set by DAppControl
-    //      Container: Inside of the FastLane ExecutionEnvironment
-    //      Access: Storage access (read+write) to the ExecutionEnvironment contract
-    function _postOpsCall(bool, bytes calldata) internal virtual {
-        revert AtlasErrors.NotImplemented();
-    }
-
-    /////////////////////////////////////////////////////////
     //                 GETTERS & HELPERS                   //
     /////////////////////////////////////////////////////////
     //
@@ -161,5 +149,9 @@ abstract contract DAppControlTemplate {
 
     function getSolverGasLimit() public view virtual returns (uint32) {
         return DEFAULT_SOLVER_GAS_LIMIT;
+    }
+
+    function getDAppGasLimit() public view virtual returns (uint32) {
+        return DEFAULT_DAPP_GAS_LIMIT;
     }
 }

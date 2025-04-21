@@ -1,31 +1,27 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
+
+import "forge-std/Test.sol";
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
+import { IExecutionEnvironment } from "../src/contracts/interfaces/IExecutionEnvironment.sol";
+import { Atlas } from "../src/contracts/atlas/Atlas.sol";
+import { Result } from "../src/contracts/helpers/Simulator.sol";
+import { V2ExPost } from "../src/contracts/examples/ex-post-mev-example/V2ExPost.sol";
+import { SolverExPost } from "../src/contracts/solver/src/TestSolverExPost.sol";
+import { AtlasEvents } from "../src/contracts/types/AtlasEvents.sol";
 
-import { Atlas } from "src/contracts/atlas/Atlas.sol";
-
-import { Result } from "src/contracts/helpers/Simulator.sol";
-
-import { V2ExPost } from "src/contracts/examples/ex-post-mev-example/V2ExPost.sol";
-
-import { SolverExPost } from "src/contracts/solver/src/TestSolverExPost.sol";
-
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/EscrowTypes.sol";
-import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/DAppOperation.sol";
-import "src/contracts/types/ConfigTypes.sol";
+import "../src/contracts/types/UserOperation.sol";
+import "../src/contracts/types/SolverOperation.sol";
+import "../src/contracts/types/EscrowTypes.sol";
+import "../src/contracts/types/LockTypes.sol";
+import "../src/contracts/types/DAppOperation.sol";
+import "../src/contracts/types/ConfigTypes.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { V2Helper } from "./V2Helper.sol";
-import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
-
-import "forge-std/Test.sol";
 
 contract ExPostTest is BaseTest {
     /// forge-config: default.gas_price = 15000000000
@@ -133,20 +129,13 @@ contract ExPostTest is BaseTest {
 
         // DAppOperation call
         DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
-
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
-
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         vm.startPrank(userEOA);
 
         address executionEnvironment = atlas.createExecutionEnvironment(userEOA, userOp.control);
         vm.label(address(executionEnvironment), "EXECUTION ENV");
-
-        console.log("userEOA", userEOA);
-        console.log("atlas", address(atlas));
-        console.log("v2 ExPost Control", address(v2ExPost));
-        console.log("executionEnvironment", executionEnvironment);
 
         // User must approve Atlas
         IERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
@@ -181,8 +170,8 @@ contract ExPostTest is BaseTest {
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
         (simSuccess, simResult,) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
         assertTrue(simSuccess, "all solverOps together should succeed in simulator");
-
-        // address bundler = userEOA;
+        
+        uint256 gasLim = _gasLim(userOp, solverOps);
         vm.startPrank(userEOA);
 
         // uint256 userEOABalance = userEOA.balance;
@@ -198,7 +187,7 @@ contract ExPostTest is BaseTest {
         // uint256 solverTwoAtlEthBalance = atlas.balanceOf(solverTwoEOA);
 
         (bool success,) =
-            address(atlas).call(abi.encodeCall(atlas.metacall, (userOp, solverOps, dAppOp)));
+            address(atlas).call{gas: gasLim}(abi.encodeCall(atlas.metacall, (userOp, solverOps, dAppOp, address(0))));
 
         if (success) {
             console.log("success!");
@@ -349,6 +338,8 @@ contract ExPostTest is BaseTest {
         // User must approve Atlas
         IERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
         IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
+        // User creates EE - to exclude EE creation from metacall gas (in real or sim metacalls)
+        atlas.createExecutionEnvironment(userEOA, userOp.control);
         vm.stopPrank();
 
         // Simulate the UserOp
@@ -361,13 +352,13 @@ contract ExPostTest is BaseTest {
             assertTrue(simSuccess, "solverOps fail in simulator");
         }
 
+        uint256 gasLim = _gasLim(userOp, solverOps);
+        
         vm.startPrank(userEOA);
         uint256 gasLeftBefore = gasleft(); // reusing var because stack too deep
         (bool success,) =
-            address(atlas).call(abi.encodeWithSelector(atlas.metacall.selector, userOp, solverOps, dAppOp));
+            address(atlas).call{gas: gasLim}(abi.encodeWithSelector(atlas.metacall.selector, userOp, solverOps, dAppOp));
         console.log("Metacall Gas Cost:", gasLeftBefore - gasleft());
-        if (success) console.log("success!");
-        else console.log("failure");
         assertTrue(success);
         vm.stopPrank();
     }

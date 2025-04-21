@@ -1,13 +1,13 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
-import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/LockTypes.sol";
-import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
-import { ChainlinkAtlasWrapper } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapper.sol";
+import { CallConfig } from "../../types/ConfigTypes.sol";
+import "../../types/UserOperation.sol";
+import "../../types/SolverOperation.sol";
+import "../../types/LockTypes.sol";
+import { DAppControl } from "../../dapp/DAppControl.sol";
+import { ChainlinkAtlasWrapper } from "./ChainlinkAtlasWrapper.sol";
 
 // Role enum as per Chainlink's OffchainAggregatorBilling.sol contract
 enum Role {
@@ -66,7 +66,6 @@ contract ChainlinkDAppControl is DAppControl {
                 delegateUser: false,
                 requirePreSolver: false,
                 requirePostSolver: false,
-                requirePostOps: false,
                 zeroSolvers: false,
                 reuseUserOp: false,
                 userAuctioneer: true,
@@ -77,8 +76,7 @@ contract ChainlinkDAppControl is DAppControl {
                 requireFulfillment: false, // Update oracle even if all solvers fail
                 trustedOpHash: true,
                 invertBidValue: false,
-                exPostBids: false,
-                allowAllocateValueFailure: false
+                exPostBids: false
             })
         )
     { }
@@ -87,7 +85,16 @@ contract ChainlinkDAppControl is DAppControl {
     //                  Atlas Hook Overrides                //
     // ---------------------------------------------------- //
 
-    function _allocateValueCall(address, uint256 bidAmount, bytes calldata data) internal virtual override {
+    function _allocateValueCall(
+        bool solved,
+        address,
+        uint256 bidAmount,
+        bytes calldata data
+    )
+        internal
+        virtual
+        override
+    {
         address chainlinkWrapper = abi.decode(data, (address));
         if (!ChainlinkDAppControl(_control()).isChainlinkWrapper(chainlinkWrapper)) {
             revert InvalidChainlinkAtlasWrapper();
