@@ -114,10 +114,20 @@ contract Atlas is Escrow, Factory {
         // Initialize the environment lock and accounting values
         _setEnvironmentLock(_dConfig, _executionEnvironment);
 
-        // _gasMarker - _bidFindOverhead = estimated winning solver gas liability (not charged for bid-find gas)
-        // userOp.bundlerSurchargeRate is checked against the value set in the DAppControl in `validateCalls()` above
+        // If in `multipleSuccessfulSolvers` mode, solvers are only liable for their own (C + E) gas costs, even if they
+        // execute successfully. In this case we set `remainingMaxGas` and `unreachedSolverGas` to the same value - the
+        // sum of all solvers' (C + E) gas limits. Then, `solverGasLiability()` will report just the current solver's
+        // gas costs with surcharges.
+        // In all other cases, `remainingMaxGas` includes non-solver gas limits and overheads that the winning solver
+        // may be liable for. In `exPostBids` mode, we also subtract the gas limit of the bid-finding solverOp
+        // iterations, as that gas will be written off (winning solver not liable for them).
+        uint256 _initialRemainingMaxGas =
+            _dConfig.callConfig.multipleSuccessfulSolvers() ? _allSolversGasLimit : _gasMarker - _bidFindOverhead;
+
+        // `userOp.bundlerSurchargeRate` is checked against the value set in the DAppControl in `validateCalls()` above,
+        // so it is safe to use here.
         _initializeAccountingValues({
-            gasMarker: _gasMarker - _bidFindOverhead,
+            initialRemainingMaxGas: _initialRemainingMaxGas,
             allSolverOpsGas: _allSolversGasLimit,
             bundlerSurchargeRate: userOp.bundlerSurchargeRate
         });
