@@ -165,6 +165,13 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                     (allSolversGasLimit, allSolversCalldataGas, bidFindOverhead, ValidCallsResult.DAppGasLimitMismatch);
             }
 
+            // Check the solverGasLimit read from DAppControl at start of metacall matches userOp value
+            if (dConfig.solverGasLimit != userOp.solverGasLimit) {
+                return (
+                    allSolversGasLimit, allSolversCalldataGas, bidFindOverhead, ValidCallsResult.SolverGasLimitMismatch
+                );
+            }
+
             // Check the bundlerSurchargeRate read from DAppControl at start of metacall matches userOp value
             if (dConfig.bundlerSurchargeRate != userOp.bundlerSurchargeRate) {
                 return (
@@ -599,6 +606,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                         userOp.control,
                         userOp.callConfig,
                         userOp.dappGasLimit,
+                        userOp.solverGasLimit,
                         userOp.bundlerSurchargeRate,
                         userOp.sessionKey
                     )
@@ -620,6 +628,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                         userOp.control,
                         userOp.callConfig,
                         userOp.dappGasLimit,
+                        userOp.solverGasLimit,
                         userOp.bundlerSurchargeRate,
                         userOp.sessionKey,
                         keccak256(userOp.data)
