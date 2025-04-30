@@ -16,7 +16,7 @@ bytes32 constant USER_TYPEHASH_TRUSTED = keccak256(
 );
 
 // Length of UserOperation in hex chars, assuming empty signature field, excluding the dynamic userOp.data field.
-uint256 constant USER_OP_STATIC_LENGTH = 576;
+uint256 constant USER_OP_STATIC_LENGTH = 608;
 
 struct UserOperation {
     address from; // User address
