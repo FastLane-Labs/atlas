@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
+import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import { SafetyLocks } from "./SafetyLocks.sol";
 import { EscrowBits } from "../libraries/EscrowBits.sol";
@@ -299,8 +300,8 @@ abstract contract GasAccounting is SafetyLocks {
             _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR);
         }
 
-        // Solver execution max gas is calculated as solverOp.gas, with a max of dConfig.solverGasLimit
-        uint256 _executionMaxGas = (solverOp.gas > dConfigSolverGasLimit) ? dConfigSolverGasLimit : solverOp.gas;
+        // Solver execution max gas is calculated as solverOp.gas, with a ceiling of dConfig.solverGasLimit
+        uint256 _executionMaxGas = Math.min(solverOp.gas, dConfigSolverGasLimit);
 
         // Deduct solver's max (C + E) gas from remainingMaxGas, for future solver gas liability calculations
         _gL.remainingMaxGas -= uint40(_executionMaxGas + _calldataGas);

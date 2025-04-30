@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
+import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
@@ -301,9 +302,8 @@ contract Atlas is Escrow, Factory {
             // remainingMaxGas separately here. This decrease does not include calldata gas as solvers are not charged
             // for calldata gas in exPostBids mode.
             GasLedger memory _gL = t_gasLedger.toGasLedger();
-            // Deduct solverOp.gas, with a max of dConfig.solverGasLimit, from remainingMaxGas
-            _solverExecutionGas =
-                (solverOps[i].gas > dConfig.solverGasLimit) ? dConfig.solverGasLimit : solverOps[i].gas;
+            // Deduct solverOp.gas (with a ceiling of dConfig.solverGasLimit) from remainingMaxGas
+            _solverExecutionGas = Math.min(solverOps[i].gas, dConfig.solverGasLimit);
             _gL.remainingMaxGas -= uint40(_solverExecutionGas);
             t_gasLedger = _gL.pack();
 

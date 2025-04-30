@@ -4,6 +4,8 @@ pragma solidity 0.8.28;
 import { EIP712 } from "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import { SignatureChecker } from "openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+
 import { DAppIntegration } from "./DAppIntegration.sol";
 import { NonceManager } from "./NonceManager.sol";
 
@@ -671,9 +673,8 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         for (uint256 i = 0; i < solverOpsLen; ++i) {
             // Sum calldata length of all solverOp.data fields in the array
             solverDataLenSum += solverOps[i].data.length;
-            // Sum all solverOp.gas values in the array, each with a max of dConfig.solverGasLimit
-            allSolversExecutionGas +=
-                (solverOps[i].gas > dConfigSolverGasLimit) ? dConfigSolverGasLimit : solverOps[i].gas;
+            // Sum all solverOp.gas values in the array, each with a ceiling of dConfig.solverGasLimit
+            allSolversExecutionGas += Math.min(solverOps[i].gas, dConfigSolverGasLimit);
         }
 
         allSolversCalldataGas =
