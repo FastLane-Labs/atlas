@@ -54,10 +54,10 @@ abstract contract GasAccounting is SafetyLocks {
         internal
     {
         t_gasLedger = GasLedger({
-            remainingMaxGas: uint40(gasMarker),
+            remainingMaxGas: gasMarker.toUint40(),
             writeoffsGas: 0,
             solverFaultFailureGas: 0,
-            unreachedSolverGas: uint40(allSolverOpsGas),
+            unreachedSolverGas: allSolverOpsGas.toUint40(),
             maxApprovedGasSpend: 0,
             atlasSurchargeRate: _atlasSurchargeRate(),
             bundlerSurchargeRate: bundlerSurchargeRate
