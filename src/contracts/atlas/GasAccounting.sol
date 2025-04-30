@@ -439,6 +439,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// `ctx.bundler`.
     /// @param unreachedCalldataValuePaid The total value successfully collected from unreached solvers for their
     /// calldata costs (from `_chargeUnreachedSolversForCalldata`).
+    /// @param multipleSuccessfulSolvers A boolean indicating whether the multipleSuccessfulSolvers mode is enabled.
     /// @return claimsPaidToBundler The net amount of ETH transferred to the `gasRefundBeneficiary`.
     /// @return netAtlasGasSurcharge The net amount of ETH taken as Atlas surcharge during the metacall.
     function _settle(
