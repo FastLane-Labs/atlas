@@ -280,12 +280,14 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param gasWaterMark The `gasleft()` watermark taken at the start of executing the SolverOperation.
     /// @param result The result bitmap of the SolverOperation execution.
     /// @param exPostBids A boolean indicating whether exPostBids is set to true in the current metacall.
+    /// @param useNetRepays A boolean indicating whether to use net repays to subsidize solver gas costs.
     function _handleSolverFailAccounting(
         SolverOperation calldata solverOp,
         uint256 dConfigSolverGasLimit,
         uint256 gasWaterMark,
         uint256 result,
-        bool exPostBids
+        bool exPostBids,
+        bool useNetRepays
     )
         internal
     {
@@ -319,9 +321,30 @@ abstract contract GasAccounting is SafetyLocks {
 
             EscrowAccountAccessData memory _solverAccountData = S_accessData[solverOp.from];
 
+            // If useNetRepays = true (only in multipleSuccessfulSolvers mode), subsidize with net repays if:
+            // - There is a net repayment available (repays > borrows)
+            // - The solver's maxApprovedGasSpend < gasValueWithSurcharges
+            // - Net repays can cover the shortfall in approved gas spend (already checked in `_isBalanceReconciled()`)
+            uint256 _approvedGasShortfall;
+            if (useNetRepays && _gL.maxApprovedGasSpend < _gasValueWithSurcharges) {
+                BorrowsLedger memory _bL = t_borrowsLedger.toBorrowsLedger();
+                _approvedGasShortfall = _gasValueWithSurcharges - _gL.maxApprovedGasSpend;
+
+                // Check added for safety - but shouldn't be reachable after checks in `_isBalanceReconciled()`
+                if (uint256(_bL.netRepayments()) < _approvedGasShortfall) revert InsufficientNetRepayments();
+
+                // Decrease repays by the shortfall in approved gas spend.
+                _bL.repays -= uint128(_approvedGasShortfall);
+
+                // Persist BorrowsLedger changes to transient storage
+                t_borrowsLedger = _bL.pack();
+            }
+
             // In `_assign()`, the solver's bonded AtlETH balance is reduced by `_gasValueWithSurcharges`. Any deficit
             // from that operation is returned as `_assignDeficit` below. GasLedger is not modified in _assign().
-            uint256 _assignDeficit = _assign(_solverAccountData, solverOp.from, _gasValueWithSurcharges);
+            // If net repays is used to subsidize solver, deduct shortfall from `_gasValueWithSurcharges` below.
+            uint256 _assignDeficit =
+                _assign(_solverAccountData, solverOp.from, _gasValueWithSurcharges - _approvedGasShortfall);
 
             // Solver's analytics updated:
             // - increment auctionFails
@@ -605,5 +628,15 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _maxApprovedGasValue = gL.maxApprovedGasSpend * tx.gasprice;
 
         return (bL.repays >= bL.borrows) && (_maxApprovedGasValue + _netRepayments >= gL.solverGasLiability());
+
+        // TODO clean up and check for overflows etc
+
+        uint256 _gasLiability = gL.solverGasLiability();
+
+        if (_gasLiability > _maxApprovedGasValue) { }
+
+        uint256 _solverGasRepaymentContribution = gL.solverGasLiability() - _maxApprovedGasValue;
+        assert(_netRepayments >= _solverGasRepaymentContribution); // idk if this is needed, feels implied
+        bL.repays -= uint128(_solverGasRepaymentContribution);
     }
 }

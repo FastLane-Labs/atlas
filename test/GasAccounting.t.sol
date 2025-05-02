@@ -545,7 +545,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         uint256 estGasUsed = (gasWaterMark + _BUNDLER_FAULT_OFFSET - gasLeft)
             + GasAccLib.solverOpCalldataGas(solverOp.data.length, address(0));
 
-        tAtlas.handleSolverFailAccounting{ gas: gasLeft }(solverOp, dConfigSolverGasLimit, gasWaterMark, result, false);
+        tAtlas.handleSolverFailAccounting{ gas: gasLeft }(solverOp, dConfigSolverGasLimit, gasWaterMark, result, false, false);
 
         GasLedger memory gLAfter = tAtlas.getGasLedger();
         EscrowAccountAccessData memory accountDataAfter = tAtlas.getAccessData(solverOneEOA);
@@ -583,7 +583,9 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         uint256 estGasValueCharged =
             estGasUsed.withSurcharge(A_SURCHARGE + B_SURCHARGE) * tx.gasprice;
 
-        tAtlas.handleSolverFailAccounting{ gas: gasLeft }(solverOp, dConfigSolverGasLimit, gasWaterMark, result, false);
+        tAtlas.handleSolverFailAccounting{ gas: gasLeft }(
+            solverOp, dConfigSolverGasLimit, gasWaterMark, result, false, false
+        );
 
         gLAfter = tAtlas.getGasLedger();
         accountDataAfter = tAtlas.getAccessData(solverOneEOA);
@@ -627,7 +629,9 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         uint256 estDeficit = estAssignValueInclSurcharges - 1e18; // 1e18 bonded balance
         uint256 estGasWrittenOff = estGasUsed * estDeficit / estAssignValueInclSurcharges;
 
-        tAtlas.handleSolverFailAccounting{ gas: gasLeft }(solverOp, dConfigSolverGasLimit, gasWaterMark, result, false);
+        tAtlas.handleSolverFailAccounting{ gas: gasLeft }(
+            solverOp, dConfigSolverGasLimit, gasWaterMark, result, false, false
+        );
 
         gLAfter = tAtlas.getGasLedger();
         accountDataAfter = tAtlas.getAccessData(solverOneEOA);
@@ -665,7 +669,9 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         gasLeft = 200_000;
         estGasUsed = (gasWaterMark + _BUNDLER_FAULT_OFFSET - gasLeft); // Calldata excluded
 
-        tAtlas.handleSolverFailAccounting{ gas: gasLeft }(solverOp, dConfigSolverGasLimit, gasWaterMark, result, true);
+        tAtlas.handleSolverFailAccounting{ gas: gasLeft }(
+            solverOp, dConfigSolverGasLimit, gasWaterMark, result, true, false
+        );
 
         gLAfter = tAtlas.getGasLedger();
         accountDataAfter = tAtlas.getAccessData(solverOneEOA);
@@ -1334,11 +1340,12 @@ contract TestAtlasGasAcc is TestAtlas {
         uint256 dConfigSolverGasLimit,
         uint256 gasWaterMark,
         uint256 result,
-        bool exPostBids
+        bool exPostBids,
+        bool useNetRepays
     )
         external
     {
-        _handleSolverFailAccounting(solverOp, dConfigSolverGasLimit, gasWaterMark, result, exPostBids);
+        _handleSolverFailAccounting(solverOp, dConfigSolverGasLimit, gasWaterMark, result, exPostBids, useNetRepays);
     }
 
     function writeOffBidFindGas(uint256 gasUsed) public {

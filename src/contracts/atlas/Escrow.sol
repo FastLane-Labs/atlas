@@ -232,7 +232,11 @@ abstract contract Escrow is AtlETH {
                         // - `_result` should be 0 (successful) below, which should charge the solver for their own
                         //   gas + surcharges, as 0 is not captured in the bundler fault block.
                         // - exPostBids is not supported in multipleSuccessfulSolvers mode, so exPostBids = false here.
-                        _handleSolverFailAccounting(solverOp, dConfig.solverGasLimit, gasWaterMark, _result, false);
+                        // - useNetRepays = true, to ensure that multiple solvers cannot doublespend the net repays. If
+                        // true, `BorrowsLedger.repays` will be decreased by amount used to subsidize solver gas costs.
+                        _handleSolverFailAccounting(
+                            solverOp, dConfig.solverGasLimit, gasWaterMark, _result, false, true
+                        );
                     } else {
                         // If not in multipleSuccessfulSolvers mode, end the auction with the first successful solver
                         // that paid what it bid.
@@ -260,9 +264,11 @@ abstract contract Escrow is AtlETH {
             _result
         );
 
-        // Account for failed SolverOperation gas costs
+        // Account for failed SolverOperation gas costs.
+        // The useNetRepays = false here, because if we reach this point, the solverOp failed and should not be able to
+        // draw on net repays to subsidize their gas liability.
         _handleSolverFailAccounting(
-            solverOp, dConfig.solverGasLimit, gasWaterMark, _result, dConfig.callConfig.exPostBids()
+            solverOp, dConfig.solverGasLimit, gasWaterMark, _result, dConfig.callConfig.exPostBids(), false
         );
 
         return 0;

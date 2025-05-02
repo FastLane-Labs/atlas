@@ -86,6 +86,7 @@ contract AtlasErrors {
     error InsufficientTotalBalance(uint256 shortfall);
     error BorrowsNotRepaid(uint256 borrows, uint256 repays);
     error AssignDeficitTooLarge(uint256 deficit, uint256 bundlerRefund);
+    error InsufficientNetRepayments();
 
     // SafetyLocks
     error NotInitialized();
