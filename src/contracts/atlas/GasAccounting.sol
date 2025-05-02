@@ -593,13 +593,14 @@ abstract contract GasAccounting is SafetyLocks {
 
     /// @notice Checks all obligations have been reconciled: native borrows AND gas liabilities.
     /// @return True if both dimensions are reconciled, false otherwise.
-    function _isBalanceReconciled() internal view returns (bool) {
+    function _isBalanceReconciled(bool multipleSuccessfulSolvers) internal view returns (bool) {
         GasLedger memory gL = t_gasLedger.toGasLedger();
         BorrowsLedger memory bL = t_borrowsLedger.toBorrowsLedger();
 
-        // DApp's excess repayments via `contribute()` can offset solverGasLiability
+        // DApp's excess repayments via `contribute()` can offset solverGasLiability.
+        // NOTE: This solver gas subsidy feature is disabled in multipleSuccessfulSolvers mode.
         uint256 _netRepayments;
-        if (bL.repays > bL.borrows) _netRepayments = bL.repays - bL.borrows;
+        if (!multipleSuccessfulSolvers && bL.repays > bL.borrows) _netRepayments = bL.repays - bL.borrows;
 
         // gL.maxApprovedGasSpend only stores the gas units, must be scaled by tx.gasprice
         uint256 _maxApprovedGasValue = gL.maxApprovedGasSpend * tx.gasprice;
