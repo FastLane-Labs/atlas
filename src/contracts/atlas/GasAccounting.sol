@@ -161,7 +161,7 @@ abstract contract GasAccounting is SafetyLocks {
         // Store solver's maxApprovedGasSpend for use in the _isBalanceReconciled() check
         if (maxApprovedGasSpend > 0) {
             // Convert maxApprovedGasSpend from wei (native token) units to gas units
-            _gL.maxApprovedGasSpend = uint40(maxApprovedGasSpend / tx.gasprice);
+            _gL.maxApprovedGasSpend = (maxApprovedGasSpend / tx.gasprice).toUint40();
             t_gasLedger = _gL.pack();
         }
 
@@ -301,7 +301,7 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _executionMaxGas = Math.min(solverOp.gas, dConfigSolverGasLimit);
 
         // Deduct solver's max (C + E) gas from remainingMaxGas, for future solver gas liability calculations
-        _gL.remainingMaxGas -= uint40(_executionMaxGas + _calldataGas);
+        _gL.remainingMaxGas -= (_executionMaxGas + _calldataGas).toUint40();
 
         uint256 _gasUsed = _calldataGas + (gasWaterMark - gasleft());
 
@@ -311,7 +311,7 @@ abstract contract GasAccounting is SafetyLocks {
             // CASE: Solver is not responsible for the failure of their operation, so we blame the bundler
             // and reduce the total amount refunded to the bundler
             _gasUsed += _BUNDLER_FAULT_OFFSET;
-            _gL.writeoffsGas += uint40(_gasUsed);
+            _gL.writeoffsGas += _gasUsed.toUint40();
         } else {
             // CASE: Solver failed, so we calculate what they owe.
             _gasUsed += _SOLVER_FAULT_OFFSET;
@@ -343,12 +343,12 @@ abstract contract GasAccounting is SafetyLocks {
 
                 // Deduct gas written off from gas tracked as "paid for" by failed solver
                 _gasUsed -= _gasWrittenOff;
-                _gL.writeoffsGas += uint40(_gasWrittenOff); // add to writeoffs in gasLedger
+                _gL.writeoffsGas += _gasWrittenOff.toUint40(); // add to writeoffs in gasLedger
             }
 
             // The gas paid for here by failed solver, and gas written off due to shortfall in `_assign()`, will offset
             // what the winning solver owes in `_settle()`.
-            _gL.solverFaultFailureGas += uint40(_gasUsed);
+            _gL.solverFaultFailureGas += _gasUsed.toUint40();
         }
 
         // Persist the updated gas ledger to transient storage
@@ -361,7 +361,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param gasUsed The amount of gas consumed during the `bidFind` phase.
     function _writeOffBidFindGas(uint256 gasUsed) internal {
         GasLedger memory _gL = t_gasLedger.toGasLedger();
-        _gL.writeoffsGas += uint40(gasUsed);
+        _gL.writeoffsGas += gasUsed.toUint40();
         t_gasLedger = _gL.pack();
     }
 
