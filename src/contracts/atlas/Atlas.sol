@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
 import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
+import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
@@ -25,6 +26,7 @@ import { IDAppControl } from "../interfaces/IDAppControl.sol";
 /// @author FastLane Labs
 /// @notice The Execution Abstraction protocol.
 contract Atlas is Escrow, Factory {
+    using SafeCast for uint256;
     using CallBits for uint32;
     using SafetyBits for Context;
     using GasAccLib for uint256;
@@ -304,7 +306,7 @@ contract Atlas is Escrow, Factory {
             GasLedger memory _gL = t_gasLedger.toGasLedger();
             // Deduct solverOp.gas (with a ceiling of dConfig.solverGasLimit) from remainingMaxGas
             _solverExecutionGas = Math.min(solverOps[i].gas, dConfig.solverGasLimit);
-            _gL.remainingMaxGas -= uint40(_solverExecutionGas);
+            _gL.remainingMaxGas -= _solverExecutionGas.toUint40();
             t_gasLedger = _gL.pack();
 
             // skip zero and overflow bid's
