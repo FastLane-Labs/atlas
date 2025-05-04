@@ -41,20 +41,23 @@ abstract contract GasAccounting is SafetyLocks {
 
     /// @notice Sets the initial gas accounting values for the metacall transaction in transient storage.
     /// @dev Resets `t_gasLedger`, `t_borrowsLedger`, `t_solverLock`, and `t_solverTo` at the start of each metacall.
-    ///      Initializes `remainingMaxGas` with the overall gas estimate and `unreachedSolverGas` with the precalculated
-    ///      gas for all potential solver operations. Sets initial `repays` based on `msg.value`.
-    /// @param gasMarker The gas measurement at the start of the metacall, which includes Execution gas limits, Calldata
-    /// gas costs, and an additional buffer for safety.
+    ///     Initializes `remainingMaxGas` with the overall gas estimate and `unreachedSolverGas` with the precalculated
+    ///     gas for all potential solver operations. Sets initial `repays` based on `msg.value`.
+    /// @param initialRemainingMaxGas The gas measurement at the start of the metacall, which generally includes
+    ///     Execution gas limits, Calldata gas costs, and an additional buffer for safety. NOTE: If in exPostBids mode,
+    ///     this param does not include calldata gas as solvers are not liable for calldata gas costs. And in
+    ///     multipleSuccessfulSolvers mode, this param is the same value as `allSolverOpsGas`, because solvers are only
+    ///     liable for their own solverOp gas, even if they execute successfully.
     /// @param allSolverOpsGas The sum of (C + E) gas limits for all solverOps in the metacall.
     function _initializeAccountingValues(
-        uint256 gasMarker,
+        uint256 initialRemainingMaxGas,
         uint256 allSolverOpsGas,
         uint24 bundlerSurchargeRate
     )
         internal
     {
         t_gasLedger = GasLedger({
-            remainingMaxGas: gasMarker.toUint40(),
+            remainingMaxGas: initialRemainingMaxGas.toUint40(),
             writeoffsGas: 0,
             solverFaultFailureGas: 0,
             unreachedSolverGas: allSolverOpsGas.toUint40(),
