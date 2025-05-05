@@ -35,7 +35,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         address atlas,
         address l2GasCalculator
     )
-        EIP712("AtlasVerification", "1.5")
+        EIP712("AtlasVerification", "1.6")
         DAppIntegration(atlas, l2GasCalculator)
     { }
 

@@ -22,7 +22,7 @@ import { GasAccLib, GasLedger } from "../libraries/GasAccLib.sol";
 import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
-/// @title Atlas V1.5
+/// @title Atlas V1.6
 /// @author FastLane Labs
 /// @notice The Execution Abstraction protocol.
 contract Atlas is Escrow, Factory {
