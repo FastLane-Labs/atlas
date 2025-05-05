@@ -341,6 +341,35 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(bLAfter.repays, 1e18, "repays should be 1e18 - repaid borrow debt");
         assertEq(solverLock, (uint256(uint160(solverOneEOA)) | _SOLVER_CALLED_BACK_MASK | _SOLVER_FULFILLED_MASK), "solver lock should be CALLED BACK and FULFILLED");
         assertEq(totalShortfall, 0, "totalShortfall should be 0");
+
+        // Case 7: if no gas spend approved, but repayment excess is enough, BUT multipleSuccessfulSolver = true, 
+        //      solver lock should be:
+        // CALLED BACK = true
+        // FULFILLED = false (because excess repays dont contribute to gas payments in multipleSuccessfulSolver)
+        vm.revertToState(snapshot);
+
+        tAtlas.setLock(
+            executionEnvironment,
+            uint32(1 << uint32(CallConfigIndex.MultipleSuccessfulSolvers)), // Sets multipleSuccessfulSolvers to true
+            uint8(ExecutionPhase.SolverOperation)
+        );
+
+        hoax(solverContract, borrowLiability + gasLiability);
+        totalShortfall = tAtlas.reconcile{value: borrowLiability + gasLiability}(0);
+
+        gLAfter = tAtlas.getGasLedger();
+        bLAfter = tAtlas.getBorrowsLedger();
+        solverLock = tAtlas.getSolverLock();
+
+        assertEq(gLAfter.remainingMaxGas, 1_000_000, "remainingMaxGas should be 1_000_000");
+        assertEq(gLAfter.writeoffsGas, 0, "writeoffsGas should be 0");
+        assertEq(gLAfter.solverFaultFailureGas, 0, "solverFaultFailureGas should be 0");
+        assertEq(gLAfter.unreachedSolverGas, 0, "unreachedSolverGas should be 0");
+        assertEq(gLAfter.maxApprovedGasSpend, 0, "maxApprovedGasSpend should be 0");
+        assertEq(bLAfter.borrows, 1e18, "borrows should be 1e18");
+        assertEq(bLAfter.repays, borrowLiability + gasLiability, "repays should be borrowLiability + gasLiability");
+        assertEq(solverLock, (uint256(uint160(solverOneEOA)) | _SOLVER_CALLED_BACK_MASK), "solver lock should be CALLED BACK only");
+        assertEq(totalShortfall, gasLiability, "totalShortfall should be gasLiability");
     }
 
     function test_show_borrows_and_repays_accumulate_after_multiple_reconciles() public {
