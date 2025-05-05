@@ -8,6 +8,7 @@ import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import { SafetyLocks } from "./SafetyLocks.sol";
 import { EscrowBits } from "../libraries/EscrowBits.sol";
+import { CallBits } from "../libraries/CallBits.sol";
 import { AccountingMath } from "../libraries/AccountingMath.sol";
 import { GasAccLib, GasLedger, BorrowsLedger } from "../libraries/GasAccLib.sol";
 import { SolverOperation } from "../types/SolverOperation.sol";
@@ -21,6 +22,7 @@ import "../types/LockTypes.sol";
 /// @notice GasAccounting manages the accounting of gas surcharges and escrow balances for the Atlas protocol.
 abstract contract GasAccounting is SafetyLocks {
     using EscrowBits for uint256;
+    using CallBits for uint32;
     using AccountingMath for uint256;
     using SafeCast for uint256;
     using GasAccLib for uint256;
@@ -135,10 +137,12 @@ abstract contract GasAccounting is SafetyLocks {
         // NOTE: After reconcile is called for the first time by the solver, neither the claims nor the borrows values
         // can be increased.
 
+        (, uint32 _callConfig, uint8 _currentPhase) = _lock();
+
         // NOTE: While anyone can call this function, it can only be called in the SolverOperation phase. Because Atlas
         // calls directly to the solver contract in this phase, the solver should be careful to not call malicious
         // contracts which may call reconcile() on their behalf, with an excessive maxApprovedGasSpend.
-        if (_phase() != uint8(ExecutionPhase.SolverOperation)) revert WrongPhase();
+        if (_currentPhase != uint8(ExecutionPhase.SolverOperation)) revert WrongPhase();
         if (msg.sender != t_solverTo) revert InvalidAccess();
 
         (address _currentSolver, bool _calledBack,) = _solverLockData();
@@ -176,7 +180,11 @@ abstract contract GasAccounting is SafetyLocks {
             if (!_calledBack) t_solverLock = (uint256(uint160(_currentSolver)) | _SOLVER_CALLED_BACK_MASK);
             return _maxGasLiability + (_borrows - _repays);
         } else {
-            uint256 _excess = _repays - _borrows;
+            // If multipleSuccessfulSolvers = true, the solver's gas liability cannot be paid in ETH - must be fully
+            // paid by the solver's bonded AtlETH balance.
+            uint256 _excess;
+            if (!_callConfig.multipleSuccessfulSolvers()) _excess = _repays - _borrows;
+
             if (maxApprovedGasSpend + _excess < _maxGasLiability) {
                 if (!_calledBack) t_solverLock = (uint256(uint160(_currentSolver)) | _SOLVER_CALLED_BACK_MASK);
                 return _maxGasLiability - _excess;
