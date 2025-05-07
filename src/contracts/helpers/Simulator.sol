@@ -19,7 +19,6 @@ import { CallBits } from "../libraries/CallBits.sol";
 import { Result } from "../interfaces/ISimulator.sol";
 import { IAtlas } from "../interfaces/IAtlas.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
-import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 
 contract Simulator is AtlasErrors, AtlasConstants {
     using CallBits for uint32;
