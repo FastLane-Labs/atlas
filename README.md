@@ -2,7 +2,7 @@
 
 ### Concept:
 
-Atlas is a permissionless and modular smart contract framework for Execution Abstraction. It provides apps and frontends with an auction system in which Solvers compete to provide optimal solutions for user intents or MEV redistribution.  A User Operation is collected by the app's frontend via the Atlas SDK and sent to a app-designated bundler, which combines it with Solver Operations into a single transaction. 
+Atlas is a permissionless and modular smart contract framework for Execution Abstraction. It provides apps and frontends with an auction system in which Solvers compete to provide optimal solutions for user intents or MEV redistribution.  A User Operation is collected by the app's frontend via the Atlas SDK and sent to an app-designated bundler, which combines it with Solver Operations into a single transaction. 
 
 ### DApp Integration
 
@@ -65,7 +65,7 @@ The DAppControl contract *must* define the following functions:
 The DAppControl contract has the option to define functions that execute at the following stages:	
 1. **PreOps***: This function is executed before the User's operation
 2. **PreSolver***: This function is executed after the User's operation but before a Solver's operation. It occurs inside of a try/catch; if it reverts, the current Solver's solution will fail and the next Solver's solution will begin. If the Solver's operation or the PostSolver function revert, anything accomplished by the PreSolver function will also be reverted. 
-3. **PostSolver***: This function is executed after the User's operation and after a Solver's operation. It occurs inside of a try/catch; if it reverts, the PreSolver function function, and the current Solver's operation will also be reverted and the next Solver's solution will begin.
+3. **PostSolver***: This function is executed after the User's operation and after a Solver's operation. It occurs inside of a try/catch; if it reverts, the PreSolver function, and the current Solver's operation will also be reverted and the next Solver's solution will begin.
 
 *These functions are executed by the Execution Environment via "delegatecall."
 
@@ -73,10 +73,10 @@ The DAppControl contract has the option to define functions that execute at the 
 When bid amounts are known ahead of time by solvers the _bidKnownIteration() function is called and bids are sorted by bid amount, and executed until one is successful. If bid amounts are not known beforehand, such as when they are doing blind on-chain solving, the _bidFindingIteration() function is called to calculate the bid amounts on-chain. This is done by calling the same _executeSolverOperation() used in the _bidKnownIteration() for each solverOp, and checking the balance of the contract before and after to calculate the bid amounts for each solverOp.
 
 #### Permit69
-A user must have an Execution Environment (EE) instance for each DApp they would like to use, and the user address is used as a salt for the create2 deterministic deployment of it. If one is not already available, EEs can be deployed during execution of a user order since their address is known beforehand, this gas cost is covered by the solver so UX is never impacted. The EE performs ops via delegateCalls, so it needs to be able to initiate token transfers from the user. Users only have to approve the Atlas contract once because Permit69 allows Atlas to transfer funds from the user if the request is from a valid EE for that user (checked by verifying the user address is one of the salts for the EE address). Permit69 is also used by DApps, but instead transfers tokens that have accumulated in the DAppControl contract, this function performs the same verification of the EE. 
+A user must have an Execution Environment (EE) instance for each DApp they would like to use, and the user address is used as a salt for the create2 deterministic deployment of it. If one is not already available, EEs can be deployed during execution of a user order since their address is known beforehand, this gas cost is covered by the solver so UX is never impacted. The EE performs ops via delegateCalls, so it needs to be able to initiate token transfers from the user. Users only have to approve the Atlas contract once because Permit69 allows Atlas to transfer funds from the user if the request is from a valid EE for that user (checked by verifying that the user address is one of the salts used for the EE address). Permit69 is also used by DApps, but instead transfers tokens that have accumulated in the DAppControl contract, this function performs the same verification of the EE. 
 
 #### ExecutionBase
-_availableFundsERC20() is used to check the approved balance of users and dapps to atlas that can be withdrawn via permit69.
+_availableFundsERC20() is used to check the approved balance of users and dapps to atlas that can be withdrawn via Permit69.
 
 _transferDAppERC20() and _transferUserERC20() are functions that can be implemented by Atlas module developers in DappControl to access the user or dapp funds referenced in _availableFundsERC20().
 
@@ -111,7 +111,7 @@ The _borrow() function makes flash loans available from the Atlas Escrow balance
 
 ### Notes:
 
-Note that the auctioneer (typically the frontend) and/or the Operations relay may want to use a reputation system for solver bids to efficiently use the space in the solverOps[]. This isnt necessarily required - it's not an economic issue - it's just that it's important to be a good member of the ecosystem and not waste too much precious blockspace by filling it with probabalistic solver txs that have a low success rate but a high profit-to-cost ratio.
+Note that the auctioneer (typically the frontend) and/or the Operations relay may want to use a reputation system for solver bids to efficiently use the space in the solverOps[]. This isnt necessarily required - it's not an economic issue - it's just that it's important to be a good member of the ecosystem and not waste too much precious blockspace by filling it with probabilistic solver txs that have a low success rate but a high profit-to-cost ratio.
 
 ### Development:
 
