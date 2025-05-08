@@ -13,7 +13,6 @@ contract TestAtlas is Atlas {
     constructor(
         uint256 escrowDuration,
         uint256 atlasSurchargeRate,
-        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
@@ -23,7 +22,6 @@ contract TestAtlas is Atlas {
         Atlas(
             escrowDuration,
             atlasSurchargeRate,
-            bundlerSurchargeRate,
             verification,
             simulator,
             initialSurchargeRecipient,

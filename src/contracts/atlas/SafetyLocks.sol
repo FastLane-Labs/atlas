@@ -19,21 +19,12 @@ abstract contract SafetyLocks is Storage {
     constructor(
         uint256 escrowDuration,
         uint256 atlasSurchargeRate,
-        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator
     )
-        Storage(
-            escrowDuration,
-            atlasSurchargeRate,
-            bundlerSurchargeRate,
-            verification,
-            simulator,
-            initialSurchargeRecipient,
-            l2GasCalculator
-        )
+        Storage(escrowDuration, atlasSurchargeRate, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
     { }
 
     /// @notice Sets the Atlas lock to the specified execution environment.
@@ -60,7 +51,7 @@ abstract contract SafetyLocks is Storage {
     /// @param userOpHash The hash of the UserOperation.
     /// @param executionEnvironment The address of the execution environment.
     /// @param bundler The address of the bundler.
-    /// @param dappGasLimit The DAppControl's gas limit for preOps, allocateValue, and postOps hooks.
+    /// @param dappGasLimit The DAppControl's gas limit for preOps and allocateValue hooks.
     /// @param solverOpCount The count of SolverOperations.
     /// @param isSimulation Whether the current execution is a simulation.
     /// @return An Context struct initialized with the provided parameters.

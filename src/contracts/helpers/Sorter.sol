@@ -1,6 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.28;
 
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+
 import { IAtlas } from "../interfaces/IAtlas.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
@@ -79,12 +81,14 @@ contract Sorter is AtlasConstants {
     {
         // Make sure the solver has enough funds bonded
         uint256 solverBalance = ATLAS.balanceOfBonded(solverOp.from);
-        uint256 solverOpGasLimit = AccountingMath.solverGasLimitScaledDown(solverOp.gas, dConfig.solverGasLimit);
+
+        // solverOp.gas has a ceiling of dConfig.solverGasLimit
+        uint256 solverOpGasLimit = Math.min(solverOp.gas, dConfig.solverGasLimit);
 
         // Calldata gas a winning solver would pay for: non-solverOp calldata + their own solverOp calldata
         uint256 calldataGas = (
-            USER_OP_STATIC_LENGTH + DAPP_OP_LENGTH + _SOLVER_OP_BASE_CALLDATA + userOp.data.length
-                + solverOp.data.length
+            USER_OP_STATIC_LENGTH + DAPP_OP_LENGTH + _SOLVER_OP_BASE_CALLDATA + _EXTRA_CALLDATA_LENGTH
+                + userOp.data.length + solverOp.data.length
         ) * _CALLDATA_LENGTH_PREMIUM_HALVED;
 
         // Execution gas a winning solver would pay for
@@ -143,7 +147,7 @@ contract Sorter is AtlasConstants {
     {
         address bidToken = IDAppControl(dConfig.to).getBidFormat(userOp);
 
-        uint256 totalSurchargeRate = ATLAS.atlasSurchargeRate() + ATLAS.bundlerSurchargeRate();
+        uint256 totalSurchargeRate = ATLAS.getAtlasSurchargeRate() + userOp.bundlerSurchargeRate;
 
         SortingData[] memory sortingData = new SortingData[](count);
 

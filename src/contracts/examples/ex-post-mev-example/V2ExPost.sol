@@ -60,7 +60,8 @@ contract V2ExPost is DAppControl {
                 requireFulfillment: false,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: true
+                exPostBids: true,
+                multipleSuccessfulSolvers: false
             })
         )
     { }

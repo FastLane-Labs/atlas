@@ -287,6 +287,8 @@ contract SimulatorTest is BaseTest {
             .withControl(address(dAppControl))
             .withCallConfig(dAppControl.CALL_CONFIG())
             .withDAppGasLimit(dAppControl.getDAppGasLimit())
+            .withSolverGasLimit(dAppControl.getSolverGasLimit())
+            .withBundlerSurchargeRate(dAppControl.getBundlerSurchargeRate())
             .withSessionKey(address(0))
             .withData("")
             .sign(address(atlasVerification), userPK);

@@ -3,6 +3,8 @@ pragma solidity 0.8.28;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
+import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
+import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
@@ -20,10 +22,11 @@ import { GasAccLib, GasLedger } from "../libraries/GasAccLib.sol";
 import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
-/// @title Atlas V1.5
+/// @title Atlas V1.6
 /// @author FastLane Labs
 /// @notice The Execution Abstraction protocol.
 contract Atlas is Escrow, Factory {
+    using SafeCast for uint256;
     using CallBits for uint32;
     using SafetyBits for Context;
     using GasAccLib for uint256;
@@ -32,22 +35,13 @@ contract Atlas is Escrow, Factory {
     constructor(
         uint256 escrowDuration,
         uint256 atlasSurchargeRate,
-        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator,
         address factoryLib
     )
-        Escrow(
-            escrowDuration,
-            atlasSurchargeRate,
-            bundlerSurchargeRate,
-            verification,
-            simulator,
-            initialSurchargeRecipient,
-            l2GasCalculator
-        )
+        Escrow(escrowDuration, atlasSurchargeRate, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
         Factory(factoryLib)
     { }
 
@@ -123,8 +117,23 @@ contract Atlas is Escrow, Factory {
         // Initialize the environment lock and accounting values
         _setEnvironmentLock(_dConfig, _executionEnvironment);
 
-        // _gasMarker - _bidFindOverhead = estimated winning solver gas liability (not charged for bid-find gas)
-        _initializeAccountingValues(_gasMarker - _bidFindOverhead, _allSolversGasLimit);
+        // If in `multipleSuccessfulSolvers` mode, solvers are only liable for their own (C + E) gas costs, even if they
+        // execute successfully. In this case we set `remainingMaxGas` and `unreachedSolverGas` to the same value - the
+        // sum of all solvers' (C + E) gas limits. Then, `solverGasLiability()` will report just the current solver's
+        // gas costs with surcharges.
+        // In all other cases, `remainingMaxGas` includes non-solver gas limits and overheads that the winning solver
+        // may be liable for. In `exPostBids` mode, we also subtract the gas limit of the bid-finding solverOp
+        // iterations, as that gas will be written off (winning solver not liable for them).
+        uint256 _initialRemainingMaxGas =
+            _dConfig.callConfig.multipleSuccessfulSolvers() ? _allSolversGasLimit : _gasMarker - _bidFindOverhead;
+
+        // `userOp.bundlerSurchargeRate` is checked against the value set in the DAppControl in `validateCalls()` above,
+        // so it is safe to use here.
+        _initializeAccountingValues({
+            initialRemainingMaxGas: _initialRemainingMaxGas,
+            allSolverOpsGas: _allSolversGasLimit,
+            bundlerSurchargeRate: userOp.bundlerSurchargeRate
+        });
 
         // Calculate `execute` gas limit such that it can fail due to an OOG error caused by any of the hook calls, and
         // the metacall will still have enough gas to gracefully finish and return, storing any nonces required.
@@ -152,9 +161,15 @@ contract Atlas is Escrow, Factory {
                 );
             }
 
-            // Gas Refund to sender only if execution is successful
-            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) =
-                _settle(ctx, _gL, _gasMarker, gasRefundBeneficiary, _unreachedCalldataValuePaid);
+            // Gas Refund to sender only if execution is successful, or if multipleSuccessfulSolvers
+            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) = _settle(
+                ctx,
+                _gL,
+                _gasMarker,
+                gasRefundBeneficiary,
+                _unreachedCalldataValuePaid,
+                _dConfig.callConfig.multipleSuccessfulSolvers()
+            );
 
             auctionWon = ctx.solverSuccessful;
             emit MetacallResult(msg.sender, userOp.from, auctionWon, _ethPaidToBundler, _netGasSurcharge);
@@ -173,7 +188,8 @@ contract Atlas is Escrow, Factory {
             emit MetacallResult(msg.sender, userOp.from, false, 0, 0);
         }
 
-        // The environment lock is explicitly released here to allow multiple metacalls in a single transaction.
+        // The environment lock is explicitly released here to allow multiple (sequential, not nested) metacalls in a
+        // single transaction.
         _releaseLock();
     }
 
@@ -258,6 +274,7 @@ contract Atlas is Escrow, Factory {
 
         uint256[] memory _bidsAndIndices = new uint256[](solverOpsLength);
         uint256 _bidAmountFound;
+        uint256 _solverExecutionGas;
         uint256 _bidsAndIndicesLastIndex = solverOpsLength - 1; // Start from the last index
 
         // Get a snapshot of the GasLedger from transient storage, to reset to after bid-finding below
@@ -287,7 +304,9 @@ contract Atlas is Escrow, Factory {
             // remainingMaxGas separately here. This decrease does not include calldata gas as solvers are not charged
             // for calldata gas in exPostBids mode.
             GasLedger memory _gL = t_gasLedger.toGasLedger();
-            _gL.remainingMaxGas -= uint48(dConfig.solverGasLimit);
+            // Deduct solverOp.gas (with a ceiling of dConfig.solverGasLimit) from remainingMaxGas
+            _solverExecutionGas = Math.min(solverOps[i].gas, dConfig.solverGasLimit);
+            _gL.remainingMaxGas -= _solverExecutionGas.toUint40();
             t_gasLedger = _gL.pack();
 
             // skip zero and overflow bid's
@@ -378,14 +397,29 @@ contract Atlas is Escrow, Factory {
 
             SolverOperation calldata solverOp = solverOps[ctx.solverIndex];
 
-            _bidAmount = _executeSolverOperation(
+            // if multipleSuccessfulSolvers = true, solver bids are summed here. Otherwise, 0 bids are returned on
+            // solverOp failure, and only the first successful solver's bid is added to `_bidAmount`.
+            _bidAmount += _executeSolverOperation(
                 ctx, dConfig, userOp, solverOp, solverOp.bidAmount, _gasWaterMark, false, returnData
             );
 
+            // If a winning solver is found, stop iterating through the solverOps and return the winning bid
             if (ctx.solverSuccessful) {
                 return _bidAmount;
             }
         }
+
+        // If no winning solver, but multipleSuccessfulSolvers is true, return the sum of solver bid amounts
+        if (dConfig.callConfig.multipleSuccessfulSolvers()) {
+            // Considered a fail for simulation purposes when only one solverOp in the metacall, and it fails. If more
+            // than 1 solverOp, any of them could fail and simulation could still be successful.
+            if (ctx.isSimulation && solverOpsLen == 1 && ctx.solverOutcome != 0) {
+                revert SolverSimFail(uint256(ctx.solverOutcome));
+            }
+
+            return _bidAmount;
+        }
+
         if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));
         if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
         return 0;

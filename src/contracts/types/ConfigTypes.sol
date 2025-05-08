@@ -6,7 +6,8 @@ struct DAppConfig {
     uint32 callConfig; // Configuration
     address bidToken; // address(0) for ETH
     uint32 solverGasLimit; // Max gas limit for solverOp (including preSolver and postSolver) execution
-    uint32 dappGasLimit; // Max shared gas limit for preOps, allocateValue, and postOps hook execution
+    uint32 dappGasLimit; // Max shared gas limit for preOps and allocateValue hook execution
+    uint128 bundlerSurchargeRate; // Bundler surcharge rate
 }
 
 struct CallConfig {
@@ -71,6 +72,9 @@ struct CallConfig {
     // exPostBids: Bids are found on-chain using `_getBidAmount` in Atlas, and solverOp.bidAmount is used as the max
     // bid. If solverOp.bidAmount is 0, then there is no max bid limit for that solver.
     bool exPostBids;
+    // multipleSolvers: If true, the metacall will proceed even if a solver successfully pays their bid, and will be
+    // charged in gas as if it was reverted. If false, the auction ends after the first successful solver.
+    bool multipleSuccessfulSolvers;
 }
 
 enum CallConfigIndex {
@@ -93,5 +97,6 @@ enum CallConfigIndex {
     RequireFulfillment,
     TrustedOpHash,
     InvertBidValue,
-    ExPostBids
+    ExPostBids,
+    MultipleSuccessfulSolvers
 }

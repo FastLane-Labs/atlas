@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
+import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import { AtlETH } from "./AtlETH.sol";
 import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
@@ -39,21 +40,12 @@ abstract contract Escrow is AtlETH {
     constructor(
         uint256 escrowDuration,
         uint256 atlasSurchargeRate,
-        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator
     )
-        AtlETH(
-            escrowDuration,
-            atlasSurchargeRate,
-            bundlerSurchargeRate,
-            verification,
-            simulator,
-            initialSurchargeRecipient,
-            l2GasCalculator
-        )
+        AtlETH(escrowDuration, atlasSurchargeRate, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
     {
         if (escrowDuration == 0) revert InvalidEscrowDuration();
     }
@@ -217,11 +209,11 @@ abstract contract Escrow is AtlETH {
                 // Execute the solver call
                 (_result, _solverTracker) = _solverOpWrapper(ctx, solverOp, bidAmount, _gasLimit, returnData);
 
-                // NOTE: we intentionally do not change GasLedger here as we have found a winning solver and don't need
-                // it anymore
-
+                // First successful solver call that paid what it bid
                 if (_result.executionSuccessful()) {
-                    // First successful solver call that paid what it bid
+                    // Logic done above `_handleSolverFailAccounting()` is to charge solver for gas used here
+                    ctx.solverOutcome = uint24(_result);
+
                     emit SolverTxResult(
                         solverOp.solver,
                         solverOp.from,
@@ -233,8 +225,22 @@ abstract contract Escrow is AtlETH {
                         _result
                     );
 
-                    ctx.solverSuccessful = true;
-                    ctx.solverOutcome = uint24(_result);
+                    // Keep executing solvers without ending the auction if multipleSuccessfulSolvers is set
+                    if (dConfig.callConfig.multipleSuccessfulSolvers()) {
+                        // multipleSuccessfulSolvers mode:
+                        // - `ctx.solverSuccessful` is implicitly left as false
+                        // - `_result` should be 0 (successful) below, which should charge the solver for their own
+                        //   gas + surcharges, as 0 is not captured in the bundler fault block.
+                        // - exPostBids is not supported in multipleSuccessfulSolvers mode, so exPostBids = false here.
+                        _handleSolverFailAccounting(solverOp, dConfig.solverGasLimit, gasWaterMark, _result, false);
+                    } else {
+                        // If not in multipleSuccessfulSolvers mode, end the auction with the first successful solver
+                        // that paid what it bid.
+                        // We intentionally do not change GasLedger here as we have found a winning solver and don't
+                        // need it anymore
+                        ctx.solverSuccessful = true;
+                    }
+
                     return _solverTracker.bidAmount;
                 }
             }
@@ -314,18 +320,22 @@ abstract contract Escrow is AtlETH {
         SolverOperation calldata solverOp
     )
         internal
+        view
     {
         // Decrease unreachedSolverGas by the current solverOp's (C + E) max gas
         uint256 _calldataGas;
 
+        // Solver's execution gas is solverOp.gas with a ceiling of dConfig.solverGasLimit
+        uint256 _executionGas = Math.min(solverOp.gas, dConfig.solverGasLimit);
+
         // Calldata gas is only included if NOT in exPostBids mode.
         if (!dConfig.callConfig.exPostBids()) {
-            _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR).toUint48();
+            _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR);
         }
 
         // Reset solver's max approved gas spend to 0 at start of each new solver execution
         gL.maxApprovedGasSpend = 0;
-        gL.unreachedSolverGas -= uint48(dConfig.solverGasLimit + _calldataGas);
+        gL.unreachedSolverGas -= (_executionGas + _calldataGas).toUint40();
 
         // NOTE: GasLedger changes must be persisted to transient storage separately after this function call
     }
@@ -352,12 +362,16 @@ abstract contract Escrow is AtlETH {
         uint256 result
     )
         internal
+        view
         returns (uint256, uint256 gasLimit)
     {
-        if (gasWaterMark < _VALIDATION_GAS_LIMIT + dConfig.solverGasLimit) {
+        // gasLimit is solverOp.gas, with a ceiling of dConfig.solverGasLimit
+        gasLimit = Math.min(solverOp.gas, dConfig.solverGasLimit);
+
+        if (gasWaterMark < _VALIDATION_GAS_LIMIT + gasLimit) {
             // Make sure to leave enough gas for dApp validation calls
             result |= 1 << uint256(SolverOutcome.UserOutOfGas);
-            return (result, gasLimit); // gasLimit = 0
+            return (result, gasLimit);
         }
 
         // Verify that we can lend the solver their tx value
@@ -369,11 +383,9 @@ abstract contract Escrow is AtlETH {
         uint256 _solverBalance = S_accessData[solverOp.from].bonded;
 
         // Checks if solver's bonded balance is enough to cover the max charge should they win, including surcharges
-        if (_solverBalance < gL.solverGasLiability(_totalSurchargeRate())) {
+        if (_solverBalance < gL.solverGasLiability()) {
             result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
         }
-
-        gasLimit = AccountingMath.solverGasLimitScaledDown(solverOp.gas, dConfig.solverGasLimit);
 
         return (result, gasLimit);
     }
@@ -710,9 +722,10 @@ abstract contract Escrow is AtlETH {
         // not fully repay the borrowed amount, the `postSolverCall` might have covered the outstanding debt via
         // `contribute()`. This final check ensures that the solver has fulfilled their repayment obligations before
         // proceeding.
+        bool _multiSuccesfulSolvers = _callConfig.multipleSuccessfulSolvers();
         (, bool _calledback, bool _fulfilled) = _solverLockData();
         if (!_calledback) revert CallbackNotCalled();
-        if (!_fulfilled && !_isBalanceReconciled()) revert BalanceNotReconciled();
+        if (!_fulfilled && !_isBalanceReconciled(_multiSuccesfulSolvers)) revert BalanceNotReconciled();
 
         // Check if this is an on-chain, ex post bid search by verifying the `ctx.bidFind` flag.
         // If the flag is set, revert with `BidFindSuccessful` and include the solver's bid amount in `solverTracker`.

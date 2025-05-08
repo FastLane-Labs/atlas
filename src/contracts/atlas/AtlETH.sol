@@ -12,21 +12,12 @@ abstract contract AtlETH is Permit69 {
     constructor(
         uint256 escrowDuration,
         uint256 atlasSurchargeRate,
-        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator
     )
-        Permit69(
-            escrowDuration,
-            atlasSurchargeRate,
-            bundlerSurchargeRate,
-            verification,
-            simulator,
-            initialSurchargeRecipient,
-            l2GasCalculator
-        )
+        Permit69(escrowDuration, atlasSurchargeRate, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
     { }
 
     /*//////////////////////////////////////////////////////////////
@@ -287,9 +278,5 @@ abstract contract AtlETH is Permit69 {
         S_surchargeRecipient = msg.sender;
         S_pendingSurchargeRecipient = address(0);
         emit SurchargeRecipientTransferred(msg.sender);
-    }
-
-    function _checkIfUnlocked() internal view {
-        if (!_isUnlocked()) revert InvalidLockState();
     }
 }

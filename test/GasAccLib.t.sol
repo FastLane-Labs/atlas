@@ -18,11 +18,9 @@ contract GasAccLibTest is Test {
     using AccountingMath for uint256;
 
     MockL2GasCalculator mockL2GasCalc;
-    MemoryToCalldataHelper memoryToCalldataHelper;
 
     function setUp() public {
         mockL2GasCalc = new MockL2GasCalculator();
-        memoryToCalldataHelper = new MemoryToCalldataHelper();
     }
 
     function test_GasAccLib_GasLedger_packAndUnpack() public pure {
@@ -31,7 +29,9 @@ contract GasAccLibTest is Test {
             writeoffsGas: 2,
             solverFaultFailureGas: 3,
             unreachedSolverGas: 4,
-            maxApprovedGasSpend: 5
+            maxApprovedGasSpend: 5,
+            atlasSurchargeRate: 6,
+            bundlerSurchargeRate: 7
         });
 
         uint256 packed = before.pack();
@@ -42,6 +42,8 @@ contract GasAccLibTest is Test {
         assertEq(unpacked.solverFaultFailureGas, before.solverFaultFailureGas, "solverFaultFailureGas mismatch");
         assertEq(unpacked.unreachedSolverGas, before.unreachedSolverGas, "unreachedSolverGas mismatch");
         assertEq(unpacked.maxApprovedGasSpend, before.maxApprovedGasSpend, "maxApprovedGasSpend mismatch");
+        assertEq(unpacked.atlasSurchargeRate, before.atlasSurchargeRate, "atlasSurchargeRate mismatch");
+        assertEq(unpacked.bundlerSurchargeRate, before.bundlerSurchargeRate, "bundlerSurchargeRate mismatch");
     }
 
     function test_GasAccLib_BorrowsLedger_packAndUnpack() public pure {
@@ -73,21 +75,23 @@ contract GasAccLibTest is Test {
     }
 
     function test_GasAccLib_solverGasLiability() public {
-        uint256 totalSurchargeRate = 20_000_000; // 200%
+        uint256 totalSurchargeRate = 8_000; // 80%
 
         GasLedger memory gL = GasLedger({
             remainingMaxGas: 10_000,
             writeoffsGas: 0,
             solverFaultFailureGas: 0,
             unreachedSolverGas: 5_000,
-            maxApprovedGasSpend: 0
+            maxApprovedGasSpend: 0,
+            atlasSurchargeRate: 3_000, // 30%
+            bundlerSurchargeRate: 5_000 // 50%
         });
 
         vm.txGasPrice(5);
 
-        // Should be: (10_000 - 5_000) * (100% + 200%) * 5 = 5000 * 3 * 5 = 75_000
+        // Should be: (10_000 - 5_000) * (100% + 80%) * 5 = 5_000 * 1.8 * 5 = 45_000
         uint256 expected = uint256(gL.remainingMaxGas - gL.unreachedSolverGas).withSurcharge(totalSurchargeRate) * tx.gasprice;
-        assertEq(gL.solverGasLiability(totalSurchargeRate), expected, "solverGasLiability unexpected");
+        assertEq(gL.solverGasLiability(), expected, "solverGasLiability unexpected");
     }
 
     function test_GasAccLib_solverOpCalldataGas() public view {
@@ -104,23 +108,6 @@ contract GasAccLibTest is Test {
         assertEq(GasAccLib.solverOpCalldataGas(calldataLength, address(mockL2GasCalc)), expectedMockGas, "solverOpCalldataGas (5x mock) unexpected");
     }
 
-    function test_GasAccLib_sumSolverOpsCalldataGas() public view {
-        SolverOperation[] memory solverOps = new SolverOperation[](3);
-        solverOps[0].data = new bytes(100);
-        solverOps[1].data = new bytes(200);
-        solverOps[2].data = new bytes(500);
-
-        // First, the default calculation, using address(0) as the GasCalculator:
-        uint256 expectedDefaultGas = ((solverOps.length * GasAccLib._SOLVER_OP_BASE_CALLDATA) + 100 + 200 + 500) * GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED;
-
-        assertEq(memoryToCalldataHelper.sumSolverOpsCalldataGas(solverOps, address(0)), expectedDefaultGas, "sumSolverOpsCalldataGas (default) unexpected");
-
-        // Now, with a mock L2GasCalculator, that returns 5x the default calldata gas:
-        uint256 expectedMockGas = 5 * expectedDefaultGas;
-
-        assertEq(memoryToCalldataHelper.sumSolverOpsCalldataGas(solverOps, address(mockL2GasCalc)), expectedMockGas, "sumSolverOpsCalldataGas (5x mock) unexpected");
-    }
-
     function test_GasAccLib_metacallCalldataGas() public view {
         uint256 msgDataLength = 3_000;
 
@@ -133,19 +120,5 @@ contract GasAccLibTest is Test {
         uint256 expectedMockGas = 5 * expectedDefaultGas;
 
         assertEq(GasAccLib.metacallCalldataGas(msgDataLength, address(mockL2GasCalc)), expectedMockGas, "metacallCalldataGas (5x mock) unexpected");
-    }
-}
-
-// Basic helper to convert the SolverOperations[] memory to calldata for testing
-contract MemoryToCalldataHelper {
-    function sumSolverOpsCalldataGas(
-        SolverOperation[] calldata solverOps,
-        address l2GasCalculator
-    )
-        public
-        view
-        returns (uint256 sumCalldataGas)
-    {
-        return GasAccLib.sumSolverOpsCalldataGas(solverOps, l2GasCalculator);
     }
 }

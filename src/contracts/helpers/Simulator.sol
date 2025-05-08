@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import "../types/SolverOperation.sol";
 import "../types/UserOperation.sol";
@@ -22,6 +23,7 @@ import { IDAppControl } from "../interfaces/IDAppControl.sol";
 contract Simulator is AtlasErrors, AtlasConstants {
     using CallBits for uint32;
     using AccountingMath for uint256;
+    using GasAccLib for SolverOperation[];
 
     uint256 internal constant _SIM_GAS_SUGGESTED_BUFFER = 30_000;
     uint256 internal constant _SIM_GAS_BEFORE_METACALL = 10_000;
@@ -49,17 +51,29 @@ contract Simulator is AtlasErrors, AtlasConstants {
         returns (uint256)
     {
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
-        uint256 metacallCalldataLength = msg.data.length + DAPP_OP_LENGTH + 28;
-        // Additional 28 length accounts for the missing address param
+        address l2GasCalculator = IAtlas(atlas).L2_GAS_CALCULATOR();
+        uint256 nonSolverCalldataLength =
+            userOp.data.length + USER_OP_STATIC_LENGTH + DAPP_OP_LENGTH + _EXTRA_CALLDATA_LENGTH;
+        uint256 solverOpsLen = solverOps.length;
+        uint256 solverDataLenSum; // Calculated as sum of solverOps[i].data.length below
+        uint256 allSolversExecutionGas; // Calculated as sum of solverOps[i].gas below
 
-        uint256 metacallCalldataGas =
-            GasAccLib.metacallCalldataGas(metacallCalldataLength, IAtlas(atlas).L2_GAS_CALCULATOR());
+        for (uint256 i = 0; i < solverOpsLen; ++i) {
+            // Sum calldata length of all solverOp.data fields in the array
+            solverDataLenSum += solverOps[i].data.length;
+            // Sum all solverOp.gas values in the array, each with a ceiling of dConfig.solverGasLimit
+            allSolversExecutionGas += Math.min(solverOps[i].gas, dConfig.solverGasLimit);
+        }
+
+        uint256 metacallCalldataGas = (_SOLVER_OP_BASE_CALLDATA * solverOpsLen)
+            + GasAccLib.calldataGas(solverDataLenSum, l2GasCalculator)
+            + GasAccLib.metacallCalldataGas(nonSolverCalldataLength, l2GasCalculator);
 
         uint256 metacallExecutionGas = _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOp.gas
-            + dConfig.dappGasLimit + solverOps.length * dConfig.solverGasLimit;
+            + dConfig.dappGasLimit + allSolversExecutionGas;
 
         if (dConfig.callConfig.exPostBids()) {
-            metacallExecutionGas += solverOps.length * (_BID_FIND_OVERHEAD + dConfig.solverGasLimit);
+            metacallExecutionGas += (solverOpsLen * _BID_FIND_OVERHEAD) + allSolversExecutionGas;
         }
 
         return metacallCalldataGas + metacallExecutionGas;
@@ -80,27 +94,41 @@ contract Simulator is AtlasErrors, AtlasConstants {
         returns (uint256)
     {
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
-        uint256 bundlerSurchargeRate = IAtlas(atlas).bundlerSurchargeRate();
-        uint256 atlasSurchargeRate = IAtlas(atlas).atlasSurchargeRate();
+        uint256 bundlerSurchargeRate = userOp.bundlerSurchargeRate;
+        uint256 atlasSurchargeRate = IAtlas(atlas).getAtlasSurchargeRate();
+        uint256 totalGas;
 
-        // In exPostBid mode, solvers do not pay for calldata gas, and these calldata gas vars will be excluded.
-        // In normal bid mode, solvers each pay for their own solverOp calldata gas, and the winning solver pays for the
-        // other non-solver calldata gas as well. In this calculation, there's only 1 solverOp so no need to subtract
-        // calldata of other solverOps as they aren't any.
-        uint256 metacallCalldataLength = (_SOLVER_OP_BASE_CALLDATA + solverOp.data.length)
-            + (USER_OP_STATIC_LENGTH + userOp.data.length) + DAPP_OP_LENGTH + _EXTRA_CALLDATA_LENGTH;
+        if (dConfig.callConfig.multipleSuccessfulSolvers()) {
+            // If multipleSuccessfulSolvers = true, each solver only pays for their own gas usage.
 
-        uint256 metacallCalldataGas =
-            GasAccLib.metacallCalldataGas(metacallCalldataLength, IAtlas(atlas).L2_GAS_CALCULATOR());
+            // Calculate solver gas obligation as if expecting a solver fault in handleSolverFailAccounting()
+            uint256 _calldataGas =
+                GasAccLib.solverOpCalldataGas(solverOp.data.length, IAtlas(atlas).L2_GAS_CALCULATOR());
 
-        uint256 metacallExecutionGas =
-            _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOp.gas + userOp.dappGasLimit + solverOp.gas;
+            // Use solver's gas limit since we can't know actual execution gas beforehand
+            totalGas = _calldataGas + solverOp.gas + _SOLVER_FAULT_OFFSET;
+        } else {
+            // If multipleSuccessfulSolvers = false, the winning solver pays for their own gas + the non-solver gas.
 
-        uint256 totalGas = metacallExecutionGas;
+            // In exPostBid mode, solvers do not pay for calldata gas, and these calldata gas vars will be excluded.
+            // In normal bid mode, solvers each pay for their own solverOp calldata gas, and the winning solver pays for
+            // the other non-solver calldata gas as well. In this calculation, there's only 1 solverOp so no need to
+            // subtract calldata of other solverOps as they aren't any.
+            uint256 metacallCalldataLength = (_SOLVER_OP_BASE_CALLDATA + solverOp.data.length)
+                + (USER_OP_STATIC_LENGTH + userOp.data.length) + DAPP_OP_LENGTH + _EXTRA_CALLDATA_LENGTH;
 
-        // Only add calldata costs if NOT in exPostBids mode
-        if (!dConfig.callConfig.exPostBids()) {
-            totalGas += metacallCalldataGas;
+            uint256 metacallCalldataGas =
+                GasAccLib.metacallCalldataGas(metacallCalldataLength, IAtlas(atlas).L2_GAS_CALCULATOR());
+
+            uint256 metacallExecutionGas =
+                _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOp.gas + userOp.dappGasLimit + solverOp.gas;
+
+            totalGas = metacallExecutionGas;
+
+            // Only add calldata costs if NOT in exPostBids mode
+            if (!dConfig.callConfig.exPostBids()) {
+                totalGas += metacallCalldataGas;
+            }
         }
 
         // NOTE: In exPostBids mode, the bid-finding solverOp execution gas is written off. So no need to add here.
@@ -239,7 +267,12 @@ contract Simulator is AtlasErrors, AtlasConstants {
         payable
     {
         if (msg.sender != address(this)) revert InvalidEntryFunction();
-        if (!IAtlas(atlas).metacall{ value: msg.value, gas: estGasLimit }(userOp, solverOps, dAppOp, address(0))) {
+        bool auctionWon =
+            IAtlas(atlas).metacall{ value: msg.value, gas: estGasLimit }(userOp, solverOps, dAppOp, address(0));
+
+        // If multipleSuccessfulSolvers = true, metacall always returns auctionWon = false, even if there were some
+        // successful solvers. So we always revert with SimulationPassed here if multipleSuccessfulSolvers = true.
+        if (!auctionWon && !userOp.callConfig.multipleSuccessfulSolvers()) {
             revert NoAuctionWinner(); // should be unreachable
         }
         revert SimulationPassed();

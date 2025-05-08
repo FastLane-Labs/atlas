@@ -55,7 +55,6 @@ contract DeployAtlasScript is DeployBaseScript {
         atlas = new Atlas({
             escrowDuration: ESCROW_DURATION,
             atlasSurchargeRate: ATLAS_SURCHARGE_RATE,
-            bundlerSurchargeRate: BUNDLER_SURCHARGE_RATE,
             verification: expectedAtlasVerificationAddr,
             simulator: expectedSimulatorAddr,
             factoryLib: address(factoryLib),

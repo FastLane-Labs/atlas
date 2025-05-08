@@ -52,8 +52,8 @@ contract MockFactoryLib is FactoryLib {
 }
 
 contract FactoryTest is Test {
-    uint256 DEFAULT_ATLAS_SURCHARGE_RATE = 1_000_000; // 10%
-    uint256 DEFAULT_BUNDLER_SURCHARGE_RATE = 1_000_000; // 10%
+    uint256 DEFAULT_ATLAS_SURCHARGE_RATE = 1_000; // 10%
+    uint256 DEFAULT_BUNDLER_SURCHARGE_RATE = 1_000; // 10%
 
     Atlas public atlas;
     AtlasVerification public atlasVerification;
@@ -81,7 +81,6 @@ contract FactoryTest is Test {
         atlas = new Atlas({
             escrowDuration: 64,
             atlasSurchargeRate: DEFAULT_ATLAS_SURCHARGE_RATE,
-            bundlerSurchargeRate: DEFAULT_BUNDLER_SURCHARGE_RATE,
             verification: expectedAtlasVerificationAddr,
             simulator: address(0),
             factoryLib: address(factoryLib),
