@@ -93,6 +93,7 @@ contract AtlasVerificationBase is BaseTest {
             .withControl(address(dAppControl))
             .withCallConfig(dAppControl.CALL_CONFIG())
             .withDAppGasLimit(dAppControl.getDAppGasLimit())
+            .withSolverGasLimit(dAppControl.getSolverGasLimit())
             .withBundlerSurchargeRate(dAppControl.getBundlerSurchargeRate())
             .withSessionKey(address(0))
             .withData("")
@@ -1677,6 +1678,27 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         ), ValidCallsResult.DAppGasLimitMismatch);
     }
 
+    // SolverGasLimitMismatch cases
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    //     where the userOp.solverGasLimit does not match the value returned by getSolverGasLimit in the dapp control
+    // when validCalls is called from the userEOA
+    // then it should return SolverGasLimitMismatch
+    //
+    function test_validCalls_SolverGasLimitMismatch() public {
+        defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation().withSolverGasLimit(1).signAndBuild(address(atlasVerification), userPK);
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.SolverGasLimitMismatch);
+    }
+
     // BundlerSurchargeRateMismatch cases
 
     //
@@ -1828,7 +1850,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     function testGetDomainSeparatorInAtlasVerification() public view {
         bytes32 hashedName = keccak256(bytes("AtlasVerification"));
-        bytes32 hashedVersion = keccak256(bytes("1.5"));
+        bytes32 hashedVersion = keccak256(bytes("1.6"));
         bytes32 typeHash = keccak256(
             "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
         );

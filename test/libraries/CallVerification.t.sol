@@ -23,6 +23,7 @@ contract CallVerificationTest is Test {
             control: address(0x3),
             callConfig: 321,
             dappGasLimit: 654,
+            solverGasLimit: 987,
             bundlerSurchargeRate: 1_000, // 10%
             sessionKey: address(0),
             data: "data",

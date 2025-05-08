@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
+import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import { AtlETH } from "./AtlETH.sol";
 import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
@@ -324,8 +325,8 @@ abstract contract Escrow is AtlETH {
         // Decrease unreachedSolverGas by the current solverOp's (C + E) max gas
         uint256 _calldataGas;
 
-        // Solver's execution gas is solverOp.gas with a max of dConfig.solverGasLimit
-        uint256 _executionGas = (solverOp.gas > dConfig.solverGasLimit) ? dConfig.solverGasLimit : solverOp.gas;
+        // Solver's execution gas is solverOp.gas with a ceiling of dConfig.solverGasLimit
+        uint256 _executionGas = Math.min(solverOp.gas, dConfig.solverGasLimit);
 
         // Calldata gas is only included if NOT in exPostBids mode.
         if (!dConfig.callConfig.exPostBids()) {
@@ -364,8 +365,8 @@ abstract contract Escrow is AtlETH {
         view
         returns (uint256, uint256 gasLimit)
     {
-        // gasLimit is solverOp.gas, with a max of dConfig.solverGasLimit
-        gasLimit = (solverOp.gas > dConfig.solverGasLimit) ? dConfig.solverGasLimit : solverOp.gas;
+        // gasLimit is solverOp.gas, with a ceiling of dConfig.solverGasLimit
+        gasLimit = Math.min(solverOp.gas, dConfig.solverGasLimit);
 
         if (gasWaterMark < _VALIDATION_GAS_LIMIT + gasLimit) {
             // Make sure to leave enough gas for dApp validation calls
@@ -721,9 +722,10 @@ abstract contract Escrow is AtlETH {
         // not fully repay the borrowed amount, the `postSolverCall` might have covered the outstanding debt via
         // `contribute()`. This final check ensures that the solver has fulfilled their repayment obligations before
         // proceeding.
+        bool _multiSuccesfulSolvers = _callConfig.multipleSuccessfulSolvers();
         (, bool _calledback, bool _fulfilled) = _solverLockData();
         if (!_calledback) revert CallbackNotCalled();
-        if (!_fulfilled && !_isBalanceReconciled()) revert BalanceNotReconciled();
+        if (!_fulfilled && !_isBalanceReconciled(_multiSuccesfulSolvers)) revert BalanceNotReconciled();
 
         // Check if this is an on-chain, ex post bid search by verifying the `ctx.bidFind` flag.
         // If the flag is set, revert with `BidFindSuccessful` and include the solver's bid amount in `solverTracker`.

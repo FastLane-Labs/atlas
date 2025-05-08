@@ -4,6 +4,8 @@ pragma solidity 0.8.28;
 import { EIP712 } from "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import { SignatureChecker } from "openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+
 import { DAppIntegration } from "./DAppIntegration.sol";
 import { NonceManager } from "./NonceManager.sol";
 
@@ -33,7 +35,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         address atlas,
         address l2GasCalculator
     )
-        EIP712("AtlasVerification", "1.5")
+        EIP712("AtlasVerification", "1.6")
         DAppIntegration(atlas, l2GasCalculator)
     { }
 
@@ -165,6 +167,13 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                     (allSolversGasLimit, allSolversCalldataGas, bidFindOverhead, ValidCallsResult.DAppGasLimitMismatch);
             }
 
+            // Check the solverGasLimit read from DAppControl at start of metacall matches userOp value
+            if (dConfig.solverGasLimit != userOp.solverGasLimit) {
+                return (
+                    allSolversGasLimit, allSolversCalldataGas, bidFindOverhead, ValidCallsResult.SolverGasLimitMismatch
+                );
+            }
+
             // Check the bundlerSurchargeRate read from DAppControl at start of metacall matches userOp value
             if (dConfig.bundlerSurchargeRate != userOp.bundlerSurchargeRate) {
                 return (
@@ -283,15 +292,15 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             return ValidCallsResult.InvertsBidValueAndMultipleSuccessfulSolversNotSupportedTogether;
         }
         if (callConfig.multipleSuccessfulSolvers() && callConfig.allowsZeroSolvers()) {
-            // Max one of multipleSolvers or invertsBidValue can be used, not both
+            // Max one of multipleSolvers or allowsZeroSolvers can be used, not both
             return ValidCallsResult.NeedSolversForMultipleSuccessfulSolvers;
         }
         if (callConfig.multipleSuccessfulSolvers() && callConfig.allowsSolverAuctioneer()) {
-            // Max one of multipleSolvers or invertsBidValue can be used, not both
+            // Max one of multipleSolvers or allowsSolverAuctioneer can be used, not both
             return ValidCallsResult.SolverCannotBeAuctioneerForMultipleSuccessfulSolvers;
         }
         if (callConfig.multipleSuccessfulSolvers() && callConfig.needsFulfillment()) {
-            // Max one of multipleSolvers or invertsBidValue can be used, not both
+            // Max one of multipleSolvers or needsFulfillment can be used, not both
             return ValidCallsResult.CannotRequireFulfillmentForMultipleSuccessfulSolvers;
         }
         if (callConfig.needsSequentialUserNonces() && callConfig.needsSequentialDAppNonces()) {
@@ -599,6 +608,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                         userOp.control,
                         userOp.callConfig,
                         userOp.dappGasLimit,
+                        userOp.solverGasLimit,
                         userOp.bundlerSurchargeRate,
                         userOp.sessionKey
                     )
@@ -620,6 +630,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                         userOp.control,
                         userOp.callConfig,
                         userOp.dappGasLimit,
+                        userOp.solverGasLimit,
                         userOp.bundlerSurchargeRate,
                         userOp.sessionKey,
                         keccak256(userOp.data)
@@ -662,9 +673,8 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         for (uint256 i = 0; i < solverOpsLen; ++i) {
             // Sum calldata length of all solverOp.data fields in the array
             solverDataLenSum += solverOps[i].data.length;
-            // Sum all solverOp.gas values in the array, each with a max of dConfig.solverGasLimit
-            allSolversExecutionGas +=
-                (solverOps[i].gas > dConfigSolverGasLimit) ? dConfigSolverGasLimit : solverOps[i].gas;
+            // Sum all solverOp.gas values in the array, each with a ceiling of dConfig.solverGasLimit
+            allSolversExecutionGas += Math.min(solverOps[i].gas, dConfigSolverGasLimit);
         }
 
         allSolversCalldataGas =

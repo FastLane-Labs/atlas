@@ -341,6 +341,35 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(bLAfter.repays, 1e18, "repays should be 1e18 - repaid borrow debt");
         assertEq(solverLock, (uint256(uint160(solverOneEOA)) | _SOLVER_CALLED_BACK_MASK | _SOLVER_FULFILLED_MASK), "solver lock should be CALLED BACK and FULFILLED");
         assertEq(totalShortfall, 0, "totalShortfall should be 0");
+
+        // Case 7: if no gas spend approved, but repayment excess is enough, BUT multipleSuccessfulSolver = true, 
+        //      solver lock should be:
+        // CALLED BACK = true
+        // FULFILLED = false (because excess repays dont contribute to gas payments in multipleSuccessfulSolver)
+        vm.revertToState(snapshot);
+
+        tAtlas.setLock(
+            executionEnvironment,
+            uint32(1 << uint32(CallConfigIndex.MultipleSuccessfulSolvers)), // Sets multipleSuccessfulSolvers to true
+            uint8(ExecutionPhase.SolverOperation)
+        );
+
+        hoax(solverContract, borrowLiability + gasLiability);
+        totalShortfall = tAtlas.reconcile{value: borrowLiability + gasLiability}(0);
+
+        gLAfter = tAtlas.getGasLedger();
+        bLAfter = tAtlas.getBorrowsLedger();
+        solverLock = tAtlas.getSolverLock();
+
+        assertEq(gLAfter.remainingMaxGas, 1_000_000, "remainingMaxGas should be 1_000_000");
+        assertEq(gLAfter.writeoffsGas, 0, "writeoffsGas should be 0");
+        assertEq(gLAfter.solverFaultFailureGas, 0, "solverFaultFailureGas should be 0");
+        assertEq(gLAfter.unreachedSolverGas, 0, "unreachedSolverGas should be 0");
+        assertEq(gLAfter.maxApprovedGasSpend, 0, "maxApprovedGasSpend should be 0");
+        assertEq(bLAfter.borrows, 1e18, "borrows should be 1e18");
+        assertEq(bLAfter.repays, borrowLiability + gasLiability, "repays should be borrowLiability + gasLiability");
+        assertEq(solverLock, (uint256(uint160(solverOneEOA)) | _SOLVER_CALLED_BACK_MASK), "solver lock should be CALLED BACK only");
+        assertEq(totalShortfall, gasLiability, "totalShortfall should be gasLiability");
     }
 
     function test_show_borrows_and_repays_accumulate_after_multiple_reconciles() public {
@@ -1196,41 +1225,53 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(gL.maxApprovedGasSpend, 600, "maxApprovedGasSpend should start 600");
         assertEq(gL.solverGasLiability(), 600 * tx.gasprice, "solverGasLiability should start 600 * tx.gasprice");
 
-        // Case 1: borrows > repays | solver liability covered
+        // Case 1: borrows > repays | solver liability covered | multipleSuccessfulSolvers = false
         // --> should return false
         bL.borrows = 1e18;
         tAtlas.setBorrowsLedger(bL.pack());
-        assertEq(tAtlas.isBalanceReconciled(), false, "borrows > repays should return false");
+        assertEq(tAtlas.isBalanceReconciled(false), false, "C1: borrows > repays should return false");
 
-        // Case 2: borrows == repays == 0 | solver liability covered
+        // Case 2: borrows == repays == 0 | solver liability covered | multipleSuccessfulSolvers = false
         // --> should return true
         bL.borrows = 0;
         tAtlas.setBorrowsLedger(bL.pack());
-        assertEq(tAtlas.isBalanceReconciled(), true, "borrows == repays == 0 should return true");
+        assertEq(tAtlas.isBalanceReconciled(false), true, "C2: borrows == repays == 0 should return true");
 
-        // Case 3: repays > borrows | solver liability covered | should return true
+        // Case 3: repays > borrows | solver liability covered | multipleSuccessfulSolvers = false
+        // --> should return true
         bL.borrows = 0;
         bL.repays = 1e18;
         tAtlas.setBorrowsLedger(bL.pack());
-        assertEq(tAtlas.isBalanceReconciled(), true, "repays > borrows should return true");
+        assertEq(tAtlas.isBalanceReconciled(false), true, "C3: repays > borrows should return true");
 
-        // Case 4: repays == borrows == 100 | solver liability not covered
+        // Case 4: repays == borrows == 100 | solver liability not covered | multipleSuccessfulSolvers = false
         // --> should return false
         bL.borrows = 100;
         bL.repays = 100;
         gL.maxApprovedGasSpend = 0;
         tAtlas.setBorrowsLedger(bL.pack());
         tAtlas.setGasLedger(gL.pack());
-        assertEq(tAtlas.isBalanceReconciled(), false, "uncovered solver liability should return false");
+        assertEq(tAtlas.isBalanceReconciled(false), false, "C4: uncovered solver liability should return false");
 
-        // Case 5: repays - borrows = 300 gwei | maxApprovedGasSpend = 300 gwei | solver liability covered by combo
+        // Case 5: repays - borrows = 300 gwei | maxApprovedGasSpend = 300 gwei | multipleSuccessfulSolvers = false
+        // --> solver liability covered by combo
         // --> should return true
         bL.borrows = uint128(100 * tx.gasprice);
         bL.repays = uint128(400 * tx.gasprice);
         gL.maxApprovedGasSpend = 300; // will be multiplied by tx.gasprice to get gas value approved
         tAtlas.setBorrowsLedger(bL.pack());
         tAtlas.setGasLedger(gL.pack());
-        assertEq(tAtlas.isBalanceReconciled(), true, "solver liability covered by combo should return true");
+        assertEq(tAtlas.isBalanceReconciled(false), true, "C5: solver liability covered by combo should return true");
+
+        // Case 6: repays - borrows = 300 gwei | maxApprovedGasSpend = 300 gwei | multipleSuccessfulSolvers = true
+        // --> subsidies from net repayments not enabled in multipleSuccessfulSolvers mode
+        // --> should return false
+        bL.borrows = uint128(100 * tx.gasprice);
+        bL.repays = uint128(400 * tx.gasprice);
+        gL.maxApprovedGasSpend = 300; // will be multiplied by tx.gasprice to get gas value approved
+        tAtlas.setBorrowsLedger(bL.pack());
+        tAtlas.setGasLedger(gL.pack());
+        assertEq(tAtlas.isBalanceReconciled(true), false, "C6: no subsidies in multipleSuccessfulSolvers, should return false");
     }
 
 
@@ -1389,8 +1430,8 @@ contract TestAtlasGasAcc is TestAtlas {
         return aData;
     }
 
-    function isBalanceReconciled() public view returns (bool) {
-        return _isBalanceReconciled();
+    function isBalanceReconciled(bool multipleSuccessfulSolvers) public view returns (bool) {
+        return _isBalanceReconciled(multipleSuccessfulSolvers);
     }
 
     function getAccessData(address account) public view returns (EscrowAccountAccessData memory) {

@@ -3,6 +3,8 @@ pragma solidity 0.8.28;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
+import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
+import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
@@ -20,10 +22,11 @@ import { GasAccLib, GasLedger } from "../libraries/GasAccLib.sol";
 import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
-/// @title Atlas V1.5
+/// @title Atlas V1.6
 /// @author FastLane Labs
 /// @notice The Execution Abstraction protocol.
 contract Atlas is Escrow, Factory {
+    using SafeCast for uint256;
     using CallBits for uint32;
     using SafetyBits for Context;
     using GasAccLib for uint256;
@@ -114,10 +117,20 @@ contract Atlas is Escrow, Factory {
         // Initialize the environment lock and accounting values
         _setEnvironmentLock(_dConfig, _executionEnvironment);
 
-        // _gasMarker - _bidFindOverhead = estimated winning solver gas liability (not charged for bid-find gas)
-        // userOp.bundlerSurchargeRate is checked against the value set in the DAppControl in `validateCalls()` above
+        // If in `multipleSuccessfulSolvers` mode, solvers are only liable for their own (C + E) gas costs, even if they
+        // execute successfully. In this case we set `remainingMaxGas` and `unreachedSolverGas` to the same value - the
+        // sum of all solvers' (C + E) gas limits. Then, `solverGasLiability()` will report just the current solver's
+        // gas costs with surcharges.
+        // In all other cases, `remainingMaxGas` includes non-solver gas limits and overheads that the winning solver
+        // may be liable for. In `exPostBids` mode, we also subtract the gas limit of the bid-finding solverOp
+        // iterations, as that gas will be written off (winning solver not liable for them).
+        uint256 _initialRemainingMaxGas =
+            _dConfig.callConfig.multipleSuccessfulSolvers() ? _allSolversGasLimit : _gasMarker - _bidFindOverhead;
+
+        // `userOp.bundlerSurchargeRate` is checked against the value set in the DAppControl in `validateCalls()` above,
+        // so it is safe to use here.
         _initializeAccountingValues({
-            gasMarker: _gasMarker - _bidFindOverhead,
+            initialRemainingMaxGas: _initialRemainingMaxGas,
             allSolverOpsGas: _allSolversGasLimit,
             bundlerSurchargeRate: userOp.bundlerSurchargeRate
         });
@@ -291,10 +304,9 @@ contract Atlas is Escrow, Factory {
             // remainingMaxGas separately here. This decrease does not include calldata gas as solvers are not charged
             // for calldata gas in exPostBids mode.
             GasLedger memory _gL = t_gasLedger.toGasLedger();
-            // Deduct solverOp.gas, with a max of dConfig.solverGasLimit, from remainingMaxGas
-            _solverExecutionGas =
-                (solverOps[i].gas > dConfig.solverGasLimit) ? dConfig.solverGasLimit : solverOps[i].gas;
-            _gL.remainingMaxGas -= uint40(_solverExecutionGas);
+            // Deduct solverOp.gas (with a ceiling of dConfig.solverGasLimit) from remainingMaxGas
+            _solverExecutionGas = Math.min(solverOps[i].gas, dConfig.solverGasLimit);
+            _gL.remainingMaxGas -= _solverExecutionGas.toUint40();
             t_gasLedger = _gL.pack();
 
             // skip zero and overflow bid's

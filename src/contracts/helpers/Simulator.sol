@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import "../types/SolverOperation.sol";
 import "../types/UserOperation.sol";
@@ -18,7 +19,6 @@ import { CallBits } from "../libraries/CallBits.sol";
 import { Result } from "../interfaces/ISimulator.sol";
 import { IAtlas } from "../interfaces/IAtlas.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
-import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 
 contract Simulator is AtlasErrors, AtlasConstants {
     using CallBits for uint32;
@@ -61,9 +61,8 @@ contract Simulator is AtlasErrors, AtlasConstants {
         for (uint256 i = 0; i < solverOpsLen; ++i) {
             // Sum calldata length of all solverOp.data fields in the array
             solverDataLenSum += solverOps[i].data.length;
-            // Sum all solverOp.gas values in the array, each with a max of dConfig.solverGasLimit
-            allSolversExecutionGas +=
-                (solverOps[i].gas > dConfig.solverGasLimit) ? dConfig.solverGasLimit : solverOps[i].gas;
+            // Sum all solverOp.gas values in the array, each with a ceiling of dConfig.solverGasLimit
+            allSolversExecutionGas += Math.min(solverOps[i].gas, dConfig.solverGasLimit);
         }
 
         uint256 metacallCalldataGas = (_SOLVER_OP_BASE_CALLDATA * solverOpsLen)
