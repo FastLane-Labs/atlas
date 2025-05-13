@@ -74,6 +74,8 @@ contract FlashLoanTest is BaseTest {
             .withControl(address(control))
             .withCallConfig(control.CALL_CONFIG())
             .withDAppGasLimit(control.getDAppGasLimit())
+            .withSolverGasLimit(control.getSolverGasLimit())
+            .withBundlerSurchargeRate(control.getBundlerSurchargeRate())
             .withDeadline(block.number + 2)
             .withData(new bytes(0))
             .build();
@@ -321,7 +323,8 @@ contract DummyDAppControlBuilder is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: false
+                exPostBids: false,
+                multipleSuccessfulSolvers: false
             })
         )
     {

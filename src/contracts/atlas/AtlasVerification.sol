@@ -4,6 +4,8 @@ pragma solidity 0.8.28;
 import { EIP712 } from "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import { SignatureChecker } from "openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+
 import { DAppIntegration } from "./DAppIntegration.sol";
 import { NonceManager } from "./NonceManager.sol";
 
@@ -33,7 +35,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         address atlas,
         address l2GasCalculator
     )
-        EIP712("AtlasVerification", "1.5")
+        EIP712("AtlasVerification", "1.6")
         DAppIntegration(atlas, l2GasCalculator)
     { }
 
@@ -164,6 +166,23 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                 return
                     (allSolversGasLimit, allSolversCalldataGas, bidFindOverhead, ValidCallsResult.DAppGasLimitMismatch);
             }
+
+            // Check the solverGasLimit read from DAppControl at start of metacall matches userOp value
+            if (dConfig.solverGasLimit != userOp.solverGasLimit) {
+                return (
+                    allSolversGasLimit, allSolversCalldataGas, bidFindOverhead, ValidCallsResult.SolverGasLimitMismatch
+                );
+            }
+
+            // Check the bundlerSurchargeRate read from DAppControl at start of metacall matches userOp value
+            if (dConfig.bundlerSurchargeRate != userOp.bundlerSurchargeRate) {
+                return (
+                    allSolversGasLimit,
+                    allSolversCalldataGas,
+                    bidFindOverhead,
+                    ValidCallsResult.BundlerSurchargeRateMismatch
+                );
+            }
         }
 
         // Check gasleft() measured at start of metacall is in line with expected gas limit
@@ -264,7 +283,26 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             // Max one of preOps or userOp return data can be tracked, not both
             return ValidCallsResult.InvalidCallConfig;
         }
-
+        if (callConfig.multipleSuccessfulSolvers() && callConfig.exPostBids()) {
+            // Max one of multipleSolvers or exPostBids can be used, not both
+            return ValidCallsResult.ExPostBidsAndMultipleSuccessfulSolversNotSupportedTogether;
+        }
+        if (callConfig.multipleSuccessfulSolvers() && callConfig.invertsBidValue()) {
+            // Max one of multipleSolvers or invertsBidValue can be used, not both
+            return ValidCallsResult.InvertsBidValueAndMultipleSuccessfulSolversNotSupportedTogether;
+        }
+        if (callConfig.multipleSuccessfulSolvers() && callConfig.allowsZeroSolvers()) {
+            // Max one of multipleSolvers or allowsZeroSolvers can be used, not both
+            return ValidCallsResult.NeedSolversForMultipleSuccessfulSolvers;
+        }
+        if (callConfig.multipleSuccessfulSolvers() && callConfig.allowsSolverAuctioneer()) {
+            // Max one of multipleSolvers or allowsSolverAuctioneer can be used, not both
+            return ValidCallsResult.SolverCannotBeAuctioneerForMultipleSuccessfulSolvers;
+        }
+        if (callConfig.multipleSuccessfulSolvers() && callConfig.needsFulfillment()) {
+            // Max one of multipleSolvers or needsFulfillment can be used, not both
+            return ValidCallsResult.CannotRequireFulfillmentForMultipleSuccessfulSolvers;
+        }
         if (callConfig.needsSequentialUserNonces() && callConfig.needsSequentialDAppNonces()) {
             // Max one of user or dapp nonces can be sequential, not both
             return ValidCallsResult.BothUserAndDAppNoncesCannotBeSequential;
@@ -324,7 +362,6 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         }
 
         if (dConfig.callConfig.allowsUnknownAuctioneer()) return (ValidCallsResult.Valid, true);
-
         return (ValidCallsResult.Valid, false);
     }
 
@@ -571,6 +608,8 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                         userOp.control,
                         userOp.callConfig,
                         userOp.dappGasLimit,
+                        userOp.solverGasLimit,
+                        userOp.bundlerSurchargeRate,
                         userOp.sessionKey
                     )
                 )
@@ -591,6 +630,8 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                         userOp.control,
                         userOp.callConfig,
                         userOp.dappGasLimit,
+                        userOp.solverGasLimit,
+                        userOp.bundlerSurchargeRate,
                         userOp.sessionKey,
                         keccak256(userOp.data)
                     )
@@ -624,10 +665,20 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             uint256 bidFindOverhead
         )
     {
-        allSolversCalldataGas = solverOps.sumSolverOpsCalldataGas(L2_GAS_CALCULATOR);
         uint256 solverOpsLen = solverOps.length;
         uint256 dConfigSolverGasLimit = dConfig.solverGasLimit;
-        uint256 allSolversExecutionGas = solverOpsLen * dConfigSolverGasLimit;
+        uint256 solverDataLenSum; // Calculated as sum of solverOps[i].data.length below
+        uint256 allSolversExecutionGas; // Calculated as sum of solverOps[i].gas below
+
+        for (uint256 i = 0; i < solverOpsLen; ++i) {
+            // Sum calldata length of all solverOp.data fields in the array
+            solverDataLenSum += solverOps[i].data.length;
+            // Sum all solverOp.gas values in the array, each with a ceiling of dConfig.solverGasLimit
+            allSolversExecutionGas += Math.min(solverOps[i].gas, dConfigSolverGasLimit);
+        }
+
+        allSolversCalldataGas =
+            GasAccLib.calldataGas(solverDataLenSum + (_SOLVER_OP_BASE_CALLDATA * solverOps.length), L2_GAS_CALCULATOR);
 
         uint256 metacallExecutionGas = _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOpGas
             + dConfig.dappGasLimit + allSolversExecutionGas;
@@ -637,7 +688,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
 
         if (dConfig.callConfig.exPostBids()) {
             // Add extra execution gas for bid-finding loop of each solverOp
-            bidFindOverhead = solverOpsLen * (_BID_FIND_OVERHEAD + dConfigSolverGasLimit);
+            bidFindOverhead = (solverOpsLen * _BID_FIND_OVERHEAD) + allSolversExecutionGas;
             metacallExecutionGas += bidFindOverhead;
             // NOTE: allSolversGasLimit excludes calldata in exPostBids mode.
         } else {

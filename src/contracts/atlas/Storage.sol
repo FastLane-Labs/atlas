@@ -45,7 +45,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 internal S_bondedTotalSupply;
 
     // Surcharge-related storage
-    uint256 internal S_surchargeRates; // left 128 bits: Atlas rate, right 128 bits: Bundler rate
+    uint256 internal S_atlasSurchargeRate; // Loaded into GasLedger during metacall, scale = 10_000
     uint256 internal S_cumulativeSurcharge; // Cumulative gas surcharges collected
     address internal S_surchargeRecipient; // Fastlane surcharge recipient
     address internal S_pendingSurchargeRecipient; // For 2-step transfer process
@@ -57,7 +57,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     constructor(
         uint256 escrowDuration,
         uint256 atlasSurchargeRate,
-        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
@@ -70,12 +69,12 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         L2_GAS_CALCULATOR = l2GasCalculator;
         ESCROW_DURATION = escrowDuration;
 
-        // Check Atlas and Bundler gas surcharges fit in 128 bits each
-        if(atlasSurchargeRate > type(uint128).max || bundlerSurchargeRate > type(uint128).max) {
+        // Check Atlas gas surcharge fits in 24 bits
+        if(atlasSurchargeRate > type(uint24).max) {
             revert SurchargeRateTooHigh();
         }
 
-        S_surchargeRates = atlasSurchargeRate << 128 | bundlerSurchargeRate;
+        S_atlasSurchargeRate = atlasSurchargeRate;
         S_cumulativeSurcharge = msg.value;
         S_surchargeRecipient = initialSurchargeRecipient;
 
@@ -86,15 +85,16 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     //                     Storage Setters                  //
     // ---------------------------------------------------- //
 
-    function setSurchargeRates(uint256 newAtlasRate, uint256 newBundlerRate) external {
+    function setAtlasSurchargeRate(uint256 newAtlasRate) external {
         _onlySurchargeRecipient();
+        _checkIfUnlocked(); // Should not be able to change Atlas surcharge during a metacall
 
-        // Check Atlas and Bundler gas surcharges fit in 128 bits each
-        if(newAtlasRate > type(uint128).max || newBundlerRate > type(uint128).max) {
+        // Check Atlas gas surcharge fits in 24 bits
+        if(newAtlasRate > type(uint24).max) {
             revert SurchargeRateTooHigh();
         }
 
-        S_surchargeRates = newAtlasRate << 128 | newBundlerRate;
+        S_atlasSurchargeRate = newAtlasRate;
     }
 
     function _onlySurchargeRecipient() internal view {
@@ -150,29 +150,16 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         return S_pendingSurchargeRecipient;
     }
 
-    function atlasSurchargeRate() external view returns (uint256) {
-        // Includes only the left 128 bits to isolate the Atlas rate
-        return S_surchargeRates >> 128;
-    }
-
-    function bundlerSurchargeRate() external view returns (uint256) {
-        // Includes only the right 128 bits to isolate the bundler rate
-        return S_surchargeRates & ((1 << 128) - 1);
+    function getAtlasSurchargeRate() external view returns (uint256) {
+        return S_atlasSurchargeRate;
     }
 
     // ---------------------------------------------------- //
     //               Storage Internal Getters               //
     // ---------------------------------------------------- //
 
-    function _surchargeRates() internal view returns (uint256 atlasRate, uint256 bundlerRate) {
-        uint256 _bothRates = S_surchargeRates;
-        atlasRate = _bothRates >> 128;
-        bundlerRate = _bothRates & ((1 << 128) - 1);
-    }
-
-    function _totalSurchargeRate() internal view returns(uint256 totalSurchargeRate) {
-        (uint256 atlasRate, uint256 bundlerRate) = _surchargeRates();
-        totalSurchargeRate = atlasRate + bundlerRate;
+    function _atlasSurchargeRate() internal view returns (uint24) {
+        return uint24(S_atlasSurchargeRate);
     }
 
     // ---------------------------------------------------- //
@@ -236,6 +223,11 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
     function _isUnlocked() internal view returns (bool) {
         return t_lock == _UNLOCKED;
+    }
+
+    // Will revert if Atlas is not in the unlocked state (i.e. will revert during a metacall).
+    function _checkIfUnlocked() internal view {
+        if (!_isUnlocked()) revert InvalidLockState();
     }
 
     // ---------------------------------------------------- //

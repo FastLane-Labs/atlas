@@ -37,8 +37,8 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
     uint256 public constant ONE_GWEI = 1e9;
     uint256 public constant SCALE = AccountingMath._SCALE;
-    uint256 public constant A_SURCHARGE = 1_000_000; // 10%
-    uint256 public constant B_SURCHARGE = 1_000_000; // 10%
+    uint24 public constant A_SURCHARGE = 1_000; // 10%
+    uint24 public constant B_SURCHARGE = 1_000; // 10%
 
     TestAtlasGasAcc public tAtlas;
     address public executionEnvironment;
@@ -58,7 +58,6 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         tAtlas = new TestAtlasGasAcc(
             DEFAULT_ESCROW_DURATION,
             A_SURCHARGE,
-            B_SURCHARGE,
             expectedAtlasVerificationAddr,
             address(simulator),
             deployer,
@@ -86,7 +85,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         uint256 allSolverOpsGas = 456;
         uint256 msgValue = 789;
 
-        tAtlas.initializeAccountingValues{ value: msgValue }(gasMarker, allSolverOpsGas);
+        tAtlas.initializeAccountingValues{ value: msgValue }(gasMarker, allSolverOpsGas, B_SURCHARGE);
 
         GasLedger memory gL = tAtlas.getGasLedger();
         BorrowsLedger memory bL = tAtlas.getBorrowsLedger();
@@ -96,6 +95,8 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(gL.solverFaultFailureGas, 0, "solverFaultFailureGas should be 0");
         assertEq(gL.unreachedSolverGas, allSolverOpsGas, "unreachedSolverGas not set correctly");
         assertEq(gL.maxApprovedGasSpend, 0, "maxApprovedGasSpend should be 0");
+        assertEq(gL.atlasSurchargeRate, A_SURCHARGE, "atlasSurchargeRate not set correctly");
+        assertEq(gL.bundlerSurchargeRate, B_SURCHARGE, "bundlerSurchargeRate not set correctly");
         assertEq(bL.borrows, 0, "borrows should be 0");
         assertEq(bL.repays, msgValue, "repays not set correctly");
     }
@@ -190,7 +191,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
     }
 
     function test_GasAccounting_shortfall() public {
-        GasLedger memory gL = GasLedger(1_000_000, 0, 0, 0, 0);
+        GasLedger memory gL = GasLedger(1_000_000, 0, 0, 0, 0, A_SURCHARGE, B_SURCHARGE);
         BorrowsLedger memory bL = BorrowsLedger(1e18, 0);
         tAtlas.setGasLedger(gL.pack());
         tAtlas.setBorrowsLedger(bL.pack());
@@ -206,7 +207,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(borrowLiability, 1e18, "borrowLiability 1 should be 1e18");
 
         // Case 2: Net borrows = -1e18 | gas liability = (200k * 1 gwei * 1 + surcharges)
-        tAtlas.setGasLedger(GasLedger(200000, 0, 0, 0, 0).pack());
+        tAtlas.setGasLedger(GasLedger(200000, 0, 0, 0, 0, A_SURCHARGE, B_SURCHARGE).pack());
         tAtlas.setBorrowsLedger(BorrowsLedger(0, 1e18).pack());
 
         (gasLiability, borrowLiability) = tAtlas.shortfall();
@@ -225,7 +226,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         tAtlas.setSolverLock(uint256(uint160(solverOneEOA)));
 
         // Solver has a 1M gas liability, and a 1 ETH borrow liability
-        GasLedger memory gL = GasLedger(1_000_000, 0, 0, 0, 0);
+        GasLedger memory gL = GasLedger(1_000_000, 0, 0, 0, 0, A_SURCHARGE, B_SURCHARGE);
         BorrowsLedger memory bL = BorrowsLedger(1e18, 0);
 
         tAtlas.setGasLedger(gL.pack());
@@ -340,6 +341,125 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(bLAfter.repays, 1e18, "repays should be 1e18 - repaid borrow debt");
         assertEq(solverLock, (uint256(uint160(solverOneEOA)) | _SOLVER_CALLED_BACK_MASK | _SOLVER_FULFILLED_MASK), "solver lock should be CALLED BACK and FULFILLED");
         assertEq(totalShortfall, 0, "totalShortfall should be 0");
+
+        // Case 7: if no gas spend approved, but repayment excess is enough, BUT multipleSuccessfulSolver = true, 
+        //      solver lock should be:
+        // CALLED BACK = true
+        // FULFILLED = false (because excess repays dont contribute to gas payments in multipleSuccessfulSolver)
+        vm.revertToState(snapshot);
+
+        tAtlas.setLock(
+            executionEnvironment,
+            uint32(1 << uint32(CallConfigIndex.MultipleSuccessfulSolvers)), // Sets multipleSuccessfulSolvers to true
+            uint8(ExecutionPhase.SolverOperation)
+        );
+
+        hoax(solverContract, borrowLiability + gasLiability);
+        totalShortfall = tAtlas.reconcile{value: borrowLiability + gasLiability}(0);
+
+        gLAfter = tAtlas.getGasLedger();
+        bLAfter = tAtlas.getBorrowsLedger();
+        solverLock = tAtlas.getSolverLock();
+
+        assertEq(gLAfter.remainingMaxGas, 1_000_000, "remainingMaxGas should be 1_000_000");
+        assertEq(gLAfter.writeoffsGas, 0, "writeoffsGas should be 0");
+        assertEq(gLAfter.solverFaultFailureGas, 0, "solverFaultFailureGas should be 0");
+        assertEq(gLAfter.unreachedSolverGas, 0, "unreachedSolverGas should be 0");
+        assertEq(gLAfter.maxApprovedGasSpend, 0, "maxApprovedGasSpend should be 0");
+        assertEq(bLAfter.borrows, 1e18, "borrows should be 1e18");
+        assertEq(bLAfter.repays, borrowLiability + gasLiability, "repays should be borrowLiability + gasLiability");
+        assertEq(solverLock, (uint256(uint160(solverOneEOA)) | _SOLVER_CALLED_BACK_MASK), "solver lock should be CALLED BACK only");
+        assertEq(totalShortfall, gasLiability, "totalShortfall should be gasLiability");
+    }
+
+    function test_show_borrows_and_repays_accumulate_after_multiple_reconciles() public {
+        // Setup two solvers
+        address solver1Contract = makeAddr("Solver1Contract");
+        address solver2Contract = makeAddr("Solver2Contract");
+        
+        // Setup solver1
+        hoax(solverOneEOA, 1e18);
+        tAtlas.depositAndBond{ value: 1e18 }(1e18);
+        
+        // Setup solver2
+        hoax(solverTwoEOA, 1e18);
+        tAtlas.depositAndBond{ value: 1e18 }(1e18);
+
+        // Set initial solver lock for solver1
+        tAtlas.setLock(executionEnvironment, uint32(0), uint8(ExecutionPhase.SolverOperation));
+        tAtlas.setSolverTo(solver1Contract);
+        // Set solver lock with just the address, no flags yet
+        tAtlas.setSolverLock(uint256(uint160(solverOneEOA)));
+
+        // Setup gas ledger for both solvers
+        GasLedger memory gL = GasLedger(2_000_000, 0, 0, 2_000_000, 0, A_SURCHARGE, B_SURCHARGE);
+        tAtlas.setGasLedger(gL.pack());
+
+        // Fund Atlas contract so it can handle borrows
+        vm.deal(address(tAtlas), 10e18);
+
+        // Solver1 borrows 1 ETH
+        hoax(executionEnvironment);
+        tAtlas.borrow(1e18);
+
+        // Verify borrows ledger after solver1's borrow
+        BorrowsLedger memory bL = tAtlas.getBorrowsLedger();
+        assertEq(bL.borrows, 1e18, "borrows should be 1e18 after solver1's borrow");
+        assertEq(bL.repays, 0, "repays should be 0 before solver1's reconcile");
+
+        uint256 expectedGasLiability = (1_000_000 * tx.gasprice).withSurcharge(
+            A_SURCHARGE + B_SURCHARGE
+        );
+
+        // Solver1 reconciles successfully
+        hoax(solver1Contract, 1e18);
+        uint256 totalShortfall = tAtlas.reconcile{value: 1e18}(expectedGasLiability);
+
+        // Verify solver1's state
+        uint256 solver1Lock = tAtlas.getSolverLock();
+        // The lock should be: solver address in lower 160 bits | CALLED_BACK_MASK | FULFILLED_MASK
+        assertEq(solver1Lock, (uint256(uint160(solverOneEOA)) | _SOLVER_CALLED_BACK_MASK | _SOLVER_FULFILLED_MASK), 
+            "solver1 lock should be CALLED BACK and FULFILLED");
+        assertEq(totalShortfall, 0, "solver1 shortfall should be 0");
+
+        // Verify borrows ledger after solver1's reconcile
+        bL = tAtlas.getBorrowsLedger();
+        assertEq(bL.borrows, 1e18, "borrows should still be 1e18 after solver1's reconcile");
+        assertEq(bL.repays, 1e18, "repays should be 1e18 after solver1's reconcile");
+
+        // Test solver2 reconciliation
+        tAtlas.setSolverTo(solver2Contract);
+        // Set solver lock with just the address, no flags yet
+        tAtlas.setSolverLock(uint256(uint160(solverTwoEOA)));
+
+        // Solver2 borrows 1 ETH
+        hoax(executionEnvironment);
+        tAtlas.borrow(1e18);
+
+        // Verify borrows ledger after solver2's borrow
+        bL = tAtlas.getBorrowsLedger();
+        assertEq(bL.borrows, 2e18, "borrows should be 2e18 after solver2's borrow");
+        assertEq(bL.repays, 1e18, "repays should still be 1e18 before solver2's reconcile");
+
+        // Solver2 reconciles successfully
+        hoax(solver2Contract, 1e18);
+        totalShortfall = tAtlas.reconcile{value: 1e18}(expectedGasLiability);
+
+        // Verify solver2's state
+        uint256 solver2Lock = tAtlas.getSolverLock();
+        // The lock should be: solver address in lower 160 bits | CALLED_BACK_MASK | FULFILLED_MASK
+        assertEq(solver2Lock, (uint256(uint160(solverTwoEOA)) | _SOLVER_CALLED_BACK_MASK | _SOLVER_FULFILLED_MASK), 
+            "solver2 lock should be CALLED BACK and FULFILLED");
+        assertEq(totalShortfall, 0, "solver2 shortfall should be 0");
+
+        // Verify final state
+        GasLedger memory finalGL = tAtlas.getGasLedger();
+        BorrowsLedger memory finalBL = tAtlas.getBorrowsLedger();
+        
+        assertEq(finalBL.borrows, 2e18, "total borrows should be 2e18");
+        assertEq(finalBL.repays, 2e18, "total repays should be 2e18");
+        assertEq(finalGL.maxApprovedGasSpend, (expectedGasLiability/tx.gasprice), 
+            "maxApprovedGasSpend is not being summed, this is OK because handleFailSolverAccounting doesn't use maxApprovedGasSpend");
     }
 
     function test_GasAccounting_assign() public {
@@ -435,7 +555,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         uint256 dConfigSolverGasLimit = 1_000_000;
         vm.txGasPrice(1e9); // set gas price to 1 gwei
-        GasLedger memory gLBefore = GasLedger(2_000_000, 0, 0, 0, 0);
+        GasLedger memory gLBefore = GasLedger(2_000_000, 0, 0, 0, 0, A_SURCHARGE, B_SURCHARGE);
         tAtlas.setGasLedger(gLBefore.pack()); // remainingMaxGas starts at 2M gas so it can decrease
 
         gLBefore = tAtlas.getGasLedger();
@@ -620,7 +740,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         solverOps[1] = _buildSolverOp(solverTwoEOA, solverTwoPK, userOpHash);
         solverOps[2] = _buildSolverOp(solverThreeEOA, solverThreePK, userOpHash);
         
-        GasLedger memory gL = GasLedger(0, 0, 0, 0, 0);
+        GasLedger memory gL = GasLedger(0, 0, 0, 0, 0, A_SURCHARGE, B_SURCHARGE);
         uint256 solverOpCalldataGasValue =
             GasAccLib.solverOpCalldataGas(solverOps[0].data.length, address(0)) * tx.gasprice;
 
@@ -869,8 +989,8 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         uint256 unreachedCalldataValuePaid = 100_000 * 1e9; // 100k gas * 1 gwei gas price
 
         // Random numbers to make sure the winning solver gas calc is working
-        uint48 writeoffsGas = 700_000;
-        uint48 solverFaultFailureGas = 250_000;
+        uint40 writeoffsGas = 700_000;
+        uint40 solverFaultFailureGas = 250_000;
 
         vm.txGasPrice(1e9); // set gas price to 1 gwei
 
@@ -887,7 +1007,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         BorrowsLedger memory bL = BorrowsLedger(1e18, 0);
         tAtlas.setBorrowsLedger(bL.pack());
         vm.expectRevert(abi.encodeWithSelector(AtlasErrors.BorrowsNotRepaid.selector, 1e18, 0));
-        tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid);
+        tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid, false);
 
         // Reset borrows ledger back to neutral
         tAtlas.setBorrowsLedger(BorrowsLedger(0,0).pack());
@@ -897,7 +1017,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         // ============================================
 
         vm.expectRevert(); // Difficult to predict error values - but should be AssignDeficitTooLarge() error
-        tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid);
+        tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid, false);
 
         // ============================================
         // Case 3: solverOne wins and has bonded atlETH
@@ -909,7 +1029,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         EscrowAccountAccessData memory aDataBefore = tAtlas.getAccessData(solverOneEOA);
         uint256 bundlerBalanceBefore = userEOA.balance;
         uint256 atlasSurchargeBefore = tAtlas.cumulativeSurcharge();
-        gL = GasLedger(0, writeoffsGas, solverFaultFailureGas, 0, 0);
+        gL = GasLedger(0, writeoffsGas, solverFaultFailureGas, 0, 0, A_SURCHARGE, B_SURCHARGE);
 
         uint256 snapshot = vm.snapshotState();
 
@@ -929,7 +1049,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         estAtlasSurcharge += (uint256(solverFaultFailureGas).getSurcharge(A_SURCHARGE) * tx.gasprice);
 
         // DO SETTLE CALL
-        (uint256 claimsPaidToBundler, uint256 netAtlasGasSurcharge) = tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid);
+        (uint256 claimsPaidToBundler, uint256 netAtlasGasSurcharge) = tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid, false);
 
         EscrowAccountAccessData memory aDataAfter = tAtlas.getAccessData(solverOneEOA);
 
@@ -971,7 +1091,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         ctx.solverSuccessful = false;
         solverFaultFailureGas = 10_000_000; // large solver failure gas, to trigger 80% bundler cap
         unreachedCalldataValuePaid = 0; // no unreached solvers if no winning solver
-        gL = GasLedger(0, writeoffsGas, solverFaultFailureGas, 0, 0);
+        gL = GasLedger(0, writeoffsGas, solverFaultFailureGas, 0, 0, A_SURCHARGE, B_SURCHARGE);
 
         uint256 bundlerRefundBeforeCap = uint256(solverFaultFailureGas).withSurcharge(B_SURCHARGE) * tx.gasprice;
 
@@ -983,7 +1103,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         estAtlasSurcharge += bundlerRefundBeforeCap - estBundlerRefund;
 
         // DO SETTLE CALL
-        (claimsPaidToBundler, netAtlasGasSurcharge) = tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid);
+        (claimsPaidToBundler, netAtlasGasSurcharge) = tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid, false);
 
         aDataAfter = tAtlas.getAccessData(solverOneEOA);
 
@@ -1011,8 +1131,54 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             "C4: netAtlasGasSurcharge should be estAtlasSurcharge"
         );
         assertEq(tAtlas.cumulativeSurcharge(), atlasSurchargeBefore + netAtlasGasSurcharge, "C4: cumulativeSurcharge should increase by netAtlasGasSurcharge");
-
+        
         assertEq(tAtlas.getPhase(), uint8(ExecutionPhase.FullyLocked), "C4: phase should be FullyLocked");
+
+        // ============================================
+        // Case 5: no winning solver, multipleSuccessfulSolvers is true
+        // ============================================
+        vm.revertToState(snapshot);
+
+        ctx.solverSuccessful = false;
+        solverFaultFailureGas = 10_000_000; // large solver failure gas, to trigger 80% bundler cap
+        gL = GasLedger(0, writeoffsGas, solverFaultFailureGas, 0, 0, A_SURCHARGE, B_SURCHARGE);
+
+        bundlerRefundBeforeCap = unreachedCalldataValuePaid 
+            + uint256(solverFaultFailureGas).withSurcharge(B_SURCHARGE) * tx.gasprice;
+
+        // calculate expected atlas surcharge
+        estAtlasSurcharge = uint256(solverFaultFailureGas).getSurcharge(A_SURCHARGE) * tx.gasprice;
+
+        // DO SETTLE CALL
+        (claimsPaidToBundler, netAtlasGasSurcharge) = tAtlas.settle{gas: settleGas}(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid, true);
+
+        aDataAfter = tAtlas.getAccessData(solverOneEOA);
+
+        // solverOne is not winner - no charge or change in analytics expected
+        assertEq(tAtlas.balanceOfBonded(solverOneEOA), 1e18, "solverOne is not winner - no balance change");
+        assertEq(aDataAfter.auctionWins, aDataBefore.auctionWins, "auctionWins should not change");
+        assertEq(aDataAfter.auctionFails, aDataBefore.auctionFails, "auctionFails should not change");
+        assertEq(aDataAfter.totalGasValueUsed, aDataBefore.totalGasValueUsed, "totalGasValueUsed should not change");
+
+        // check bundler refund was not capped at 80%
+        assertApproxEqRel(
+            claimsPaidToBundler,
+            bundlerRefundBeforeCap,
+            0.01e18, // 1% tolerance
+            "C5: claimsPaidToBundler should be BundlerRefundBeforeCap"
+        );
+        assertEq(bundlerBalanceBefore + claimsPaidToBundler, userEOA.balance, "bundler balance should increase by BundlerRefundBeforeCap");
+
+        // check atlas surcharge
+        assertApproxEqRel(
+            netAtlasGasSurcharge,
+            estAtlasSurcharge,
+            0.01e18, // 1% tolerance
+            "netAtlasGasSurcharge should be estAtlasSurcharge"
+        );
+        assertEq(tAtlas.cumulativeSurcharge(), atlasSurchargeBefore + netAtlasGasSurcharge, "cumulativeSurcharge should increase by netAtlasGasSurcharge");
+
+        assertEq(tAtlas.getPhase(), uint8(ExecutionPhase.FullyLocked), "phase should be FullyLocked");
     }
 
     function test_GasAccounting_updateAnalytics() public {
@@ -1049,7 +1215,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
     function test_GasAccounting_isBalanceReconciled() public {
         // solverGasLiability = (1000 - 500) * (1 + surcharges) = 500 * 1.2 * 1e9 = 600 gwei
         // maxApprovedGasSpend = (600 gwei / tx.gasprice) as well
-        GasLedger memory gL = GasLedger(1000, 0, 0, 500, 600); 
+        GasLedger memory gL = GasLedger(1000, 0, 0, 500, 600, A_SURCHARGE, B_SURCHARGE); 
         BorrowsLedger memory bL; // starts (0, 0)
         tAtlas.setGasLedger(gL.pack());
 
@@ -1057,43 +1223,55 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         // NOTE: maxApprovedGasSpend stores gas units, so implicitly need to multiply by tx.gasprice when using
         assertEq(gL.maxApprovedGasSpend, 600, "maxApprovedGasSpend should start 600");
-        assertEq(gL.solverGasLiability(A_SURCHARGE + B_SURCHARGE), 600 * tx.gasprice, "solverGasLiability should start 600 * tx.gasprice");
+        assertEq(gL.solverGasLiability(), 600 * tx.gasprice, "solverGasLiability should start 600 * tx.gasprice");
 
-        // Case 1: borrows > repays | solver liability covered
+        // Case 1: borrows > repays | solver liability covered | multipleSuccessfulSolvers = false
         // --> should return false
         bL.borrows = 1e18;
         tAtlas.setBorrowsLedger(bL.pack());
-        assertEq(tAtlas.isBalanceReconciled(), false, "borrows > repays should return false");
+        assertEq(tAtlas.isBalanceReconciled(false), false, "C1: borrows > repays should return false");
 
-        // Case 2: borrows == repays == 0 | solver liability covered
+        // Case 2: borrows == repays == 0 | solver liability covered | multipleSuccessfulSolvers = false
         // --> should return true
         bL.borrows = 0;
         tAtlas.setBorrowsLedger(bL.pack());
-        assertEq(tAtlas.isBalanceReconciled(), true, "borrows == repays == 0 should return true");
+        assertEq(tAtlas.isBalanceReconciled(false), true, "C2: borrows == repays == 0 should return true");
 
-        // Case 3: repays > borrows | solver liability covered | should return true
+        // Case 3: repays > borrows | solver liability covered | multipleSuccessfulSolvers = false
+        // --> should return true
         bL.borrows = 0;
         bL.repays = 1e18;
         tAtlas.setBorrowsLedger(bL.pack());
-        assertEq(tAtlas.isBalanceReconciled(), true, "repays > borrows should return true");
+        assertEq(tAtlas.isBalanceReconciled(false), true, "C3: repays > borrows should return true");
 
-        // Case 4: repays == borrows == 100 | solver liability not covered
+        // Case 4: repays == borrows == 100 | solver liability not covered | multipleSuccessfulSolvers = false
         // --> should return false
         bL.borrows = 100;
         bL.repays = 100;
         gL.maxApprovedGasSpend = 0;
         tAtlas.setBorrowsLedger(bL.pack());
         tAtlas.setGasLedger(gL.pack());
-        assertEq(tAtlas.isBalanceReconciled(), false, "uncovered solver liability should return false");
+        assertEq(tAtlas.isBalanceReconciled(false), false, "C4: uncovered solver liability should return false");
 
-        // Case 5: repays - borrows = 300 gwei | maxApprovedGasSpend = 300 gwei | solver liability covered by combo
+        // Case 5: repays - borrows = 300 gwei | maxApprovedGasSpend = 300 gwei | multipleSuccessfulSolvers = false
+        // --> solver liability covered by combo
         // --> should return true
         bL.borrows = uint128(100 * tx.gasprice);
         bL.repays = uint128(400 * tx.gasprice);
         gL.maxApprovedGasSpend = 300; // will be multiplied by tx.gasprice to get gas value approved
         tAtlas.setBorrowsLedger(bL.pack());
         tAtlas.setGasLedger(gL.pack());
-        assertEq(tAtlas.isBalanceReconciled(), true, "solver liability covered by combo should return true");
+        assertEq(tAtlas.isBalanceReconciled(false), true, "C5: solver liability covered by combo should return true");
+
+        // Case 6: repays - borrows = 300 gwei | maxApprovedGasSpend = 300 gwei | multipleSuccessfulSolvers = true
+        // --> subsidies from net repayments not enabled in multipleSuccessfulSolvers mode
+        // --> should return false
+        bL.borrows = uint128(100 * tx.gasprice);
+        bL.repays = uint128(400 * tx.gasprice);
+        gL.maxApprovedGasSpend = 300; // will be multiplied by tx.gasprice to get gas value approved
+        tAtlas.setBorrowsLedger(bL.pack());
+        tAtlas.setGasLedger(gL.pack());
+        assertEq(tAtlas.isBalanceReconciled(true), false, "C6: no subsidies in multipleSuccessfulSolvers, should return false");
     }
 
 
@@ -1131,7 +1309,6 @@ contract TestAtlasGasAcc is TestAtlas {
     constructor(
         uint256 _escrowDuration,
         uint256 _atlasSurchargeRate,
-        uint256 _bundlerSurchargeRate,
         address _verification,
         address _simulator,
         address _surchargeRecipient,
@@ -1141,7 +1318,6 @@ contract TestAtlasGasAcc is TestAtlas {
         TestAtlas(
             _escrowDuration,
             _atlasSurchargeRate,
-            _bundlerSurchargeRate,
             _verification,
             _simulator,
             _surchargeRecipient,
@@ -1150,8 +1326,8 @@ contract TestAtlasGasAcc is TestAtlas {
         )
     { }
 
-    function initializeAccountingValues(uint256 gasMarker, uint256 allSolverOpsGas) public payable {
-        _initializeAccountingValues(gasMarker, allSolverOpsGas);
+    function initializeAccountingValues(uint256 gasMarker, uint256 allSolverOpsGas, uint24 bundlerSurchargeRate) public payable {
+        _initializeAccountingValues(gasMarker, allSolverOpsGas, bundlerSurchargeRate);
     }
 
     // contribute() is already external
@@ -1233,13 +1409,10 @@ contract TestAtlasGasAcc is TestAtlas {
         GasLedger memory gL,
         uint256 gasMarker,
         address gasRefundBeneficiary,
-        uint256 unreachedCalldataValuePaid
-    )
-        public
-        returns (uint256 claimsPaidToBundler, uint256 netAtlasGasSurcharge)
-    {
-        (claimsPaidToBundler, netAtlasGasSurcharge) =
-            _settle(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid);
+        uint256 unreachedCalldataValuePaid,
+        bool multipleSuccessfulSolvers
+    ) public returns (uint256 claimsPaidToBundler, uint256 netAtlasGasSurcharge) {
+        (claimsPaidToBundler, netAtlasGasSurcharge) = _settle(ctx, gL, gasMarker, gasRefundBeneficiary, unreachedCalldataValuePaid, multipleSuccessfulSolvers);
     }
 
     function updateAnalytics(
@@ -1257,8 +1430,8 @@ contract TestAtlasGasAcc is TestAtlas {
         return aData;
     }
 
-    function isBalanceReconciled() public view returns (bool) {
-        return _isBalanceReconciled();
+    function isBalanceReconciled(bool multipleSuccessfulSolvers) public view returns (bool) {
+        return _isBalanceReconciled(multipleSuccessfulSolvers);
     }
 
     function getAccessData(address account) public view returns (EscrowAccountAccessData memory) {

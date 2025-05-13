@@ -87,7 +87,8 @@ contract Filler is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: false,
                 invertBidValue: true,
-                exPostBids: false
+                exPostBids: false,
+                multipleSuccessfulSolvers: false
             })
         )
     { }

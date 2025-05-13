@@ -62,8 +62,8 @@ contract BaseTest is Test {
     IERC20 DAI = IERC20(DAI_ADDRESS);
 
     uint256 DEFAULT_ESCROW_DURATION = 64;
-    uint256 DEFAULT_ATLAS_SURCHARGE_RATE = 1_000_000; // 10%
-    uint256 DEFAULT_BUNDLER_SURCHARGE_RATE = 1_000_000; // 10%
+    uint256 DEFAULT_ATLAS_SURCHARGE_RATE = 1_000; // 10%
+    uint256 DEFAULT_BUNDLER_SURCHARGE_RATE = 1_000; // 10%
     uint256 MAINNET_FORK_BLOCK = 17_441_786;
 
     function setUp() public virtual {
@@ -98,7 +98,6 @@ contract BaseTest is Test {
         // TODO change 'atlas-certora' to 'atlas' once merged back to original Atlas repo
         string memory pathInImporterRepo = "lib/atlas-certora/src/contracts/precompiles/FactoryLib.sol/FactoryLib.json";
         if (vm.exists(pathInImporterRepo) && vm.isFile(pathInImporterRepo)) {
-            console.log("Context seems to be importer repo");
             factoryLib = FactoryLib(
                 deployCode(pathInImporterRepo, abi.encode(address(execEnvTemplate)))
             );
@@ -111,7 +110,6 @@ contract BaseTest is Test {
         atlas = new TestAtlas({
             escrowDuration: DEFAULT_ESCROW_DURATION,
             atlasSurchargeRate: DEFAULT_ATLAS_SURCHARGE_RATE,
-            bundlerSurchargeRate: DEFAULT_BUNDLER_SURCHARGE_RATE,
             verification: expectedAtlasVerificationAddr,
             simulator: address(simulator),
             factoryLib: address(factoryLib),

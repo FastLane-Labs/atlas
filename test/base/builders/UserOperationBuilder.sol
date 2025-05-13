@@ -103,6 +103,16 @@ contract UserOperationBuilder is Test {
         return this;
     }
 
+    function withSolverGasLimit(uint32 solverGasLimit) public returns (UserOperationBuilder) {
+        userOperation.solverGasLimit = solverGasLimit;
+        return this;
+    }
+
+    function withBundlerSurchargeRate(uint24 bundlerSurchargeRate) public returns (UserOperationBuilder) {
+        userOperation.bundlerSurchargeRate = bundlerSurchargeRate;
+        return this;
+    }
+
     function withSessionKey(address sessionKey) public returns (UserOperationBuilder) {
         userOperation.sessionKey = sessionKey;
         return this;

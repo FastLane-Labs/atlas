@@ -9,6 +9,7 @@ import { AtlasErrors } from "../types/AtlasErrors.sol";
 abstract contract DAppControlTemplate {
     uint32 internal constant DEFAULT_SOLVER_GAS_LIMIT = 1_000_000;
     uint32 internal constant DEFAULT_DAPP_GAS_LIMIT = 2_000_000;
+    uint24 internal constant DEFAULT_BUNDLER_SURCHARGE_RATE = 1000; // out of 10_000 = 10%
 
     constructor() { }
 
@@ -153,5 +154,9 @@ abstract contract DAppControlTemplate {
 
     function getDAppGasLimit() public view virtual returns (uint32) {
         return DEFAULT_DAPP_GAS_LIMIT;
+    }
+
+    function getBundlerSurchargeRate() public view virtual returns (uint24) {
+        return DEFAULT_BUNDLER_SURCHARGE_RATE;
     }
 }

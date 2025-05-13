@@ -301,7 +301,7 @@ contract TrebleSwapTest is BaseTest {
 
         // Estimate gas surcharge Atlas should have taken
         txGasUsed = estAtlasGasSurcharge - gasleft();
-        estAtlasGasSurcharge = txGasUsed * tx.gasprice * atlas.atlasSurchargeRate() / atlas.SCALE();
+        estAtlasGasSurcharge = txGasUsed * tx.gasprice * atlas.getAtlasSurchargeRate() / atlas.SCALE();
 
         // For benchmarking
         console.log("Metacall gas cost: ", txGasUsed);
@@ -437,6 +437,8 @@ contract TrebleSwapTest is BaseTest {
             control: address(trebleSwapControl),
             callConfig: trebleSwapControl.CALL_CONFIG(),
             dappGasLimit: trebleSwapControl.getDAppGasLimit(),
+            solverGasLimit: trebleSwapControl.getSolverGasLimit(),
+            bundlerSurchargeRate: trebleSwapControl.getBundlerSurchargeRate(),
             sessionKey: address(0),
             data: userOpData,
             signature: new bytes(0)
