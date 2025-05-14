@@ -95,8 +95,7 @@ contract BaseTest is Test {
         // The conditional logic below handles local Atlas repo, and another repo importing Atlas as a lib.
         FactoryLib factoryLib;
         string memory pathInAtlasRepo = "src/contracts/precompiles/FactoryLib.sol/FactoryLib.json";
-        // TODO change 'atlas-certora' to 'atlas' once merged back to original Atlas repo
-        string memory pathInImporterRepo = "lib/atlas-certora/src/contracts/precompiles/FactoryLib.sol/FactoryLib.json";
+        string memory pathInImporterRepo = "lib/atlas/src/contracts/precompiles/FactoryLib.sol/FactoryLib.json";
         if (vm.exists(pathInImporterRepo) && vm.isFile(pathInImporterRepo)) {
             console.log("Context seems to be importer repo");
             factoryLib = FactoryLib(
