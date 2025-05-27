@@ -38,7 +38,7 @@ contract AtlasErrors {
     error SolverSimFail(uint256 solverOutcomeResult); // uint param is result returned in `verifySolverOp`
     error AllocateValueSimFail();
     error ValidCalls(ValidCallsResult);
-    error InsufficientGasForMetacallSimulation(uint256 estimatedMetacallGas, uint256 suggestedSimGas);
+    error InsufficientGasForMetacallSimulation(uint256 gasLeft, uint256 estimatedMetacallGas, uint256 suggestedSimGas);
 
     // Execution Environment
     error InvalidUser();
