@@ -65,9 +65,9 @@ contract Simulator is AtlasErrors, AtlasConstants {
             allSolversExecutionGas += Math.min(solverOps[i].gas, dConfig.solverGasLimit);
         }
 
-        uint256 metacallCalldataGas = (_SOLVER_OP_BASE_CALLDATA * solverOpsLen)
-            + GasAccLib.calldataGas(solverDataLenSum, l2GasCalculator)
-            + GasAccLib.metacallCalldataGas(nonSolverCalldataLength, l2GasCalculator);
+        uint256 metacallCalldataGas = GasAccLib.calldataGas(
+            solverDataLenSum + (_SOLVER_OP_STATIC_LENGTH * solverOpsLen), l2GasCalculator
+        ) + GasAccLib.metacallCalldataGas(nonSolverCalldataLength, l2GasCalculator);
 
         uint256 metacallExecutionGas = _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOp.gas
             + dConfig.dappGasLimit + allSolversExecutionGas;
@@ -114,7 +114,7 @@ contract Simulator is AtlasErrors, AtlasConstants {
             // In normal bid mode, solvers each pay for their own solverOp calldata gas, and the winning solver pays for
             // the other non-solver calldata gas as well. In this calculation, there's only 1 solverOp so no need to
             // subtract calldata of other solverOps as they aren't any.
-            uint256 metacallCalldataLength = (_SOLVER_OP_BASE_CALLDATA + solverOp.data.length)
+            uint256 metacallCalldataLength = (_SOLVER_OP_STATIC_LENGTH + solverOp.data.length)
                 + (USER_OP_STATIC_LENGTH + userOp.data.length) + DAPP_OP_LENGTH + _EXTRA_CALLDATA_LENGTH;
 
             uint256 metacallCalldataGas =
