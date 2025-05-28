@@ -267,6 +267,14 @@ contract SimulatorTest is BaseTest {
         assertTrue(success, "C3: simSolverCalls does not early revert if enough gas");
     }
 
+    function test_simUserOperation_succeedsWithLargeCalldata() public {
+        UserOperation memory userOp = validUserOperation()
+            .withData(new bytes(100_000)) // Ridiculously large calldata
+            .signAndBuild(address(atlasVerification), userPK);
+        (bool success,,) = simulator.simUserOperation(userOp);
+        assertTrue(success, "Large calldata does not make metacall unsimulateable");
+    }
+
     function test_simUserOperation_success_valid_SkipCoverage() public {
         UserOperation memory userOp = validUserOperation().build();
 
