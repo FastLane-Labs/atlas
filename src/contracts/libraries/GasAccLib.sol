@@ -34,7 +34,7 @@ library GasAccLib {
     using AccountingMath for uint256;
     using SafeCast for uint256;
 
-    uint256 internal constant _SOLVER_OP_STATIC_LENGTH = 608;
+    uint256 internal constant _SOLVER_OP_BASE_CALLDATA = 608;
     uint256 internal constant _CALLDATA_LENGTH_PREMIUM_HALVED = 8;
 
     function pack(GasLedger memory gasLedger) internal pure returns (uint256) {
@@ -90,10 +90,10 @@ library GasAccLib {
     function solverOpCalldataGas(uint256 calldataLength, address l2GasCalculator) internal view returns (uint256 gas) {
         if (l2GasCalculator == address(0)) {
             // Default to using mainnet gas calculations
-            // _SOLVER_OP_STATIC_LENGTH = SolverOperation calldata length excluding solverOp.data
-            gas = (calldataLength + _SOLVER_OP_STATIC_LENGTH) * _CALLDATA_LENGTH_PREMIUM_HALVED;
+            // _SOLVER_OP_BASE_CALLDATA = SolverOperation calldata length excluding solverOp.data
+            gas = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED;
         } else {
-            gas = IL2GasCalculator(l2GasCalculator).getCalldataGas(calldataLength + _SOLVER_OP_STATIC_LENGTH);
+            gas = IL2GasCalculator(l2GasCalculator).getCalldataGas(calldataLength + _SOLVER_OP_BASE_CALLDATA);
         }
     }
 
@@ -106,11 +106,18 @@ library GasAccLib {
         }
     }
 
-    function metacallCalldataGas(uint256 msgDataLength, address l2GasCalculator) internal view returns (uint256 gas) {
+    function metacallCalldataGas(
+        uint256 msgDataLength,
+        address l2GasCalculator
+    )
+        internal
+        view
+        returns (uint256 calldataGas)
+    {
         if (l2GasCalculator == address(0)) {
-            gas = msgDataLength * _CALLDATA_LENGTH_PREMIUM_HALVED;
+            calldataGas = msgDataLength * _CALLDATA_LENGTH_PREMIUM_HALVED;
         } else {
-            gas = IL2GasCalculator(l2GasCalculator).initialGasUsed(msgDataLength);
+            calldataGas = IL2GasCalculator(l2GasCalculator).initialGasUsed(msgDataLength);
         }
     }
 }

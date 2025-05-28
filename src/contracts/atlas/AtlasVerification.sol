@@ -678,7 +678,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         }
 
         allSolversCalldataGas =
-            GasAccLib.calldataGas(solverDataLenSum + (_SOLVER_OP_STATIC_LENGTH * solverOpsLen), L2_GAS_CALCULATOR);
+            GasAccLib.calldataGas(solverDataLenSum + (_SOLVER_OP_BASE_CALLDATA * solverOps.length), L2_GAS_CALCULATOR);
 
         uint256 metacallExecutionGas = _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOpGas
             + dConfig.dappGasLimit + allSolversExecutionGas;
