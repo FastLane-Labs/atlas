@@ -7,10 +7,10 @@ import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol"
 
 import { FactoryLib } from "../../src/contracts/atlas/FactoryLib.sol";
 import { TestAtlas } from "./TestAtlas.sol";
+import { TestSimulator } from "./TestSimulator.sol";
 import { AtlasVerification } from "../../src/contracts/atlas/AtlasVerification.sol";
 import { ExecutionEnvironment } from "../../src/contracts/common/ExecutionEnvironment.sol";
 import { Sorter } from "../../src/contracts/helpers/Sorter.sol";
-import { Simulator } from "../../src/contracts/helpers/Simulator.sol";
 import { GovernanceBurner } from "../../src/contracts/helpers/GovernanceBurner.sol";
 
 import { UserOperation } from "../../src/contracts/types/UserOperation.sol";
@@ -52,7 +52,7 @@ contract BaseTest is Test {
 
     TestAtlas atlas;
     AtlasVerification atlasVerification;
-    Simulator simulator;
+    TestSimulator simulator;
     Sorter sorter;
     GovernanceBurner govBurner;
 
@@ -84,7 +84,7 @@ contract BaseTest is Test {
 
     function __deployAtlasContracts() internal {
         vm.startPrank(deployer);
-        simulator = new Simulator();
+        simulator = new TestSimulator();
 
         // Computes the addresses at which AtlasVerification will be deployed
         address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
