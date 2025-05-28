@@ -208,7 +208,64 @@ contract SimulatorTest is BaseTest {
             0.01e18, // 1% tolerance
             "C3: incorrect metacall gasleft"
         );
-    }        
+    }
+
+    function test_simFunctionsRevertIfGasLimitTooLow() public {
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        solverOps[0] = validSolverOperation(userOp).build();
+        DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
+
+        uint256 BUFFER = 50_000; // Same as _SIM_ENTRYPOINT_GAS_BUFFER in Simulator
+        uint256 SCALING_FACTOR = 10_320; // Same as _MIN_GAS_SCALING_FACTOR in Simulator
+        uint256 SCALE = 10_000; // Same as _SCALE in Simulator
+
+        // C1: simUserOperation reverts if gas limit is too low
+        uint256 metacallGasLimit = simulator.estimateMetacallGasLimit(userOp, new SolverOperation[](0));
+        (uint256 calldataGas, uint256 executionGas) = simulator.estimateMetacallGasLimitComponents(userOp, new SolverOperation[](0));
+
+        vm.expectRevert(); // First, check early revert due to insufficient gas
+        simulator.simUserOperation{gas: metacallGasLimit + BUFFER}(userOp);
+
+        uint256 simGasLimit = (executionGas * SCALING_FACTOR / SCALE) + calldataGas + BUFFER;
+        (bool success,) = address(simulator).call{gas: simGasLimit}(abi.encodeCall(
+            Simulator.simUserOperation,
+            (userOp)
+        ));
+        assertTrue(success, "C1: simUserOperation does not early revert if enough gas");
+
+        // C2: simSolverCall reverts if gas limit is too low
+        metacallGasLimit = simulator.estimateMetacallGasLimit(userOp, solverOps);
+        (calldataGas, executionGas) = simulator.estimateMetacallGasLimitComponents(userOp, solverOps);
+
+        vm.expectRevert(); // First, check early revert due to insufficient gas
+        simulator.simSolverCall{gas: metacallGasLimit + BUFFER}(userOp, solverOps[0], dAppOp);
+
+        simGasLimit = (executionGas * SCALING_FACTOR / SCALE) + calldataGas + BUFFER;
+        (success,) = address(simulator).call{gas: simGasLimit}(
+            abi.encodeCall(Simulator.simSolverCall, (userOp, solverOps[0], dAppOp))
+        );
+        assertTrue(success, "C2: simSolverCall does not early revert if enough gas");
+
+        // C3: simSolverCalls reverts if gas limit is too low
+        solverOps = new SolverOperation[](2);
+        solverOps[0] = validSolverOperation(userOp).build();
+        solverOps[1] = validSolverOperation(userOp).build();
+        dAppOp = validDAppOperation(userOp, solverOps).build();
+
+        metacallGasLimit = simulator.estimateMetacallGasLimit(userOp, solverOps);
+        (calldataGas, executionGas) = simulator.estimateMetacallGasLimitComponents(userOp, solverOps);
+
+        vm.expectRevert(); // First, check early revert due to insufficient gas
+        simulator.simSolverCalls{gas: metacallGasLimit + BUFFER}(userOp, solverOps, dAppOp);
+
+        simGasLimit = (executionGas * SCALING_FACTOR / SCALE) + calldataGas + BUFFER;
+        (success,) = address(simulator).call{gas: simGasLimit}(abi.encodeCall(
+            Simulator.simSolverCalls,
+            (userOp, solverOps, dAppOp)
+        ));
+        assertTrue(success, "C3: simSolverCalls does not early revert if enough gas");
+    }
 
     function test_simUserOperation_success_valid_SkipCoverage() public {
         UserOperation memory userOp = validUserOperation().build();
