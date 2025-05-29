@@ -6,7 +6,6 @@ import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import "../types/SolverOperation.sol";
 import "../types/UserOperation.sol";
-import "../types/LockTypes.sol";
 import "../types/DAppOperation.sol";
 import "../types/ConfigTypes.sol";
 import "../types/ValidCalls.sol";
@@ -25,8 +24,17 @@ contract Simulator is AtlasErrors, AtlasConstants {
     using AccountingMath for uint256;
     using GasAccLib for SolverOperation[];
 
-    uint256 internal constant _SIM_GAS_SUGGESTED_BUFFER = 30_000;
-    uint256 internal constant _SIM_GAS_BEFORE_METACALL = 10_000;
+    // The approx gas used between the minGasLeft check and the Atlas metacall() from this Simulator contract.
+    uint256 internal constant _ERROR_CATCHER_GAS_BUFFER = 10_000;
+    // The approx gas used between the `simUserOperation()` or `simSolverCall()` entrypoint functions in this Simulator
+    // contract, and the minGasLeft check.
+    uint256 internal constant _SIM_ENTRYPOINT_GAS_BUFFER = 50_000;
+
+    // An approximation of (64 / 63) ^ 2. This is the scaling to apply to a min amount of gas, such that after 2
+    // external calls where only 63/64 of the gas is forwarded, there is still that original intended amount of gas
+    // left. Used in _errorCatcher() below.
+    uint256 internal constant _MIN_GAS_SCALING_FACTOR = 10_320; // 10_320 out of 10_000 = 1.032
+    uint256 internal constant _SCALE = AccountingMath._SCALE; // 10_000 = 100%
 
     address public immutable deployer;
     address public atlas;
@@ -50,6 +58,19 @@ contract Simulator is AtlasErrors, AtlasConstants {
         view
         returns (uint256)
     {
+        (uint256 metacallCalldataGas, uint256 metacallExecutionGas) = _estimateMetacallGasLimit(userOp, solverOps);
+        return metacallCalldataGas + metacallExecutionGas;
+    }
+
+    /// @notice Internal function to estimate the calldata and execution gas for a metacall.
+    function _estimateMetacallGasLimit(
+        UserOperation calldata userOp,
+        SolverOperation[] memory solverOps
+    )
+        internal
+        view
+        returns (uint256 metacallCalldataGas, uint256 metacallExecutionGas)
+    {
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
         address l2GasCalculator = IAtlas(atlas).L2_GAS_CALCULATOR();
         uint256 nonSolverCalldataLength =
@@ -65,18 +86,19 @@ contract Simulator is AtlasErrors, AtlasConstants {
             allSolversExecutionGas += Math.min(solverOps[i].gas, dConfig.solverGasLimit);
         }
 
-        uint256 metacallCalldataGas = (_SOLVER_OP_BASE_CALLDATA * solverOpsLen)
-            + GasAccLib.calldataGas(solverDataLenSum, l2GasCalculator)
-            + GasAccLib.metacallCalldataGas(nonSolverCalldataLength, l2GasCalculator);
+        // metacallCalldataGas is first item in return tuple
+        metacallCalldataGas = GasAccLib.calldataGas(
+            solverDataLenSum + (_SOLVER_OP_BASE_CALLDATA * solverOpsLen), l2GasCalculator
+        ) + GasAccLib.metacallCalldataGas(nonSolverCalldataLength, l2GasCalculator);
 
-        uint256 metacallExecutionGas = _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOp.gas
-            + dConfig.dappGasLimit + allSolversExecutionGas;
+        // metacallExecutionGas is second item in return tuple
+        metacallExecutionGas = _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOp.gas + dConfig.dappGasLimit
+            + allSolversExecutionGas;
 
+        // If exPostBids = true, add extra execution gas to account for bid-finding.
         if (dConfig.callConfig.exPostBids()) {
             metacallExecutionGas += (solverOpsLen * _BID_FIND_OVERHEAD) + allSolversExecutionGas;
         }
-
-        return metacallCalldataGas + metacallExecutionGas;
     }
 
     /// @notice Returns an estimation of the max amount (in native token) a winning solver could be charged, given the
@@ -148,9 +170,10 @@ contract Simulator is AtlasErrors, AtlasConstants {
         dAppOp.to = atlas;
         dAppOp.control = userOp.control;
 
-        uint256 estGasLim = estimateMetacallGasLimit(userOp, solverOps);
+        (uint256 metacallCalldataGas, uint256 metacallExecutionGas) = _estimateMetacallGasLimit(userOp, solverOps);
 
-        (Result result, uint256 validCallsResult) = _errorCatcher(userOp, solverOps, dAppOp, estGasLim);
+        (Result result, uint256 validCallsResult) =
+            _errorCatcher(userOp, solverOps, dAppOp, metacallExecutionGas, metacallCalldataGas);
         success = uint8(result) > uint8(Result.UserOpSimFail);
         if (success) validCallsResult = uint256(ValidCallsResult.Valid);
         if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
@@ -171,9 +194,10 @@ contract Simulator is AtlasErrors, AtlasConstants {
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         solverOps[0] = solverOp;
 
-        uint256 estGasLim = estimateMetacallGasLimit(userOp, solverOps);
+        (uint256 metacallCalldataGas, uint256 metacallExecutionGas) = _estimateMetacallGasLimit(userOp, solverOps);
 
-        (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp, estGasLim);
+        (Result result, uint256 solverOutcomeResult) =
+            _errorCatcher(userOp, solverOps, dAppOp, metacallExecutionGas, metacallCalldataGas);
         success = result == Result.SimulationPassed;
         if (success) solverOutcomeResult = 0; // discard additional error uint if solver stage was successful
         if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
@@ -196,9 +220,10 @@ contract Simulator is AtlasErrors, AtlasConstants {
             return (false, Result.Unknown, uint256(type(SolverOutcome).max) + 1);
         }
 
-        uint256 estGasLim = estimateMetacallGasLimit(userOp, solverOps);
+        (uint256 metacallCalldataGas, uint256 metacallExecutionGas) = _estimateMetacallGasLimit(userOp, solverOps);
 
-        (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp, estGasLim);
+        (Result result, uint256 solverOutcomeResult) =
+            _errorCatcher(userOp, solverOps, dAppOp, metacallExecutionGas, metacallCalldataGas);
         success = result == Result.SimulationPassed;
         if (success) solverOutcomeResult = 0; // discard additional error uint if solver stage was successful
         if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
@@ -209,16 +234,33 @@ contract Simulator is AtlasErrors, AtlasConstants {
         UserOperation memory userOp,
         SolverOperation[] memory solverOps,
         DAppOperation memory dAppOp,
-        uint256 estGasLimit
+        uint256 metacallExecutionGas,
+        uint256 metacallCalldataGas
     )
         internal
         returns (Result result, uint256 additionalErrorCode)
     {
-        if (gasleft() < estGasLimit + _SIM_GAS_BEFORE_METACALL) {
-            revert InsufficientGasForMetacallSimulation(estGasLimit, estGasLimit + _SIM_GAS_SUGGESTED_BUFFER);
+        // Calculate the minimum gas left at this point, given that the Atlas `metacall()` should start with
+        // approximately `metacallExecutionGas`, and that there are still 2x external calls to be made before that
+        // point:
+        // - First in the `metacallSimulation()` call below.
+        // - Second when the `metacallSimulation()` function calls `metacall()` in Atlas.
+        //
+        // For each external call, a max of 63/64 of the gas left is forwarded.
+        // Therefore we should have at least [metacallExecutionGas * (64/63) ^ 2] at this point to ensure there will be
+        // enough gas at the start of the `metacall()`
+        uint256 minGasLeft = metacallExecutionGas * _MIN_GAS_SCALING_FACTOR / _SCALE + _ERROR_CATCHER_GAS_BUFFER;
+        uint256 gasLeft = gasleft();
+
+        if (gasLeft < minGasLeft) {
+            revert InsufficientGasForMetacallSimulation(
+                gasLeft, // The gas left at this point that was insufficient to pass the check
+                metacallExecutionGas + metacallCalldataGas, // Suggested gas limit for a real metacall
+                _SIM_ENTRYPOINT_GAS_BUFFER + minGasLeft + metacallCalldataGas // Suggested gas limit for a sim call
+            );
         }
 
-        try this.metacallSimulation{ value: userOp.value }(userOp, solverOps, dAppOp, estGasLimit) {
+        try this.metacallSimulation{ value: userOp.value }(userOp, solverOps, dAppOp, metacallExecutionGas) {
             revert Unreachable();
         } catch (bytes memory revertData) {
             bytes4 errorSwitch = bytes4(revertData);
@@ -261,14 +303,20 @@ contract Simulator is AtlasErrors, AtlasConstants {
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         DAppOperation calldata dAppOp,
-        uint256 estGasLimit
+        uint256 metacallExecutionGas
     )
         external
         payable
     {
         if (msg.sender != address(this)) revert InvalidEntryFunction();
+
+        // In real Atlas metacalls, when the caller is an EOA, it should include the suggested calldata gas in the gas
+        // limit. However, in as this is a Simulator call, that calldata gas has already been deducted in the initial
+        // `simUserOperation()` or `simSolverCall()` call. As such, we set the metacall gas limit here to just the
+        // suggested execution gas.
+
         bool auctionWon =
-            IAtlas(atlas).metacall{ value: msg.value, gas: estGasLimit }(userOp, solverOps, dAppOp, address(0));
+            IAtlas(atlas).metacall{ value: msg.value, gas: metacallExecutionGas }(userOp, solverOps, dAppOp, address(0));
 
         // If multipleSuccessfulSolvers = true, metacall always returns auctionWon = false, even if there were some
         // successful solvers. So we always revert with SimulationPassed here if multipleSuccessfulSolvers = true.

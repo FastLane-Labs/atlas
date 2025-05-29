@@ -34,7 +34,7 @@ contract OuterHelpers is FastLaneOnlineInner {
     address public immutable SIMULATOR;
 
     uint256 internal constant _BITS_FOR_INDEX = 16;
-    uint256 internal constant _SOLVER_SIM_GAS_LIM = 4_800_000;
+    uint256 internal constant _SOLVER_SIM_GAS_LIM = 4_850_000;
 
     constructor(address atlas, address protocolGuildWallet) FastLaneOnlineInner(atlas) {
         CARDANO_ENGINEER_THERAPY_FUND = msg.sender;
