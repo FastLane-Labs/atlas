@@ -10,8 +10,9 @@ import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 import { AccountingMath } from "../libraries/AccountingMath.sol";
 import { CallVerification } from "../libraries/CallVerification.sol";
-import { AtlasConstants } from "../types/AtlasConstants.sol";
+import { SafeBlockNumber } from "../libraries/SafeBlockNumber.sol";
 
+import { AtlasConstants } from "../types/AtlasConstants.sol";
 import "../types/UserOperation.sol";
 import "../types/SolverOperation.sol";
 import "../types/DAppOperation.sol";
@@ -108,7 +109,7 @@ contract Sorter is AtlasConstants {
 
         // Solvers can only do one tx per block - this prevents double counting bonded balances
         uint256 solverLastActiveBlock = ATLAS.accountLastActiveBlock(solverOp.from);
-        if (solverLastActiveBlock >= block.number) {
+        if (solverLastActiveBlock >= SafeBlockNumber.get()) {
             return false;
         }
 
@@ -128,7 +129,7 @@ contract Sorter is AtlasConstants {
         }
 
         // solverOp.deadline must be in the future
-        if (solverOp.deadline != 0 && block.number > solverOp.deadline) {
+        if (solverOp.deadline != 0 && SafeBlockNumber.get() > solverOp.deadline) {
             return false;
         }
 
