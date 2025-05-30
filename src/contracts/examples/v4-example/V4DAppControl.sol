@@ -8,6 +8,7 @@ import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol"
 // Atlas Base Imports
 import { IAtlas } from "../../interfaces/IAtlas.sol";
 import { SafetyBits } from "../../libraries/SafetyBits.sol";
+import { SafeBlockNumber } from "../../libraries/SafeBlockNumber.sol";
 
 import { CallConfig } from "../../types/ConfigTypes.sol";
 import "../../types/SolverOperation.sol";
@@ -184,7 +185,9 @@ contract V4DAppControl is DAppControl {
         // Flag the pool to be open for trading for the remainder of the block
         bytes32 sequenceKey = keccak256(
             abi.encodePacked(
-                IPoolManager.Currency.unwrap(key.currency0), IPoolManager.Currency.unwrap(key.currency1), block.number
+                IPoolManager.Currency.unwrap(key.currency0),
+                IPoolManager.Currency.unwrap(key.currency1),
+                SafeBlockNumber.get()
             )
         );
 
