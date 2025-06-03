@@ -22,7 +22,7 @@ contract ArbitrumTest is BaseTest {
 
     ArbitrumGasCalculator arbGasCalculator;
 
-    function setUp() public override {
+    function setUp() public virtual override {
         // Fork Arbitrum One for tests
         FORK_RPC_STRING = "ARBITRUM_RPC_URL";
         FORK_BLOCK = 343_453_130;
