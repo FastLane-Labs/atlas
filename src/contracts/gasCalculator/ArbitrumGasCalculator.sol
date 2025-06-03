@@ -48,7 +48,8 @@ contract ArbitrumGasCalculator is IL2GasCalculator, Ownable {
     function getCalldataGas(uint256 calldataLength) external view override returns (uint256 calldataGas) {
         // Get the price per L1 calldata byte in ArbGas
         (, uint256 perL1CalldataByte,) = ARB_GAS_INFO.getPricesInArbGas();
-        return calldataLength * perL1CalldataByte * s_gasVars.M / SCALE + s_gasVars.C;
+        CalibrationVars memory gasVars = s_gasVars;
+        return calldataLength * perL1CalldataByte * gasVars.M / SCALE + gasVars.C;
     }
 
     /// @notice Calculate the initial gas used for a transaction
@@ -57,6 +58,7 @@ contract ArbitrumGasCalculator is IL2GasCalculator, Ownable {
     function initialGasUsed(uint256 calldataLength) external view override returns (uint256 gasUsed) {
         // Get the price per L1 calldata byte in ArbGas
         (, uint256 perL1CalldataByte,) = ARB_GAS_INFO.getPricesInArbGas();
-        return calldataLength * perL1CalldataByte * s_gasVars.M / SCALE + s_gasVars.C;
+        CalibrationVars memory gasVars = s_gasVars;
+        return calldataLength * perL1CalldataByte * gasVars.M / SCALE + gasVars.C;
     }
 }
