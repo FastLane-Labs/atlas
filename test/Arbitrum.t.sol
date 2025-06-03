@@ -15,6 +15,11 @@ contract ArbitrumTest is BaseTest {
     address ARB_GAS_INFO = 0x000000000000000000000000000000000000006C;
     address ARB_SYS = 0x0000000000000000000000000000000000000064;
 
+    // Precompile Return Values at FORK_BLOCK
+    uint256 PER_L2_TX = 9879; // per L2 tx in ArbGas
+    uint256 PER_L1_CALLDATA_BYTE = 70; // per L1 calldata byte in ArbGas
+    uint256 PER_STORAGE_ALLOCATION = 20000; // per storage allocation in ArbGas
+
     ArbitrumGasCalculator arbGasCalculator;
 
     function setUp() public override {
@@ -31,7 +36,11 @@ contract ArbitrumTest is BaseTest {
 
         // Deploy Arbitrum precompile mocks to simulate Arbitrum without Foundry errors
         vm.etch(ARB_SYS, address(new MockArbSys(FORK_BLOCK)).code);
-        vm.etch(ARB_GAS_INFO, address(new MockArbGasInfo()).code);
+        vm.etch(ARB_GAS_INFO, address(new MockArbGasInfo(
+            PER_L2_TX,
+            PER_L1_CALLDATA_BYTE,
+            PER_STORAGE_ALLOCATION
+        )).code);
 
         // The rest of the standard test setup, after forking Arbitrum
         __createAndLabelAccounts();
@@ -43,9 +52,9 @@ contract ArbitrumTest is BaseTest {
         // Check the Arbitrum precompile addresses are set correctly
         assertEq(FORK_BLOCK, MockArbSys(ARB_SYS).arbBlockNumber(), "ArbSys.arbBlockNumber mismatch");
         (uint256 l2TxPrice, uint256 l1CalldataPrice, uint256 storagePrice) = MockArbGasInfo(ARB_GAS_INFO).getPricesInArbGas();
-        assertEq(l2TxPrice, 9879, "ArbGasInfo: L2 tx price incorrect");
-        assertEq(l1CalldataPrice, 70, "ArbGasInfo: L1 calldata price incorrect");
-        assertEq(storagePrice, 20000, "ArbGasInfo: Storage price incorrect");
+        assertEq(l2TxPrice, PER_L2_TX, "ArbGasInfo: L2 tx price incorrect");
+        assertEq(l1CalldataPrice, PER_L1_CALLDATA_BYTE, "ArbGasInfo: L1 calldata price incorrect");
+        assertEq(storagePrice, PER_STORAGE_ALLOCATION, "ArbGasInfo: Storage price incorrect");
 
         // L2GasCalculator parameters
         assertEq(address(arbGasCalculator.ARB_GAS_INFO()), ARB_GAS_INFO, "ArbGasInfo incorrect");
@@ -56,7 +65,6 @@ contract ArbitrumTest is BaseTest {
         assertEq(DEFAULT_ESCROW_DURATION, atlas.ESCROW_DURATION(), "Atlas.ESCROW_DURATION incorrect");
         assertEq(DEFAULT_ATLAS_SURCHARGE_RATE, atlas.getAtlasSurchargeRate(), "Atlas surcharge rate incorrect");
     }
-
 }
 
 // Mocks the ArbSys precompile for SafeBlockNumber lib tests
@@ -72,10 +80,23 @@ contract MockArbSys {
 
 // Mocks the ArbGasInfo precompile for gas estimation tests
 contract MockArbGasInfo {
+    uint256 public immutable PER_L2_TX;
+    uint256 public immutable PER_L1_CALLDATA_BYTE;
+    uint256 public immutable PER_STORAGE_ALLOCATION;
+
+    constructor(
+        uint256 perL2Tx,
+        uint256 perL1CalldataByte,
+        uint256 perStorageAllocation
+    ) {
+        PER_L2_TX = perL2Tx;
+        PER_L1_CALLDATA_BYTE = perL1CalldataByte;
+        PER_STORAGE_ALLOCATION = perStorageAllocation;
+    }
+
     /// @notice Get prices in ArbGas. Assumes the callers preferred validator, or the default if caller doesn't have a preferred one.
     /// @return (per L2 tx, per L1 calldata byte, per storage allocation)
     function getPricesInArbGas() external view returns (uint256, uint256, uint256) {
-        // Values reported on Arbitrum One at block 343453130
-        return (9879, 70, 20000);
+        return (PER_L2_TX, PER_L1_CALLDATA_BYTE, PER_STORAGE_ALLOCATION);
     }
 }
