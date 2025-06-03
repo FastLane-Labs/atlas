@@ -6,7 +6,8 @@ import "forge-std/Test.sol";
 import { DeployBaseScript } from "script/base/deploy-base.s.sol";
 import { BaseGasCalculator } from "src/contracts/gasCalculator/BaseGasCalculator.sol";
 
-contract DeployGasCalculatorScript is DeployBaseScript {
+// Deploy script for the Base L2GasCalculator - for the Base L2 (or other OP Stack L2s)
+contract DeployBaseGasCalculatorScript is DeployBaseScript {
     // NOTE: Adjust the constructor parameters as needed here:
     // - BASE_GAS_PRICE_ORACLE: The address of the gas price oracle contract
     // - BASE_CALLDATA_LENGTH_OFFSET: The offset to be applied to the calldata length (can be negative or positive)

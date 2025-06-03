@@ -63,7 +63,11 @@
       "solver-deposit": "source .env && forge script script/solver-deposit.s.sol:SolverAtlasDepositScript --fork-url http://localhost:8545 --broadcast --non-interactive",
       "setup-demo": "npm run deploy-atlas-swap-intent-tx-builder && npm run deploy-solver && npm run solver-deposit",
 
-      "deploy-gas-calculator-base": "source .env && forge script script/deploy-gas-calculator.s.sol:DeployGasCalculatorScript --rpc-url ${BASE_RPC_URL} --broadcast --etherscan-api-key ${BASESCAN_API_KEY} --verify",
+      "deploy-gas-calculator-base": "source .env && forge script script/deploy-gas-calculator-base.s.sol:DeployBaseGasCalculatorScript --rpc-url ${BASE_RPC_URL} --broadcast --etherscan-api-key ${BASESCAN_API_KEY} --verify",
+
+      "deploy-gas-calculator-arbitrum-sepolia": "source .env && forge script script/deploy-gas-calculator-arbitrum.s.sol:DeployArbGasCalculatorScript --rpc-url ${ARBITRUM_SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ARBISCAN_API_KEY} --verify",
+      "deploy-gas-calculator-arbitrum": "source .env && forge script script/deploy-gas-calculator-arbitrum.s.sol:DeployArbGasCalculatorScript --rpc-url ${ARBITRUM_RPC_URL} --broadcast --etherscan-api-key ${ARBISCAN_API_KEY} --verify",
+
       "transfer-surcharge-recipient:sepolia": ". ./.env && forge script script/transfer-surcharge-recipient.s.sol:TransferSurchargeRecipientScript --rpc-url ${SEPOLIA_RPC_URL} --sig 'run(string)' --broadcast --non-interactive --slow",
 
       "atlas-addr": "echo 'ATLAS:' && jq -r '.ATLAS' deployments.json",
