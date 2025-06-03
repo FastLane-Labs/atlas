@@ -64,10 +64,12 @@ contract BaseTest is Test {
     uint256 DEFAULT_ESCROW_DURATION = 64;
     uint256 DEFAULT_ATLAS_SURCHARGE_RATE = 1_000; // 10%
     uint256 DEFAULT_BUNDLER_SURCHARGE_RATE = 1_000; // 10%
-    uint256 MAINNET_FORK_BLOCK = 17_441_786;
+    address L2_GAS_CALCULATOR = address(0); // Empty by default
+    uint256 FORK_BLOCK = 17_441_786;
+    string FORK_RPC_STRING = "MAINNET_RPC_URL";
 
     function setUp() public virtual {
-        vm.createSelectFork(vm.envString("MAINNET_RPC_URL"), MAINNET_FORK_BLOCK);
+        vm.createSelectFork(vm.envString(FORK_RPC_STRING), FORK_BLOCK);
         __createAndLabelAccounts();
         __deployAtlasContracts();
         __fundSolversAndDepositAtlETH();
@@ -113,11 +115,11 @@ contract BaseTest is Test {
             simulator: address(simulator),
             factoryLib: address(factoryLib),
             initialSurchargeRecipient: deployer,
-            l2GasCalculator: address(0)
+            l2GasCalculator: L2_GAS_CALCULATOR
         });
         atlasVerification = new AtlasVerification({
             atlas: expectedAtlasAddr,
-            l2GasCalculator: address(0)
+            l2GasCalculator: L2_GAS_CALCULATOR
         });
         simulator.setAtlas(address(atlas));
         sorter = new Sorter(address(atlas));
