@@ -18,6 +18,7 @@ contract DeployAtlasScript is DeployBaseScript {
     uint256 ESCROW_DURATION = 64;
     uint256 ATLAS_SURCHARGE_RATE; // Set below
     uint256 BUNDLER_SURCHARGE_RATE; // Set below
+    address L2_GAS_CALCULATOR = address(0);
 
     function run() external {
         console.log("\n=== DEPLOYING Atlas ===\n");
@@ -59,9 +60,9 @@ contract DeployAtlasScript is DeployBaseScript {
             simulator: expectedSimulatorAddr,
             factoryLib: address(factoryLib),
             initialSurchargeRecipient: deployer,
-            l2GasCalculator: address(0)
+            l2GasCalculator: L2_GAS_CALCULATOR
         });
-        atlasVerification = new AtlasVerification({ atlas: expectedAtlasAddr, l2GasCalculator: address(0) });
+        atlasVerification = new AtlasVerification({ atlas: expectedAtlasAddr, l2GasCalculator: L2_GAS_CALCULATOR });
 
         simulator = new Simulator();
         simulator.setAtlas(address(atlas));
@@ -139,6 +140,15 @@ contract DeployAtlasScript is DeployBaseScript {
         // Check ESCROW_DURATION was not set to 0
         if (atlas.ESCROW_DURATION() == 0) {
             console.log("ERROR: ESCROW_DURATION was set to 0");
+            error = true;
+        }
+        // Check if L2GasCalculator is set to same addr in all deployed contracts
+        if (L2_GAS_CALCULATOR != atlas.L2_GAS_CALCULATOR()) {
+            console.log("ERROR: L2_GAS_CALCULATOR address not set correctly in Atlas");
+            error = true;
+        }
+        if (L2_GAS_CALCULATOR != atlasVerification.L2_GAS_CALCULATOR()) {
+            console.log("ERROR: L2_GAS_CALCULATOR address not set correctly in AtlasVerification");
             error = true;
         }
 
