@@ -15,9 +15,8 @@ import { Sorter } from "../src/contracts/helpers/Sorter.sol";
 import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironment.sol";
 
 contract DeployAtlasScript is DeployBaseScript {
-    uint256 ESCROW_DURATION = 64;
+    uint256 ESCROW_DURATION = 128; // 32 seconds at 250ms block times on Arbitrum
     uint256 ATLAS_SURCHARGE_RATE; // Set below
-    uint256 BUNDLER_SURCHARGE_RATE; // Set below
     address L2_GAS_CALCULATOR = address(0);
 
     function run() external {
@@ -28,7 +27,7 @@ contract DeployAtlasScript is DeployBaseScript {
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
-        (ATLAS_SURCHARGE_RATE, BUNDLER_SURCHARGE_RATE) = _getSurchargeRates();
+        (ATLAS_SURCHARGE_RATE,) = _getSurchargeRates();
 
         // Computes the addresses at which AtlasVerification will be deployed
         address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
