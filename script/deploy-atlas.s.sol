@@ -17,7 +17,8 @@ import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironme
 contract DeployAtlasScript is DeployBaseScript {
     uint256 ESCROW_DURATION = 128; // 32 seconds at 250ms block times on Arbitrum
     uint256 ATLAS_SURCHARGE_RATE; // Set below
-    address L2_GAS_CALCULATOR = 0xf5DF545113DeE4DF10f8149090Aa737dDC05070a; // Arbitrum Sepolia Temp L2GasCalculator
+    // address L2_GAS_CALCULATOR = 0xf5DF545113DeE4DF10f8149090Aa737dDC05070a; // Arbitrum Sepolia Temp L2GasCalculator
+    address L2_GAS_CALCULATOR = 0x870584178A64f409B00De32816D56756772E6cb4; // Arbitrum One Temp L2GasCalculator
 
     function run() external {
         console.log("\n=== DEPLOYING Atlas ===\n");
