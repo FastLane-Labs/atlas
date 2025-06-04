@@ -17,7 +17,7 @@ struct CalibrationVars {
 /// @notice Calculates gas costs for transactions on Arbitrum
 contract ArbitrumGasCalculator is IL2GasCalculator, Ownable {
     // Interface to interact with Arbitrum's gas info precompile
-    ArbGasInfo public immutable ARB_GAS_INFO = ArbGasInfo(address(0x000000000000000000000000000000000000006C));
+    ArbGasInfo public constant ARB_GAS_INFO = ArbGasInfo(address(0x000000000000000000000000000000000000006C));
 
     // Denominator for M in calldata gas calibration
     uint128 public constant SCALE = 10_000; // 10_000 / 10_000 = 100%
