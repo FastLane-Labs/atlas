@@ -11,8 +11,10 @@ contract SetArbGasCalculatorScript is DeployBaseScript {
     ArbitrumGasCalculator public gasCalculator = ArbitrumGasCalculator(0x870584178A64f409B00De32816D56756772E6cb4);
 
     // GAS CALCULATOR SETTINGS
-    uint128 newM = 4000;
-    uint128 newC = 0;
+    uint64 newA = 0;
+    uint64 newB = 0;
+    uint64 newR = 0;
+    uint64 newC = 0;
 
     function run() external {
         console.log("\n=== DEPLOYING GasCalculator ===\n");
@@ -27,23 +29,27 @@ contract SetArbGasCalculatorScript is DeployBaseScript {
         uint256 chainId = block.chainid;
         address deploymentAddr;
 
-        (uint128 m, uint128 c) = gasCalculator.getCalibrationVars();
+        (uint64 a, uint64 b, uint64 r, uint64 c) = gasCalculator.getCalibrationVars();
 
-        console.log("old m:", m);
+        console.log("old a:", a);
+        console.log("old b:", b);
+        console.log("old r:", r);
         console.log("old c:", c);
 
         vm.startBroadcast(deployerPrivateKey);
 
         // Check if chainId is Arbitrum One or Arbitrum Sepolia
         if (chainId == 42_161 || chainId == 421_614) {
-            gasCalculator.setCalibrationVars(newM, newC);
+            gasCalculator.setCalibrationVars(newA, newB, newR, newC);
         } else {
             revert("Error: Chain ID not supported");
         }
 
         vm.stopBroadcast();
 
-        console.log("new m:", newM);
+        console.log("new a:", newA);
+        console.log("new b:", newB);
+        console.log("new r:", newR);
         console.log("new c:", newC);
     }
 }
