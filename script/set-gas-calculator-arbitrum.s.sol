@@ -8,13 +8,11 @@ import { ArbitrumGasCalculator } from "src/contracts/gasCalculator/ArbitrumGasCa
 
 // Deploy script for the Arbitrum L2GasCalculator
 contract SetArbGasCalculatorScript is DeployBaseScript {
-
     ArbitrumGasCalculator public gasCalculator = ArbitrumGasCalculator(0x870584178A64f409B00De32816D56756772E6cb4);
 
     // GAS CALCULATOR SETTINGS
     uint128 newM = 4000;
     uint128 newC = 0;
-    
 
     function run() external {
         console.log("\n=== DEPLOYING GasCalculator ===\n");
