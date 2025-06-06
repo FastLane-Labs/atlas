@@ -17,6 +17,7 @@ import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 import { AccountingMath } from "../libraries/AccountingMath.sol";
 import { GasAccLib, GasLedger } from "../libraries/GasAccLib.sol";
+import { SafeBlockNumber } from "../libraries/SafeBlockNumber.sol";
 import { DAppConfig } from "../types/ConfigTypes.sol";
 import "../types/SolverOperation.sol";
 import "../types/UserOperation.sol";
@@ -402,7 +403,7 @@ abstract contract Escrow is AtlETH {
         view
         returns (uint256 result)
     {
-        if (solverOp.deadline != 0 && block.number > solverOp.deadline) {
+        if (solverOp.deadline != 0 && SafeBlockNumber.get() > solverOp.deadline) {
             result |= (
                 1
                     << uint256(
@@ -416,7 +417,7 @@ abstract contract Escrow is AtlETH {
 
         uint256 lastAccessedBlock = S_accessData[solverOp.from].lastAccessedBlock;
 
-        if (lastAccessedBlock >= block.number) {
+        if (lastAccessedBlock >= SafeBlockNumber.get()) {
             result |= 1 << uint256(SolverOutcome.PerBlockLimit);
         }
     }

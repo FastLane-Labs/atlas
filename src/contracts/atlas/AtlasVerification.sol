@@ -13,6 +13,7 @@ import { CallBits } from "../libraries/CallBits.sol";
 import { CallVerification } from "../libraries/CallVerification.sol";
 import { GasAccLib } from "../libraries/GasAccLib.sol";
 import { AccountingMath } from "../libraries/AccountingMath.sol";
+import { SafeBlockNumber } from "../libraries/SafeBlockNumber.sol";
 import { AtlasErrors } from "../types/AtlasErrors.sol";
 import "../types/SolverOperation.sol";
 import "../types/UserOperation.sol";
@@ -35,7 +36,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         address atlas,
         address l2GasCalculator
     )
-        EIP712("AtlasVerification", "1.6")
+        EIP712("AtlasVerification", "1.6.1")
         DAppIntegration(atlas, l2GasCalculator)
     { }
 
@@ -129,13 +130,13 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             }
 
             // Check if past user's deadline
-            if (userOp.deadline != 0 && block.number > userOp.deadline) {
+            if (userOp.deadline != 0 && SafeBlockNumber.get() > userOp.deadline) {
                 return
                     (allSolversGasLimit, allSolversCalldataGas, bidFindOverhead, ValidCallsResult.UserDeadlineReached);
             }
 
             // Check if past dapp's deadline
-            if (dAppOp.deadline != 0 && block.number > dAppOp.deadline) {
+            if (dAppOp.deadline != 0 && SafeBlockNumber.get() > dAppOp.deadline) {
                 return
                     (allSolversGasLimit, allSolversCalldataGas, bidFindOverhead, ValidCallsResult.DAppDeadlineReached);
             }
