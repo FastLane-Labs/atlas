@@ -18,9 +18,11 @@ contract GasAccLibTest is Test {
     using AccountingMath for uint256;
 
     MockL2GasCalculator mockL2GasCalc;
+    MemoryToCalldataHelper calldataHelper;
 
     function setUp() public {
         mockL2GasCalc = new MockL2GasCalculator();
+        calldataHelper = new MemoryToCalldataHelper();
     }
 
     function test_GasAccLib_GasLedger_packAndUnpack() public pure {
@@ -95,30 +97,45 @@ contract GasAccLibTest is Test {
     }
 
     function test_GasAccLib_solverOpCalldataGas() public view {
-        uint256 calldataLength = 500;
+        bytes memory data = new bytes(500);
 
         // First, the default calculation, using address(0) as the GasCalculator:
-        uint256 expectedDefaultGas = (calldataLength + GasAccLib._SOLVER_OP_BASE_CALLDATA) * GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED;
+        uint256 expectedDefaultGas = (data.length + GasAccLib._SOLVER_OP_BASE_CALLDATA) * GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED;
 
-        assertEq(GasAccLib.solverOpCalldataGas(calldataLength, address(0)), expectedDefaultGas, "solverOpCalldataGas (default) unexpected");
+        uint256 actualGas = calldataHelper.solverOpCalldataGas(data, address(0));
+
+        assertEq(actualGas, expectedDefaultGas, "solverOpCalldataGas (default) unexpected");
 
         // Now, with a mock L2GasCalculator, that returns 5x the default calldata gas:
         uint256 expectedMockGas = 5 * expectedDefaultGas;
+        actualGas = calldataHelper.solverOpCalldataGas(data, address(mockL2GasCalc));
 
-        assertEq(GasAccLib.solverOpCalldataGas(calldataLength, address(mockL2GasCalc)), expectedMockGas, "solverOpCalldataGas (5x mock) unexpected");
+        assertEq(actualGas, expectedMockGas, "solverOpCalldataGas (5x mock) unexpected");
     }
 
     function test_GasAccLib_metacallCalldataGas() public view {
-        uint256 msgDataLength = 3_000;
+        bytes memory data = new bytes(500);
 
         // First, the default calculation, using address(0) as the GasCalculator:
-        uint256 expectedDefaultGas = msgDataLength * GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED;
+        uint256 expectedDefaultGas = data.length * GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED;
+        uint256 actualGas = calldataHelper.metacallCalldataGas(data, address(0));
 
-        assertEq(GasAccLib.metacallCalldataGas(msgDataLength, address(0)), expectedDefaultGas, "metacallCalldataGas (default) unexpected");
+        assertEq(actualGas, expectedDefaultGas, "metacallCalldataGas (default) unexpected");
 
         // Now, with a mock L2GasCalculator, that returns 5x the default calldata gas:
         uint256 expectedMockGas = 5 * expectedDefaultGas;
+        actualGas = calldataHelper.metacallCalldataGas(data, address(mockL2GasCalc));
 
-        assertEq(GasAccLib.metacallCalldataGas(msgDataLength, address(mockL2GasCalc)), expectedMockGas, "metacallCalldataGas (5x mock) unexpected");
+        assertEq(actualGas, expectedMockGas, "metacallCalldataGas (5x mock) unexpected");
+    }
+}
+
+contract MemoryToCalldataHelper {
+    function solverOpCalldataGas(bytes calldata data, address l2GasCalculator) external view returns (uint256 gas) {
+        return GasAccLib.solverOpCalldataGas(data, l2GasCalculator);
+    }
+
+    function metacallCalldataGas(bytes calldata data, address l2GasCalculator) external view returns (uint256 gas) {
+        return GasAccLib.metacallCalldataGas(data, l2GasCalculator);
     }
 }

@@ -150,7 +150,6 @@ contract AtlasVerificationBase is BaseTest {
     // TODO update tests to check allSolversGasLimit, allSolversCalldataGas, bidFindOverhead return values
     function doValidateCalls(ValidCallsCall memory call) public returns (
         uint256 allSolversGasLimit,
-        uint256 allSolversCalldataGas,
         uint256 bidFindOverhead,
         ValidCallsResult result
     ) {
@@ -160,7 +159,7 @@ contract AtlasVerificationBase is BaseTest {
         call.metacallGasLeft = _gasLim(call.userOp, call.solverOps) - 10_000; 
 
         vm.startPrank(address(atlas));
-        (allSolversGasLimit,  allSolversCalldataGas, bidFindOverhead, result) = atlasVerification.validateCalls(
+        (allSolversGasLimit, bidFindOverhead, result) = atlasVerification.validateCalls(
             config,
             call.userOp,
             call.solverOps,
@@ -181,7 +180,7 @@ contract AtlasVerificationBase is BaseTest {
     function callAndAssert(ValidCallsCall memory call, ValidCallsResult expected) public {
         ValidCallsResult result;
         // TODO add tests for new return values
-        (,,, result) = doValidateCalls(call);
+        (,, result) = doValidateCalls(call);
         assertValidCallsResult(result, expected);
     }
 
@@ -1850,7 +1849,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     function testGetDomainSeparatorInAtlasVerification() public view {
         bytes32 hashedName = keccak256(bytes("AtlasVerification"));
-        bytes32 hashedVersion = keccak256(bytes("1.6.1"));
+        bytes32 hashedVersion = keccak256(bytes("1.7"));
         bytes32 typeHash = keccak256(
             "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
         );

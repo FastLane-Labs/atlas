@@ -42,6 +42,8 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
 
     uint256 solverBidAmount = 1 ether;
 
+    MemoryToCalldataHelper calldataHelper;
+
     function setUp() public override {
         super.setUp();
 
@@ -78,6 +80,8 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         vm.deal(address(solver4), 10 * solverBidAmount);
         vm.prank(solverFourEOA);
         atlas.depositAndBond{value: 5 ether}(5 ether);
+
+        calldataHelper = new MemoryToCalldataHelper();
     }
 
     function buildUserOperation(uint256 signerPK) internal view returns (UserOperation memory) {
@@ -217,7 +221,7 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         console.log("Solver1 max win gas:", solver1MaxWinGas);
         
         // Verify simulator calculation
-        uint256 solver1CalldataGas = GasAccLib.solverOpCalldataGas(solverOp1.data.length, atlas.L2_GAS_CALCULATOR());
+        uint256 solver1CalldataGas = calldataHelper.solverOpCalldataGas(solverOp1.data, atlas.L2_GAS_CALCULATOR());
         uint256 solver1ExpectedGas = (solver1CalldataGas + (solverOp1.gas + 21000)) * solverOp1.maxFeePerGas;
         solver1ExpectedGas = solver1ExpectedGas * 120 / 100; // 20% surcharge
         assertApproxEqAbs(solver1MaxWinGas, solver1ExpectedGas, solver1ExpectedGas / 20, "Solver1 gas estimation mismatch");
@@ -253,7 +257,7 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         console.log("Solver2 max win gas:", solver2MaxWinGas);
         
         // Verify simulator calculation
-        uint256 solver2CalldataGas = GasAccLib.solverOpCalldataGas(solverOp2.data.length, atlas.L2_GAS_CALCULATOR());
+        uint256 solver2CalldataGas = calldataHelper.solverOpCalldataGas(solverOp2.data, atlas.L2_GAS_CALCULATOR());
         uint256 solver2ExpectedGas = (solver2CalldataGas + (solverOp2.gas + 21000)) * solverOp2.maxFeePerGas;
         solver2ExpectedGas = solver2ExpectedGas * 120 / 100; // 20% surcharge
         assertApproxEqAbs(solver2MaxWinGas, solver2ExpectedGas, solver2ExpectedGas / 20, "Solver2 gas estimation mismatch");
@@ -289,7 +293,7 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         console.log("Solver3 max win gas:", solver3MaxWinGas);
         
         // Verify simulator calculation
-        uint256 solver3CalldataGas = GasAccLib.solverOpCalldataGas(solverOp3.data.length, atlas.L2_GAS_CALCULATOR());
+        uint256 solver3CalldataGas = calldataHelper.solverOpCalldataGas(solverOp3.data, atlas.L2_GAS_CALCULATOR());
         uint256 solver3ExpectedGas = (solver3CalldataGas + (solverOp3.gas + 21000)) * solverOp3.maxFeePerGas;
         solver3ExpectedGas = solver3ExpectedGas * 120 / 100; // 20% surcharge
         assertApproxEqAbs(solver3MaxWinGas, solver3ExpectedGas, solver3ExpectedGas / 20, "Solver3 gas estimation mismatch");
@@ -325,7 +329,7 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         console.log("Solver4 max win gas:", solver4MaxWinGas);
         
         // Verify simulator calculation
-        uint256 solver4CalldataGas = GasAccLib.solverOpCalldataGas(solverOp4.data.length, atlas.L2_GAS_CALCULATOR());
+        uint256 solver4CalldataGas = calldataHelper.solverOpCalldataGas(solverOp4.data, atlas.L2_GAS_CALCULATOR());
         uint256 solver4ExpectedGas = (solver4CalldataGas + (solverOp4.gas + 21000)) * solverOp4.maxFeePerGas;
         solver4ExpectedGas = solver4ExpectedGas * 120 / 100; // 20% surcharge
         assertApproxEqAbs(solver4MaxWinGas, solver4ExpectedGas, solver4ExpectedGas / 20, "Solver4 gas estimation mismatch");
@@ -689,5 +693,15 @@ contract MockSolver is SolverBase {
             revert("revertWhileSolving");
         }
         executed = true;
+    }
+}
+
+contract MemoryToCalldataHelper {
+    function solverOpCalldataGas(bytes calldata data, address l2GasCalculator) external view returns (uint256 gas) {
+        return GasAccLib.solverOpCalldataGas(data, l2GasCalculator);
+    }
+
+    function metacallCalldataGas(bytes calldata data, address l2GasCalculator) external view returns (uint256 gas) {
+        return GasAccLib.metacallCalldataGas(data, l2GasCalculator);
     }
 }
