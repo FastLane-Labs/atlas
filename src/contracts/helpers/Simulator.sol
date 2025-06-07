@@ -19,6 +19,8 @@ import { Result } from "../interfaces/ISimulator.sol";
 import { IAtlas } from "../interfaces/IAtlas.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
+// TODO needs a big clean up refactor
+
 contract Simulator is AtlasErrors, AtlasConstants {
     using CallBits for uint32;
     using AccountingMath for uint256;
@@ -73,8 +75,6 @@ contract Simulator is AtlasErrors, AtlasConstants {
     {
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
         address l2GasCalculator = IAtlas(atlas).L2_GAS_CALCULATOR();
-        uint256 nonSolverCalldataLength =
-            userOp.data.length + USER_OP_STATIC_LENGTH + DAPP_OP_LENGTH + _EXTRA_CALLDATA_LENGTH;
         uint256 solverOpsLen = solverOps.length;
         uint256 solverDataLenSum; // Calculated as sum of solverOps[i].data.length below
         uint256 allSolversExecutionGas; // Calculated as sum of solverOps[i].gas below
@@ -84,12 +84,22 @@ contract Simulator is AtlasErrors, AtlasConstants {
             solverDataLenSum += solverOps[i].data.length;
             // Sum all solverOp.gas values in the array, each with a ceiling of dConfig.solverGasLimit
             allSolversExecutionGas += Math.min(solverOps[i].gas, dConfig.solverGasLimit);
+            // NOTE: solverOp calldata not summed individually in this estimation - done below as array
         }
 
+        // TODO fix - dAppOp needs a bunch of non-zero values
+        DAppOperation memory dAppOp;
+
+        // TODO THIS NEEDS FIXES - should be close to the real calldata of a metacall
+        bytes memory metacallCalldata = abi.encode(
+            userOp,
+            solverOps,
+            dAppOp,
+            address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE) // gasRefundBeneficiary
+        );
+
         // metacallCalldataGas is first item in return tuple
-        metacallCalldataGas = GasAccLib.calldataGas(
-            solverDataLenSum + (_SOLVER_OP_BASE_CALLDATA * solverOpsLen), l2GasCalculator
-        ) + GasAccLib.metacallCalldataGas(nonSolverCalldataLength, l2GasCalculator);
+        metacallCalldataGas = GasAccLib.metacallCalldataGasMemoryArg(metacallCalldata, l2GasCalculator);
 
         // metacallExecutionGas is second item in return tuple
         metacallExecutionGas = _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOp.gas + dConfig.dappGasLimit
@@ -116,6 +126,7 @@ contract Simulator is AtlasErrors, AtlasConstants {
         returns (uint256)
     {
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
+        address l2GasCalculator = IAtlas(atlas).L2_GAS_CALCULATOR();
         uint256 bundlerSurchargeRate = userOp.bundlerSurchargeRate;
         uint256 atlasSurchargeRate = IAtlas(atlas).getAtlasSurchargeRate();
         uint256 totalGas;
@@ -124,8 +135,7 @@ contract Simulator is AtlasErrors, AtlasConstants {
             // If multipleSuccessfulSolvers = true, each solver only pays for their own gas usage.
 
             // Calculate solver gas obligation as if expecting a solver fault in handleSolverFailAccounting()
-            uint256 _calldataGas =
-                GasAccLib.solverOpCalldataGas(solverOp.data.length, IAtlas(atlas).L2_GAS_CALCULATOR());
+            uint256 _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data, l2GasCalculator);
 
             // Use solver's gas limit since we can't know actual execution gas beforehand
             totalGas = _calldataGas + solverOp.gas + _SOLVER_FAULT_OFFSET;
@@ -136,11 +146,21 @@ contract Simulator is AtlasErrors, AtlasConstants {
             // In normal bid mode, solvers each pay for their own solverOp calldata gas, and the winning solver pays for
             // the other non-solver calldata gas as well. In this calculation, there's only 1 solverOp so no need to
             // subtract calldata of other solverOps as they aren't any.
-            uint256 metacallCalldataLength = (_SOLVER_OP_BASE_CALLDATA + solverOp.data.length)
-                + (USER_OP_STATIC_LENGTH + userOp.data.length) + DAPP_OP_LENGTH + _EXTRA_CALLDATA_LENGTH;
 
-            uint256 metacallCalldataGas =
-                GasAccLib.metacallCalldataGas(metacallCalldataLength, IAtlas(atlas).L2_GAS_CALCULATOR());
+            // TODO fix - dAppOp needs a bunch of non-zero values
+            DAppOperation memory dAppOp;
+            SolverOperation[] memory solverOps = new SolverOperation[](1);
+            solverOps[0] = solverOp;
+
+            // TODO THIS NEEDS FIXES - should be close to the real calldata of a metacall
+            bytes memory metacallCalldata = abi.encode(
+                userOp, // UserOperation
+                solverOps, // SolverOperation[] including the solver's solverOp
+                dAppOp, // DAppOperation
+                address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE) // gasRefundBeneficiary
+            );
+
+            uint256 metacallCalldataGas = GasAccLib.metacallCalldataGasMemoryArg(metacallCalldata, l2GasCalculator);
 
             uint256 metacallExecutionGas =
                 _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOp.gas + userOp.dappGasLimit + solverOp.gas;

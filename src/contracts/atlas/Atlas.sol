@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
+import { LibBytes } from "solady/utils/LibBytes.sol";
 import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 
@@ -20,7 +21,7 @@ import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 import { GasAccLib, GasLedger } from "../libraries/GasAccLib.sol";
 
-/// @title Arbitrum Atlas V1.6.1
+/// @title Arbitrum Atlas V1.7
 /// @author FastLane Labs
 /// @notice The Execution Abstraction protocol.
 contract Atlas is Escrow, Factory {
@@ -29,6 +30,7 @@ contract Atlas is Escrow, Factory {
     using SafetyBits for Context;
     using GasAccLib for uint256;
     using GasAccLib for GasLedger;
+    using LibBytes for bytes;
 
     constructor(
         uint256 escrowDuration,
@@ -74,12 +76,8 @@ contract Atlas is Escrow, Factory {
         (_executionEnvironment, _dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
         // Validate metacall params, and get back vars used in gas accounting logic
-        (
-            uint256 _allSolversGasLimit,
-            uint256 _allSolversCalldataGas,
-            uint256 _bidFindOverhead,
-            ValidCallsResult _validCallsResult
-        ) = VERIFICATION.validateCalls({
+        (uint256 _allSolversGasLimit, uint256 _bidFindOverhead, ValidCallsResult _validCallsResult) = VERIFICATION
+            .validateCalls({
             dConfig: _dConfig,
             userOp: userOp,
             solverOps: solverOps,
@@ -92,11 +90,10 @@ contract Atlas is Escrow, Factory {
 
         // Solvers pay for calldata when exPostBids = false
         if (!_dConfig.callConfig.exPostBids()) {
-            // total calldata gas = solver calldata gas + (userOp + dAppOp + offset) calldata gas
-            _gasMarker += _allSolversCalldataGas
-                + GasAccLib.metacallCalldataGas(
-                    userOp.data.length + USER_OP_STATIC_LENGTH + DAPP_OP_LENGTH + _EXTRA_CALLDATA_LENGTH, L2_GAS_CALCULATOR
-                );
+            // If bundler packs additional calldata onto metacall, this will still only get the calldata gas of the
+            // standard metacall args.
+            _gasMarker +=
+                GasAccLib.metacallCalldataGas(msg.data.sliceCalldata(0, _endOfMetacallArgs()), L2_GAS_CALCULATOR);
         }
 
         // Handle the ValidCallsResult
@@ -479,5 +476,37 @@ contract Atlas is Escrow, Factory {
         returns (bool)
     {
         return environment == _getExecutionEnvironmentCustom(user, control, callConfig);
+    }
+
+    /// @notice Calculates the end index in calldata of the standard metacall arguments. Any additional calldata packed
+    /// onto the end of the metacall will be ignored.
+    /// @dev Calculated using the DAppOperation's signature field as an anchor point, as it is the last dynamic field in
+    /// the standard metacall calldata. Includes the metacall function selector and everything up to the end of the
+    /// gasRefundBeneficiary address.
+    /// @return endIndex The end index in calldata of the standard metacall arguments.
+    function _endOfMetacallArgs() internal pure returns (uint256 endIndex) {
+        assembly {
+            // ── 1. Constants ────────────────────────────────────────────────
+            let HEAD_START := 4 // skip selector
+            // positions inside the head
+            let DAPP_OP_PTR_POS := add(HEAD_START, 0x40) // 2×32 (arg index = 2)
+            // inside DAppOperation
+            let SIGNATURE_PTR_IN_STRUCT := 0x100 // 8×32
+
+            // ── 2. Find where DAppOperation starts ──────────────────────────
+            let dAppRel := calldataload(DAPP_OP_PTR_POS) // offset (relative)
+            let dAppHead := add(HEAD_START, dAppRel) // absolute byte-index
+
+            // ── 3. Jump to DAppOperation `signature` field ──────────────────
+            let sigRel := calldataload(add(dAppHead, SIGNATURE_PTR_IN_STRUCT))
+            let sigHead := add(dAppHead, sigRel) // absolute
+
+            // ── 4. Read length & compute padded length ──────────────────────
+            let sigLen := calldataload(sigHead)
+            let padded := and(add(sigLen, 0x1f), not(0x1f)) // ceil32
+
+            // ── 5. End of expected data = selector + everything up to sig bytes
+            endIndex := add(add(sigHead, 0x20), padded)
+        }
     }
 }

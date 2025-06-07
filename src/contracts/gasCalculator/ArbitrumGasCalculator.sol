@@ -6,6 +6,10 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ArbGasInfo } from "nitro-contracts/src/precompiles/ArbGasInfo.sol";
 import { IL2GasCalculator } from "src/contracts/interfaces/IL2GasCalculator.sol";
 
+// TODO in GasAccLib - need a way to get calldata price for static SolverOp.
+// For now that can be a constant amount of zero and non-zero bytes, that get put through getCalldataGas() to get a
+// number to add to solverOp.data cost.
+
 // NOTE: For Arbitrum gas pricing calibration. Replace with constants once calibrated.
 // - getCalldataGas: Y = A(zero bytes)(gasPerL1Byte) + B(non-zero bytes)(gasPerL1Byte) + C
 // - initialGasUsed: Y = A(zero bytes)(gasPerL1Byte) + B(non-zero bytes)(gasPerL1Byte) + R(perL2TxInArbGas) + C
@@ -74,7 +78,7 @@ contract ArbitrumGasCalculator is IL2GasCalculator, Ownable {
 
     /// @notice Calculate the initial gas used for a transaction
     /// @param data The calldata for which to calculate the gas cost
-    /// @return gasUsed The amount of gas used
+    /// @return gasUsed The initial gas used for the metacall in ArbGas units
     function initialGasUsed(bytes calldata data) external view override returns (uint256 gasUsed) {
         // Get the number of zero and non-zero bytes in the calldata
         uint256 zeroByteCount = data.countZeroBytesCalldata();
