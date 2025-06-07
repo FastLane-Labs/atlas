@@ -87,27 +87,55 @@ library GasAccLib {
         return uint256(gL.atlasSurchargeRate + gL.bundlerSurchargeRate);
     }
 
-    function solverOpCalldataGas(uint256 calldataLength, address l2GasCalculator) internal view returns (uint256 gas) {
+    function solverOpCalldataGas(bytes calldata data, address l2GasCalculator) internal view returns (uint256 gas) {
         if (l2GasCalculator == address(0)) {
             // Default to using mainnet gas calculations
             // _SOLVER_OP_BASE_CALLDATA = SolverOperation calldata length excluding solverOp.data
-            gas = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED;
+            gas = (data.length + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED;
         } else {
-            gas = IL2GasCalculator(l2GasCalculator).getCalldataGas(calldataLength + _SOLVER_OP_BASE_CALLDATA);
+            // TODO fix the 2nd piece here - see ArbitrumGasCalculator.sol
+            gas = IL2GasCalculator(l2GasCalculator).getCalldataGas(data);
+
+            // TODO fix this: temporary hack to calc static solverOp calldata price in ArbGas
+            // Takes average gas per byte and assumes static solverOp has same zero:non-zero byte ratio.
+            gas += _SOLVER_OP_BASE_CALLDATA * (gas / data.length);
         }
     }
 
-    function calldataGas(uint256 calldataLength, address l2GasCalculator) internal view returns (uint256 gas) {
+    // Same as `solverOpCalldataGas()` but takes a memory data argument, instead of calldata.
+    function solverOpCalldataGasMemoryArg(
+        bytes memory data,
+        address l2GasCalculator
+    )
+        internal
+        view
+        returns (uint256 gas)
+    {
         if (l2GasCalculator == address(0)) {
             // Default to using mainnet gas calculations
-            gas = calldataLength * _CALLDATA_LENGTH_PREMIUM_HALVED;
+            // _SOLVER_OP_BASE_CALLDATA = SolverOperation calldata length excluding solverOp.data
+            gas = (data.length + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED;
         } else {
-            gas = IL2GasCalculator(l2GasCalculator).getCalldataGas(calldataLength);
+            // TODO fix the 2nd piece here - see ArbitrumGasCalculator.sol
+            gas = IL2GasCalculator(l2GasCalculator).getCalldataGas(data);
+
+            // TODO fix this: temporary hack to calc static solverOp calldata price in ArbGas
+            // Takes average gas per byte and assumes static solverOp has same zero:non-zero byte ratio.
+            gas += _SOLVER_OP_BASE_CALLDATA * (gas / data.length);
+        }
+    }
+
+    function calldataGas(bytes calldata data, address l2GasCalculator) internal view returns (uint256 gas) {
+        if (l2GasCalculator == address(0)) {
+            // Default to using mainnet gas calculations
+            gas = data.length * _CALLDATA_LENGTH_PREMIUM_HALVED;
+        } else {
+            gas = IL2GasCalculator(l2GasCalculator).getCalldataGas(data);
         }
     }
 
     function metacallCalldataGas(
-        uint256 msgDataLength,
+        bytes calldata msgData,
         address l2GasCalculator
     )
         internal
@@ -115,9 +143,24 @@ library GasAccLib {
         returns (uint256 calldataGas)
     {
         if (l2GasCalculator == address(0)) {
-            calldataGas = msgDataLength * _CALLDATA_LENGTH_PREMIUM_HALVED;
+            calldataGas = msgData.length * _CALLDATA_LENGTH_PREMIUM_HALVED;
         } else {
-            calldataGas = IL2GasCalculator(l2GasCalculator).initialGasUsed(msgDataLength);
+            calldataGas = IL2GasCalculator(l2GasCalculator).initialGasUsed(msgData);
+        }
+    }
+
+    function metacallCalldataGasMemoryArg(
+        bytes memory msgData,
+        address l2GasCalculator
+    )
+        internal
+        view
+        returns (uint256 calldataGas)
+    {
+        if (l2GasCalculator == address(0)) {
+            calldataGas = msgData.length * _CALLDATA_LENGTH_PREMIUM_HALVED;
+        } else {
+            calldataGas = IL2GasCalculator(l2GasCalculator).initialGasUsed(msgData);
         }
     }
 }

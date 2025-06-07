@@ -13,8 +13,6 @@ import { AccountingMath } from "../libraries/AccountingMath.sol";
 import { GasAccLib, GasLedger, BorrowsLedger } from "../libraries/GasAccLib.sol";
 import { SafeBlockNumber } from "../libraries/SafeBlockNumber.sol";
 import { SolverOperation } from "../types/SolverOperation.sol";
-import { DAppConfig } from "../types/ConfigTypes.sol";
-import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
@@ -306,7 +304,7 @@ abstract contract GasAccounting is SafetyLocks {
         // Solvers do not pay for calldata gas in exPostBids mode.
         uint256 _calldataGas;
         if (!exPostBids) {
-            _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR);
+            _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data, L2_GAS_CALCULATOR);
         }
 
         // Solver execution max gas is calculated as solverOp.gas, with a ceiling of dConfig.solverGasLimit
@@ -409,8 +407,7 @@ abstract contract GasAccounting is SafetyLocks {
         // Start at the solver after the current solverIdx, because current solverIdx is the winner
         for (uint256 i = winningSolverIdx + 1; i < solverOps.length; ++i) {
             address _from = solverOps[i].from;
-            uint256 _calldataGasCost =
-                GasAccLib.solverOpCalldataGas(solverOps[i].data.length, L2_GAS_CALCULATOR) * tx.gasprice;
+            uint256 _calldataGasCost = GasAccLib.solverOpCalldataGas(solverOps[i].data, L2_GAS_CALCULATOR) * tx.gasprice;
 
             // Verify the solverOp, and write off solver's calldata gas if included due to bundler fault
             uint256 _result =

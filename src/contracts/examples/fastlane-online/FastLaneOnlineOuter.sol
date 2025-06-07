@@ -3,24 +3,19 @@ pragma solidity 0.8.28;
 
 // Base Imports
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
-import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Imports
 import { DAppControl } from "../../dapp/DAppControl.sol";
 import { DAppOperation } from "../../types/DAppOperation.sol";
-import { CallConfig } from "../../types/ConfigTypes.sol";
 import "../../types/UserOperation.sol";
 import "../../types/SolverOperation.sol";
-import "../../types/LockTypes.sol";
 
 // Interface Import
 import { IAtlasVerification } from "../../interfaces/IAtlasVerification.sol";
-import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.sol";
 import { IAtlas } from "../../interfaces/IAtlas.sol";
 import { ISimulator } from "../../interfaces/ISimulator.sol";
 
 import { FastLaneOnlineControl } from "./FastLaneControl.sol";
-import { FastLaneOnlineInner } from "./FastLaneOnlineInner.sol";
 import { SolverGateway } from "./SolverGateway.sol";
 
 import { SwapIntent, BaselineCall } from "./FastLaneTypes.sol";

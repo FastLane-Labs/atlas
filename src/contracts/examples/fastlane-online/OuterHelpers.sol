@@ -4,24 +4,18 @@ pragma solidity 0.8.28;
 // Base Imports
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
-import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Imports
 import { DAppControl } from "../../dapp/DAppControl.sol";
 import { DAppOperation } from "../../types/DAppOperation.sol";
-import { CallConfig } from "../../types/ConfigTypes.sol";
 import "../../types/UserOperation.sol";
 import "../../types/SolverOperation.sol";
-import "../../types/LockTypes.sol";
-import "../../types/EscrowTypes.sol";
 
 // Interface Import
 import { IAtlasVerification } from "../../interfaces/IAtlasVerification.sol";
-import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.sol";
 import { IAtlas } from "../../interfaces/IAtlas.sol";
 import { ISimulator } from "../../interfaces/ISimulator.sol";
 
-import { FastLaneOnlineControl } from "./FastLaneControl.sol";
 import { FastLaneOnlineInner } from "./FastLaneOnlineInner.sol";
 
 import { SwapIntent, BaselineCall, Reputation } from "./FastLaneTypes.sol";
@@ -34,7 +28,7 @@ contract OuterHelpers is FastLaneOnlineInner {
     address public immutable SIMULATOR;
 
     uint256 internal constant _BITS_FOR_INDEX = 16;
-    uint256 internal constant _SOLVER_SIM_GAS_LIM = 4_850_000;
+    uint256 internal constant _SOLVER_SIM_GAS_LIM = 4_900_000;
 
     constructor(address atlas, address protocolGuildWallet) FastLaneOnlineInner(atlas) {
         CARDANO_ENGINEER_THERAPY_FUND = msg.sender;
