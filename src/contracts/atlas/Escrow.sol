@@ -331,7 +331,7 @@ abstract contract Escrow is AtlETH {
 
         // Calldata gas is only included if NOT in exPostBids mode.
         if (!dConfig.callConfig.exPostBids()) {
-            _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR);
+            _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data, L2_GAS_CALCULATOR);
         }
 
         // Reset solver's max approved gas spend to 0 at start of each new solver execution

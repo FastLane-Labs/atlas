@@ -10,7 +10,6 @@ import { DAppControl } from "../../dapp/DAppControl.sol";
 import { CallConfig } from "../../types/ConfigTypes.sol";
 import "../../types/UserOperation.sol";
 import "../../types/SolverOperation.sol";
-import "../../types/LockTypes.sol";
 import { IAtlas } from "../../interfaces/IAtlas.sol";
 
 import { SwapIntent, BaselineCall } from "./FastLaneTypes.sol";
