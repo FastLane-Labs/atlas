@@ -75,6 +75,9 @@ struct CallConfig {
     // multipleSolvers: If true, the metacall will proceed even if a solver successfully pays their bid, and will be
     // charged in gas as if it was reverted. If false, the auction ends after the first successful solver.
     bool multipleSuccessfulSolvers;
+    // checkMetacallGasLimit: If true, the execution gas measured by `gasleft()` at the start of the metacall is
+    // verified to be in line with the expected gas limit, based on the userOp, solverOps, and dAppOp.
+    bool checkMetacallGasLimit;
 }
 
 enum CallConfigIndex {
@@ -98,5 +101,6 @@ enum CallConfigIndex {
     TrustedOpHash,
     InvertBidValue,
     ExPostBids,
-    MultipleSuccessfulSolvers
+    MultipleSuccessfulSolvers,
+    CheckMetacallGasLimit
 }

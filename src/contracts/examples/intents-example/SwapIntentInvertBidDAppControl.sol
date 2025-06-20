@@ -65,7 +65,8 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
                 trustedOpHash: true,
                 invertBidValue: true,
                 exPostBids: false,
-                multipleSuccessfulSolvers: false
+                multipleSuccessfulSolvers: false,
+                checkMetacallGasLimit: true
             })
         )
     {

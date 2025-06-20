@@ -5,7 +5,6 @@ import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.s
 
 import { AccountingMath } from "./AccountingMath.sol";
 import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
-import { SolverOperation } from "../types/SolverOperation.sol";
 
 // All GasLedger vars are measured in units of gas.
 // All GasLedger vars also include calldata and execution gas components.
