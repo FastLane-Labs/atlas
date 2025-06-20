@@ -12,8 +12,6 @@ import { CallBits } from "../libraries/CallBits.sol";
 import { AccountingMath } from "../libraries/AccountingMath.sol";
 import { GasAccLib, GasLedger, BorrowsLedger } from "../libraries/GasAccLib.sol";
 import { SolverOperation } from "../types/SolverOperation.sol";
-import { DAppConfig } from "../types/ConfigTypes.sol";
-import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 

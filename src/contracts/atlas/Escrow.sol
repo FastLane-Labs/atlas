@@ -6,10 +6,8 @@ import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import { AtlETH } from "./AtlETH.sol";
 import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
-import { IAtlas } from "../interfaces/IAtlas.sol";
 import { ISolverContract } from "../interfaces/ISolverContract.sol";
 import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
-import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
 import { SafeCall } from "../libraries/SafeCall/SafeCall.sol";
 import { EscrowBits } from "../libraries/EscrowBits.sol";

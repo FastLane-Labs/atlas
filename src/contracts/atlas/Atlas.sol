@@ -19,8 +19,6 @@ import "../types/ValidCalls.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 import { GasAccLib, GasLedger } from "../libraries/GasAccLib.sol";
-import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
-import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
 /// @title Atlas V1.6
 /// @author FastLane Labs
