@@ -212,7 +212,7 @@ abstract contract Escrow is AtlETH {
                 // First successful solver call that paid what it bid
                 if (_result.executionSuccessful()) {
                     // Logic done above `_handleSolverFailAccounting()` is to charge solver for gas used here
-                    ctx.solverOutcome = uint24(_result);
+                    ctx.solverOutcome = _result.toUint24();
 
                     emit SolverTxResult(
                         solverOp.solver,
@@ -247,7 +247,7 @@ abstract contract Escrow is AtlETH {
         }
 
         // If we reach this point, the solver call did not execute successfully.
-        ctx.solverOutcome = uint24(_result);
+        ctx.solverOutcome = _result.toUint24();
 
         emit SolverTxResult(
             solverOp.solver,
