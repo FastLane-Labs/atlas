@@ -2,13 +2,9 @@
 pragma solidity 0.8.28;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
-import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { GasAccounting } from "./GasAccounting.sol";
-
 import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "../libraries/SafetyBits.sol";
-import "../types/LockTypes.sol";
-import "../types/EscrowTypes.sol";
 
 // NOTE: Permit69 only works inside of the Atlas environment - specifically
 // inside of the custom ExecutionEnvironments that each user deploys when

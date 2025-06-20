@@ -73,7 +73,8 @@ contract ChainlinkDAppControl is DAppControl {
                 trustedOpHash: true,
                 invertBidValue: false,
                 exPostBids: false,
-                multipleSuccessfulSolvers: false
+                multipleSuccessfulSolvers: false,
+                checkMetacallGasLimit: true
             })
         )
     { }

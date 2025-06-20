@@ -7,7 +7,6 @@ import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol"
 import { Base } from "./ExecutionBase.sol";
 
 import { IAtlas } from "../interfaces/IAtlas.sol";
-import { ISolverContract } from "../interfaces/ISolverContract.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { AtlasErrors } from "../types/AtlasErrors.sol";
 import { CallBits } from "../libraries/CallBits.sol";

@@ -6,10 +6,8 @@ import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import { AtlETH } from "./AtlETH.sol";
 import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
-import { IAtlas } from "../interfaces/IAtlas.sol";
 import { ISolverContract } from "../interfaces/ISolverContract.sol";
 import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
-import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
 import { SafeCall } from "../libraries/SafeCall/SafeCall.sol";
 import { EscrowBits } from "../libraries/EscrowBits.sol";
@@ -213,7 +211,7 @@ abstract contract Escrow is AtlETH {
                 // First successful solver call that paid what it bid
                 if (_result.executionSuccessful()) {
                     // Logic done above `_handleSolverFailAccounting()` is to charge solver for gas used here
-                    ctx.solverOutcome = uint24(_result);
+                    ctx.solverOutcome = _result.toUint24();
 
                     emit SolverTxResult(
                         solverOp.solver,
@@ -248,7 +246,7 @@ abstract contract Escrow is AtlETH {
         }
 
         // If we reach this point, the solver call did not execute successfully.
-        ctx.solverOutcome = uint24(_result);
+        ctx.solverOutcome = _result.toUint24();
 
         emit SolverTxResult(
             solverOp.solver,
