@@ -4,391 +4,163 @@ pragma solidity 0.8.28;
 import "forge-std/Test.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
-import "./base/TestUtils.sol";
-
-import { Permit69 } from "../src/contracts/atlas/Permit69.sol";
-import { Mimic } from "../src/contracts/common/Mimic.sol";
-import { FactoryLib } from "../src/contracts/atlas/FactoryLib.sol";
+import { TestAtlas } from "../test/base/TestAtlas.sol";
 
 import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "../src/contracts/atlas/Permit69.sol";
-import { AtlasEvents } from "../src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "../src/contracts/types/AtlasErrors.sol";
-
-import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironment.sol";
-
-import { Atlas } from "../src/contracts/atlas/Atlas.sol";
-import { AtlasVerification } from "../src/contracts/atlas/AtlasVerification.sol";
-
-import "../src/contracts/types/LockTypes.sol";
-import "../src/contracts/types/DAppOperation.sol";
+import { ExecutionPhase } from "../src/contracts/types/LockTypes.sol";
 
 contract Permit69Test is BaseTest {
-    Context ctx;
-    address mockUser;
-
-    MockAtlasForPermit69Tests public mockAtlas;
-
-    address public mockExecutionEnvAddress;
-    address public mockDAppControl;
-    uint32 public mockCallConfig;
+    MockDAppControl mockDAppControl;
+    address executionEnvironment;
 
     function setUp() public virtual override {
         BaseTest.setUp();
 
-        mockUser = address(0x13371337);
+        mockDAppControl = new MockDAppControl();
 
-        address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
-        address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
-
-        vm.startPrank(deployer);
-        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
-        FactoryLib factoryLib = new FactoryLib(address(execEnvTemplate));
-
-        mockAtlas = new MockAtlasForPermit69Tests({
-            escrowDuration: 64,
-            atlasSurchargeRate: DEFAULT_ATLAS_SURCHARGE_RATE,
-            verification: expectedAtlasVerificationAddr,
-            simulator: address(0),
-            factoryLib: address(factoryLib),
-            _surchargeRecipient: deployer,
-            l2GasCalculator: address(0)
+        vm.startPrank(userEOA);
+        executionEnvironment = atlas.createExecutionEnvironment({
+            user: userEOA,
+            control: address(mockDAppControl)
         });
+        WETH.approve(address(atlas), type(uint256).max);
         vm.stopPrank();
 
-        console.log("Mock Atlas address: ", address(mockAtlas));
-        console.log("Predicted atlas address: ", expectedAtlasAddr);
+        vm.prank(address(mockDAppControl));
+        WETH.approve(address(atlas), type(uint256).max);
 
-
-        assertEq(address(mockAtlas), expectedAtlasAddr, "Atlas address mismatch");
-
-        mockDAppControl = address(0x123321);
-        mockCallConfig = 0;
-
-        mockExecutionEnvAddress = mockAtlas.getOrCreateExecutionEnvironment({
-            user: mockUser,
-            control: mockDAppControl,
-            callConfig: mockCallConfig
-        });
-
-        ctx = Context({
-            executionEnvironment: mockExecutionEnvAddress,
-            userOpHash: bytes32(0),
-            bundler: address(0),
-            solverSuccessful: false,
-            solverIndex: 0,
-            solverCount: 0,
-            phase: uint8(ExecutionPhase.PreOps),
-            solverOutcome: 0,
-            bidFind: false,
-            isSimulation: false,
-            callDepth: 0,
-            dappGasLeft: 0
-        });
-
-        mockAtlas.setLock(mockExecutionEnvAddress, mockCallConfig);
-        mockAtlas.setContext(ctx);
-        mockAtlas.setEnvironment(mockExecutionEnvAddress);
-
-        deal(WETH_ADDRESS, mockDAppControl, 100e18);
-        deal(WETH_ADDRESS, mockUser, 100e18);
+        deal(WETH_ADDRESS, address(mockDAppControl), 100e18);
+        deal(WETH_ADDRESS, userEOA, 100e18);
     }
 
     // transferUserERC20 tests
 
-    function testTransferUserERC20RevertsIsCallerNotExecutionEnv() public {
-        ExecutionPhase phase = ExecutionPhase.PreOps;
-        mockAtlas.setContext(ctx);
-        mockAtlas.setPhase(phase);
+    function test_Permit69_TransferUserERC20RevertsIfCallerNotExecutionEnv() public {
+        // Set active ExecutionEnvironment in Atlas
+        atlas.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PreOps));
 
-        vm.prank(solverOneEOA);
+        vm.prank(solverOneEOA); // Should revert because caller is not the ExecutionEnvironment
         vm.expectRevert(AtlasErrors.InvalidEnvironment.selector);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl);
+        atlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, address(mockDAppControl));
     }
 
-    function testTransferUserERC20RevertsIfLockStateNotValid() public {
-        // FIXME: fix before merging spearbit-reaudit branch
-        vm.skip(true);
+    function test_Permit69_TransferUserERC20RevertsIfEnvironmentMismatch() public {
+        // Set active ExecutionEnvironment in Atlas
+        atlas.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PreOps));
 
-        ExecutionPhase phase = ExecutionPhase.Uninitialized;
-        mockAtlas.setContext(ctx);
-        mockAtlas.setPhase(phase);
-
-        // Check reverts at all invalid execution phases
-        vm.startPrank(mockExecutionEnvAddress);
-
-        // Uninitialized
-        vm.expectRevert(AtlasErrors.InvalidLockState.selector);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl);
-
-        // AllocateValue
-        phase = ExecutionPhase.AllocateValue;
-        mockAtlas.setContext(ctx);
-        mockAtlas.setPhase(phase);
-        vm.expectRevert(AtlasErrors.InvalidLockState.selector);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl);
-
-        // Releasing
-        phase = ExecutionPhase.Uninitialized;
-        mockAtlas.setContext(ctx);
-        mockAtlas.setPhase(phase);
-        vm.expectRevert(AtlasErrors.InvalidLockState.selector);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl);
-
-        vm.stopPrank();
+        vm.prank(executionEnvironment); // Tries to transfer from GovEOA, not the user associated with EE
+        vm.expectRevert(AtlasErrors.EnvironmentMismatch.selector);
+        atlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, governanceEOA, address(mockDAppControl));
     }
 
-    function testTransferUserERC20SuccessfullyTransfersTokens() public {
-        // FIXME: fix before merging spearbit-reaudit branch
-        vm.skip(true);
+    function test_Permit69_TransferUserERC20RevertsIfLockStateNotValid() public {
+        // No User transfers allowed during AllocateValue phase
+        atlas.setLock(executionEnvironment, 0, uint8(ExecutionPhase.AllocateValue));
 
-        uint256 wethTransferred = 10e18;
+        vm.prank(executionEnvironment);
+        vm.expectRevert(AtlasErrors.InvalidLockState.selector);
+        atlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, address(mockDAppControl));
+    }
 
-        uint256 userWethBefore = WETH.balanceOf(mockUser);
-        uint256 solverWethBefore = WETH.balanceOf(solverOneEOA);
+    function test_Permit69_TransferUserERC20SuccessfullyTransfersTokens() public {
+        // Set active ExecutionEnvironment in Atlas
+        atlas.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PreOps));
+        
+        uint256 solverBalanceBefore = WETH.balanceOf(solverOneEOA);
+        uint256 userBalanceBefore = WETH.balanceOf(userEOA);
 
-        ExecutionPhase phase = ExecutionPhase.PreOps;
+        // Transfer tokens from user to solverOneEOA
+        vm.prank(executionEnvironment);
+        atlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, address(mockDAppControl));
 
-        mockAtlas.setPhase(phase);
-
-        vm.prank(mockUser);
-        WETH.approve(address(mockAtlas), wethTransferred);
-
-        vm.prank(mockExecutionEnvAddress);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, wethTransferred, mockUser, mockDAppControl);
-
-        assertEq(WETH.balanceOf(mockUser), userWethBefore - wethTransferred, "User did not lose WETH");
-        assertEq(WETH.balanceOf(solverOneEOA), solverWethBefore + wethTransferred, "Solver did not gain WETH");
+        // Check balances
+        assertEq(WETH.balanceOf(solverOneEOA), solverBalanceBefore + 10e18, "Solver balance should increase by 10 WETH");
+        assertEq(WETH.balanceOf(userEOA), userBalanceBefore - 10e18, "User balance should decrease by 10 WETH");
     }
 
     // transferDAppERC20 tests
 
-    function testTransferDAppERC20RevertsIsCallerNotExecutionEnv() public {
-        ExecutionPhase phase = ExecutionPhase.PreOps;
-        mockAtlas.setPhase(phase);
+    function test_Permit69_TransferDAppERC20RevertsIfCallerNotExecutionEnv() public {
+        // Set active ExecutionEnvironment in Atlas
+        atlas.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PreOps));
 
-        vm.prank(solverOneEOA);
+        vm.prank(solverOneEOA); // Should revert because caller is not the ExecutionEnvironment
         vm.expectRevert(AtlasErrors.InvalidEnvironment.selector);
-        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl);
+        atlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, address(mockDAppControl));
     }
 
-    function testTransferDAppERC20RevertsIfLockStateNotValid() public {
-        // FIXME: fix before merging spearbit-reaudit branch
-        vm.skip(true);
+    function test_Permit69_TransferDAppERC20RevertsIfEnvironmentMismatch() public {
+        // Set active ExecutionEnvironment in Atlas
+        atlas.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PreOps));
 
-        // Check reverts at all invalid execution phases
-        vm.startPrank(mockExecutionEnvAddress);
-
-        // Uninitialized
-        ExecutionPhase phase = ExecutionPhase.Uninitialized;
-        mockAtlas.setPhase(phase);
-        vm.expectRevert(AtlasErrors.InvalidLockState.selector);
-        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl);
-
-        // UserOperation
-        phase = ExecutionPhase.UserOperation;
-        mockAtlas.setPhase(phase);
-        vm.expectRevert(AtlasErrors.InvalidLockState.selector);
-        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl);
-
-        // SolverOperations
-        phase = ExecutionPhase.SolverOperation;
-        mockAtlas.setPhase(phase);
-        vm.expectRevert(AtlasErrors.InvalidLockState.selector);
-        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl);
-
-        // Releasing
-        phase = ExecutionPhase.Uninitialized;
-        mockAtlas.setPhase(phase);
-        vm.expectRevert(AtlasErrors.InvalidLockState.selector);
-        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl);
-
-        vm.stopPrank();
+        vm.prank(executionEnvironment); // Tries to transfer from GovEOA, not the user associated with EE
+        vm.expectRevert(AtlasErrors.EnvironmentMismatch.selector);
+        atlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, governanceEOA, address(mockDAppControl));
     }
 
-    function testTransferDAppERC20SuccessfullyTransfersTokens() public {
-        // FIXME: fix before merging spearbit-reaudit branch
-        vm.skip(true);
+    function test_Permit69_TransferDAppERC20RevertsIfLockStateNotValid() public {
+        // No DApp transfers allowed during UserOperation phase
+        atlas.setLock(executionEnvironment, 0, uint8(ExecutionPhase.UserOperation));
 
-        uint256 wethTransferred = 10e18;
+        vm.prank(executionEnvironment);
+        vm.expectRevert(AtlasErrors.InvalidLockState.selector);
+        atlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, address(mockDAppControl));
+    }
 
-        uint256 dAppWethBefore = WETH.balanceOf(mockDAppControl);
-        uint256 solverWethBefore = WETH.balanceOf(solverOneEOA);
+    function test_Permit69_TransferDAppERC20SuccessfullyTransfersTokens() public {
+        // Set active ExecutionEnvironment in Atlas
+        atlas.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PreOps));
+        
+        uint256 solverBalanceBefore = WETH.balanceOf(solverOneEOA);
+        uint256 dAppControlBalanceBefore = WETH.balanceOf(address(mockDAppControl));
 
-        ExecutionPhase phase = ExecutionPhase.PreOps;
-        mockAtlas.setPhase(phase);
+        // Transfer tokens from DAppControl to solverOneEOA
+        vm.prank(executionEnvironment);
+        atlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, address(mockDAppControl));
 
-        vm.prank(mockDAppControl);
-        WETH.approve(address(mockAtlas), wethTransferred);
-
-        vm.prank(mockExecutionEnvAddress);
-        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, wethTransferred, mockUser, mockDAppControl);
-
-        assertEq(WETH.balanceOf(mockDAppControl), dAppWethBefore - wethTransferred, "DApp did not lose WETH");
-        assertEq(WETH.balanceOf(solverOneEOA), solverWethBefore + wethTransferred, "Solver did not gain WETH");
+        // Check balances
+        assertEq(WETH.balanceOf(solverOneEOA), solverBalanceBefore + 10e18, "Solver balance should increase by 10 WETH");
+        assertEq(WETH.balanceOf(address(mockDAppControl)), dAppControlBalanceBefore - 10e18, "DAppControl balance should decrease by 10 WETH");
     }
 
     // constants tests
-    function testConstantValueOfSafeUserTransfer() public {
-        // FIXME: fix before merging spearbit-reaudit branch
-        vm.skip(true);
+    function test_Permit69_ConstantValueOfSafeUserTransfer() public {
+        uint8 SAFE_U = SAFE_USER_TRANSFER;
 
-        string memory expectedBitMapString = "0000101011100000";
-        // Safe phases for user transfers are PreOps, UserOperation, and DAppOperation
-        // preOpsPhaseSafe = 0000 0000 0010 0000
-        uint8 preOpsPhaseSafe = uint8(ExecutionPhase.PreOps);
-        // userOpPhaseSafe = 0000 0000 0100 0000
-        uint8 userOpPhaseSafe = uint8(ExecutionPhase.UserOperation);
+        // Safe phases for TransferUserERC20
+        assertTrue(SAFE_U & (1 << uint8(ExecutionPhase.PreOps)) != 0, "User transfer safe in PreOps");
+        assertTrue(SAFE_U & (1 << uint8(ExecutionPhase.UserOperation)) != 0, "User transfer safe in UserOperation");
+        assertTrue(SAFE_U & (1 << uint8(ExecutionPhase.PreSolver)) != 0, "User transfer safe in PreSolver");
+        assertTrue(SAFE_U & (1 << uint8(ExecutionPhase.PostSolver)) != 0, "User transfer safe in PostSolver");
 
-        uint8 preSolverOpsPhaseSafe = uint8(ExecutionPhase.PreSolver);
-        uint8 postSolverOpsPhaseSafe = uint8(ExecutionPhase.PostSolver);
-        uint8 allocateValuePhaseSafe = uint8(ExecutionPhase.AllocateValue);
-
-        uint8 expectedSafeUserTransferBitMap =
-            preOpsPhaseSafe | userOpPhaseSafe | preSolverOpsPhaseSafe | postSolverOpsPhaseSafe | allocateValuePhaseSafe;
-
-        assertEq(
-            mockAtlas.getSafeUserTransfer(),
-            expectedSafeUserTransferBitMap,
-            "Expected to be the bitwise OR of the safe phases (0000 0100 1110 0000)"
-        );
-        assertEq(
-            TestUtils.uint16ToBinaryString(expectedSafeUserTransferBitMap),
-            expectedBitMapString,
-            "Binary string form of bit map not as expected"
-        );
+        // Blocked phases for TransferUserERC20
+        assertTrue(SAFE_U & (1 << uint8(ExecutionPhase.Uninitialized)) == 0, "User transfer blocked in Uninitialized");
+        assertTrue(SAFE_U & (1 << uint8(ExecutionPhase.SolverOperation)) == 0, "User transfer blocked in SolverOperation");
+        assertTrue(SAFE_U & (1 << uint8(ExecutionPhase.AllocateValue)) == 0, "User transfer blocked in AllocateValue");
+        assertTrue(SAFE_U & (1 << uint8(ExecutionPhase.FullyLocked)) == 0, "User transfer blocked in FullyLocked");
     }
 
-    function testConstantValueOfSafeDAppTransfer() public {
-        // FIXME: fix before merging spearbit-reaudit branch
-        vm.skip(true);
+    function test_Permit69_ConstantValueOfSafeDAppTransfer() public {
+        uint8 SAFE_D = SAFE_DAPP_TRANSFER;
 
-        string memory expectedBitMapString = "0000111010100000";
-        // Safe phases for dApp transfers are PreOps, AllocateValue, and DAppOperation
-        // preOpsPhaseSafe = 0000 0000 0010 0000
-        uint8 preOpsPhaseSafe = uint8(ExecutionPhase.PreOps);
-        // userOpPhaseSafe = 0000 0000 0100 0000
-        // uint8 userOpPhaseSafe = uint8(ExecutionPhase.UserOperation);
+        // Safe phases for TransferDAppERC20
+        assertTrue(SAFE_D & (1 << uint8(ExecutionPhase.PreOps)) != 0, "DApp transfer safe in PreOps");
+        assertTrue(SAFE_D & (1 << uint8(ExecutionPhase.PreSolver)) != 0, "DApp transfer safe in PreSolver");
+        assertTrue(SAFE_D & (1 << uint8(ExecutionPhase.PostSolver)) != 0, "DApp transfer safe in PostSolver");
+        assertTrue(SAFE_D & (1 << uint8(ExecutionPhase.AllocateValue)) != 0, "DApp transfer safe in AllocateValue");
 
-        uint8 preSolverOpsPhaseSafe = uint8(ExecutionPhase.PreSolver);
-        uint8 postSolverOpsPhaseSafe = uint8(ExecutionPhase.PostSolver);
-        uint8 allocateValuePhaseSafe = uint8(ExecutionPhase.AllocateValue);
-
-        uint16 expectedSafeDAppTransferBitMap = preOpsPhaseSafe | preSolverOpsPhaseSafe | postSolverOpsPhaseSafe
-            | allocateValuePhaseSafe;
-
-        assertEq(
-            mockAtlas.getSafeDAppTransfer(),
-            expectedSafeDAppTransferBitMap,
-            "Expected to be the bitwise OR of the safe phases (0000 0111 0010 0000)"
-        );
-        assertEq(
-            TestUtils.uint16ToBinaryString(expectedSafeDAppTransferBitMap),
-            expectedBitMapString,
-            "Binary string form of bit map not as expected"
-        );
-    }
-
-    function testVerifyCallerIsExecutionEnv() public {
-        vm.prank(solverOneEOA);
-        vm.expectRevert(AtlasErrors.InvalidEnvironment.selector);
-        mockAtlas.verifyCallerIsExecutionEnv(mockUser, mockDAppControl, mockCallConfig);
-
-        vm.prank(mockExecutionEnvAddress);
-        bool res = mockAtlas.verifyCallerIsExecutionEnv(mockUser, mockDAppControl, mockCallConfig);
-        assertTrue(res, "Should return true and not revert");
+        // Blocked phases for TransferDAppERC20
+        assertTrue(SAFE_D & (1 << uint8(ExecutionPhase.Uninitialized)) == 0, "DApp transfer blocked in Uninitialized");
+        assertTrue(SAFE_D & (1 << uint8(ExecutionPhase.UserOperation)) == 0, "DApp transfer blocked in UserOperation");
+        assertTrue(SAFE_D & (1 << uint8(ExecutionPhase.SolverOperation)) == 0, "DApp transfer blocked in SolverOperation");
+        assertTrue(SAFE_D & (1 << uint8(ExecutionPhase.FullyLocked)) == 0, "DApp transfer blocked in FullyLocked");
     }
 }
 
-// Mock Atlas with standard implementations of Permit69's virtual functions
-contract MockAtlasForPermit69Tests is Atlas {
-    constructor(
-        uint256 escrowDuration,
-        uint256 atlasSurchargeRate,
-        address verification,
-        address simulator,
-        address _surchargeRecipient,
-        address l2GasCalculator,
-        address factoryLib
-    )
-        Atlas(
-            escrowDuration,
-            atlasSurchargeRate,
-            verification,
-            simulator,
-            _surchargeRecipient,
-            l2GasCalculator,
-            factoryLib
-        )
-    { }
-
-    // Declared in SafetyLocks.sol in the canonical Atlas system
-    // The only property relevant to testing Permit69 is _ctx.phase (bitwise uint16)
-    Context internal _ctx;
-    address internal _environment;
-
-    function getSafeUserTransfer() public pure returns (uint16) {
-        return SAFE_USER_TRANSFER;
-    }
-
-    function getSafeDAppTransfer() public pure returns (uint16) {
-        return SAFE_DAPP_TRANSFER;
-    }
-
-    // Setters for testing
-    function setContext(Context memory ctx) public {
-        _ctx = ctx;
-    }
-
-    function setEnvironment(address _activeEnvironment) public {
-        _environment = _activeEnvironment;
-    }
-
-    function setLock(address _activeEnvironment, uint32 callConfig) public {
-        _setLock({
-            activeEnvironment: _activeEnvironment,
-            callConfig: callConfig,
-            phase: uint8(ExecutionPhase.Uninitialized)
-        });
-    }
-
-    function setPhase(ExecutionPhase _phase) public {
-        _setLockPhase(uint8(_phase));
-        _ctx.phase = uint8(_phase);
-    }
-
-    function getOrCreateExecutionEnvironment(
-        address user,
-        address control,
-        uint32 callConfig
-    )
-        public
-        returns (address executionEnvironment)
-    {
-        return _getOrCreateExecutionEnvironment(user, control, callConfig);
-    }
-
-    function verifyUserControlExecutionEnv(
-        address sender,
-        address user,
-        address control,
-        uint32 callConfig
-    )
-        internal
-        returns (bool)
-    {
-        return _verifyUserControlExecutionEnv(sender, user, control, callConfig);
-    }
-
-    // Exposing above overridden function for testing and Permit69 coverage
-    function verifyCallerIsExecutionEnv(address user, address control, uint32 callConfig) public returns (bool) {
-        if (!_verifyUserControlExecutionEnv(msg.sender, user, control, callConfig)) {
-            revert AtlasErrors.InvalidEnvironment();
-        }
-        return true; // Added to test lack of revert
-    }
-
-    // Implemented in Factory.sol in the canonical Atlas system
-    function _getLockState() internal view virtual returns (Context memory) {
-        return _ctx;
+contract MockDAppControl {
+    // Just needs to return a uint32 when CALL_CONFIG() is called by Factory.sol
+    function CALL_CONFIG() external pure returns (uint32) {
+        return 0;
     }
 }
