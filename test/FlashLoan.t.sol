@@ -324,7 +324,8 @@ contract DummyDAppControlBuilder is DAppControl {
                 trustedOpHash: false,
                 invertBidValue: false,
                 exPostBids: false,
-                multipleSuccessfulSolvers: false
+                multipleSuccessfulSolvers: false,
+                checkMetacallGasLimit: true
             })
         )
     {

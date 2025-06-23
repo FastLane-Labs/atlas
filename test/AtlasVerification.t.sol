@@ -147,7 +147,6 @@ contract AtlasVerificationBase is BaseTest {
             .sign(address(atlasVerification), governancePK);
     }
 
-    // TODO update tests to check allSolversGasLimit, allSolversCalldataGas, bidFindOverhead return values
     function doValidateCalls(ValidCallsCall memory call) public returns (
         uint256 allSolversGasLimit,
         uint256 allSolversCalldataGas,
@@ -156,8 +155,9 @@ contract AtlasVerificationBase is BaseTest {
     ) {
         DAppConfig memory config = dAppControl.getDAppConfig(call.userOp);
 
-        // set to just under expected exec gas limit
-        call.metacallGasLeft = _gasLim(call.userOp, call.solverOps) - 10_000; 
+        // If 0, set to just under expected exec gas limit. Otherwise use the existing value.
+        if(call.metacallGasLeft == 0)
+            call.metacallGasLeft = _gasLim(call.userOp, call.solverOps) - 10_000; 
 
         vm.startPrank(address(atlas));
         (allSolversGasLimit,  allSolversCalldataGas, bidFindOverhead, result) = atlasVerification.validateCalls(
@@ -180,7 +180,6 @@ contract AtlasVerificationBase is BaseTest {
 
     function callAndAssert(ValidCallsCall memory call, ValidCallsResult expected) public {
         ValidCallsResult result;
-        // TODO add tests for new return values
         (,,, result) = doValidateCalls(call);
         assertValidCallsResult(result, expected);
     }
@@ -202,7 +201,7 @@ contract AtlasVerificationBase is BaseTest {
 }
 
 //
-// ---- NON VALID CALLS TESTS ---- //
+// ---- verifySolverOp() Tests ---- //
 //
 
 contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
@@ -1749,6 +1748,58 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: 0, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ), ValidCallsResult.Valid);
+    }
+
+    function test_validCalls_checkMetacallGasLimitEnabled_GasLimitTooLow() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withCheckMetacallGasLimit(true).build());
+        uint256 gasLim = 300_000; // Should be too low to pass checks
+
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: gasLim, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.MetacallGasLimitTooLow);
+    }
+
+    function test_validCalls_checkMetacallGasLimitEnabled_GasLimitTooHigh() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withCheckMetacallGasLimit(true).build());
+        uint256 gasLim = 50_000_000; // Should be too high to pass checks
+
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: gasLim, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.MetacallGasLimitTooHigh);
+    }
+
+    function test_validCalls_checkMetacallGasLimitDisabled_LowGasLimitValid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withCheckMetacallGasLimit(false).build());
+        uint256 gasLim = 300_000; // Should be valid when checks are disabled
+
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: gasLim, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.Valid);
+    }
+
+    function test_validCalls_checkMetacallGasLimitDisabled_HighGasLimitValid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withCheckMetacallGasLimit(false).build());
+        uint256 gasLim = 50_000_000; // Should be valid when checks are disabled
+
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, metacallGasLeft: gasLim, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
 

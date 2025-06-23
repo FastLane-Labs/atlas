@@ -3,10 +3,7 @@ pragma solidity 0.8.28;
 
 import { Storage } from "./Storage.sol";
 import { CallBits } from "../libraries/CallBits.sol";
-import "../types/SolverOperation.sol";
-import "../types/UserOperation.sol";
 import "../types/ConfigTypes.sol";
-import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
 /// @title SafetyLocks
