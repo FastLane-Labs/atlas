@@ -98,7 +98,7 @@ contract GasAccLibTest is Test {
         uint256 calldataLength = 500;
 
         // First, the default calculation, using address(0) as the GasCalculator:
-        uint256 expectedDefaultGas = (calldataLength + GasAccLib._SOLVER_OP_STATIC_LENGTH) * GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED;
+        uint256 expectedDefaultGas = (calldataLength + GasAccLib._SOLVER_OP_STATIC_LENGTH) * GasAccLib._GAS_PER_CALLDATA_BYTE;
 
         assertEq(GasAccLib.solverOpCalldataGas(calldataLength, address(0)), expectedDefaultGas, "solverOpCalldataGas (default) unexpected");
 
@@ -112,7 +112,7 @@ contract GasAccLibTest is Test {
         uint256 msgDataLength = 3_000;
 
         // First, the default calculation, using address(0) as the GasCalculator:
-        uint256 expectedDefaultGas = msgDataLength * GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED;
+        uint256 expectedDefaultGas = msgDataLength * GasAccLib._GAS_PER_CALLDATA_BYTE;
 
         assertEq(GasAccLib.metacallCalldataGas(msgDataLength, address(0)), expectedDefaultGas, "metacallCalldataGas (default) unexpected");
 

@@ -34,7 +34,8 @@ library GasAccLib {
     using SafeCast for uint256;
 
     uint256 internal constant _SOLVER_OP_STATIC_LENGTH = 608;
-    uint256 internal constant _CALLDATA_LENGTH_PREMIUM_HALVED = 8;
+    uint256 internal constant _GAS_PER_CALLDATA_BYTE = 8; // Half of the upper 16 gas per non-zero byte, applied to all
+        // calldata bytes.
 
     function pack(GasLedger memory gasLedger) internal pure returns (uint256) {
         return uint256(gasLedger.remainingMaxGas) | (uint256(gasLedger.writeoffsGas) << 40)
@@ -90,7 +91,7 @@ library GasAccLib {
         if (l2GasCalculator == address(0)) {
             // Default to using mainnet gas calculations
             // _SOLVER_OP_STATIC_LENGTH = SolverOperation calldata length excluding solverOp.data
-            gas = (calldataLength + _SOLVER_OP_STATIC_LENGTH) * _CALLDATA_LENGTH_PREMIUM_HALVED;
+            gas = (calldataLength + _SOLVER_OP_STATIC_LENGTH) * _GAS_PER_CALLDATA_BYTE;
         } else {
             gas = IL2GasCalculator(l2GasCalculator).getCalldataGas(calldataLength + _SOLVER_OP_STATIC_LENGTH);
         }
@@ -99,7 +100,7 @@ library GasAccLib {
     function calldataGas(uint256 calldataLength, address l2GasCalculator) internal view returns (uint256 gas) {
         if (l2GasCalculator == address(0)) {
             // Default to using mainnet gas calculations
-            gas = calldataLength * _CALLDATA_LENGTH_PREMIUM_HALVED;
+            gas = calldataLength * _GAS_PER_CALLDATA_BYTE;
         } else {
             gas = IL2GasCalculator(l2GasCalculator).getCalldataGas(calldataLength);
         }
@@ -114,7 +115,7 @@ library GasAccLib {
         returns (uint256 calldataGas)
     {
         if (l2GasCalculator == address(0)) {
-            calldataGas = msgDataLength * _CALLDATA_LENGTH_PREMIUM_HALVED;
+            calldataGas = msgDataLength * _GAS_PER_CALLDATA_BYTE;
         } else {
             calldataGas = IL2GasCalculator(l2GasCalculator).initialGasUsed(msgDataLength);
         }

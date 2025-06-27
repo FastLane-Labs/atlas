@@ -90,7 +90,7 @@ contract Sorter is AtlasConstants {
         uint256 calldataGas = (
             USER_OP_STATIC_LENGTH + DAPP_OP_LENGTH + _SOLVER_OP_STATIC_LENGTH + _EXTRA_CALLDATA_LENGTH
                 + userOp.data.length + solverOp.data.length
-        ) * _CALLDATA_LENGTH_PREMIUM_HALVED;
+        ) * _GAS_PER_CALLDATA_BYTE;
 
         // Execution gas a winning solver would pay for
         uint256 executionGas =

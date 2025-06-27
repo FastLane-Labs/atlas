@@ -12,7 +12,7 @@ interface IGasPriceOracle {
 }
 
 contract BaseGasCalculator is IL2GasCalculator, Ownable {
-    uint256 internal constant _CALLDATA_LENGTH_PREMIUM_HALVED = 8;
+    uint256 internal constant _GAS_PER_CALLDATA_BYTE = 8;
     uint256 internal constant _BASE_TX_GAS_USED = 21_000;
 
     address public immutable GAS_PRICE_ORACLE;
@@ -31,7 +31,7 @@ contract BaseGasCalculator is IL2GasCalculator, Ownable {
         // bytes, *not calldata length only*, which makes this function a rough estimate.
 
         // Base execution gas.
-        calldataGas = calldataLength * _CALLDATA_LENGTH_PREMIUM_HALVED;
+        calldataGas = calldataLength * _GAS_PER_CALLDATA_BYTE;
 
         // L1 data cost.
         // `getL1FeeUpperBound` adds 68 to the size because it expects an unsigned transaction size.
@@ -58,7 +58,7 @@ contract BaseGasCalculator is IL2GasCalculator, Ownable {
     /// @notice Gets the cost of initial gas used for a transaction with a different calldata fee than mainnet
     /// @param calldataLength The length of the calldata in bytes
     function initialGasUsed(uint256 calldataLength) external pure override returns (uint256 gasUsed) {
-        return calldataLength * _CALLDATA_LENGTH_PREMIUM_HALVED;
+        return calldataLength * _GAS_PER_CALLDATA_BYTE;
     }
 
     /// @notice Sets the calldata length offset
