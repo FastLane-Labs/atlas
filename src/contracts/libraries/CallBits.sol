@@ -73,6 +73,9 @@ library CallBits {
         if (callConfig.multipleSuccessfulSolvers) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.MultipleSuccessfulSolvers);
         }
+        if (callConfig.checkMetacallGasLimit) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.CheckMetacallGasLimit);
+        }
     }
 
     function decodeCallConfig(uint32 encodedCallConfig) internal pure returns (CallConfig memory callConfig) {
@@ -96,6 +99,7 @@ library CallBits {
         callConfig.invertBidValue = invertsBidValue(encodedCallConfig);
         callConfig.exPostBids = exPostBids(encodedCallConfig);
         callConfig.multipleSuccessfulSolvers = multipleSuccessfulSolvers(encodedCallConfig);
+        callConfig.checkMetacallGasLimit = checkMetacallGasLimit(encodedCallConfig);
     }
 
     function needsSequentialUserNonces(uint32 callConfig) internal pure returns (bool sequential) {
@@ -176,5 +180,9 @@ library CallBits {
 
     function multipleSuccessfulSolvers(uint32 callConfig) internal pure returns (bool) {
         return (callConfig & (1 << uint32(CallConfigIndex.MultipleSuccessfulSolvers))) != 0;
+    }
+
+    function checkMetacallGasLimit(uint32 callConfig) internal pure returns (bool) {
+        return (callConfig & (1 << uint32(CallConfigIndex.CheckMetacallGasLimit))) != 0;
     }
 }

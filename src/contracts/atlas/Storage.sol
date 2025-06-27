@@ -2,7 +2,6 @@
 pragma solidity 0.8.28;
 
 import "../types/EscrowTypes.sol";
-import "../types/LockTypes.sol";
 import "../libraries/AccountingMath.sol";
 
 import { AtlasEvents } from "../types/AtlasEvents.sol";

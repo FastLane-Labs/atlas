@@ -34,7 +34,8 @@ contract CallBitsTest is Test {
             trustedOpHash: false,
             invertBidValue: true,
             exPostBids: false,
-            multipleSuccessfulSolvers: false
+            multipleSuccessfulSolvers: true,
+            checkMetacallGasLimit: false
         });
 
         callConfig2 = CallConfig({
@@ -57,19 +58,20 @@ contract CallBitsTest is Test {
             trustedOpHash: !callConfig1.trustedOpHash,
             invertBidValue: !callConfig1.invertBidValue,
             exPostBids: !callConfig1.exPostBids,
-            multipleSuccessfulSolvers: !callConfig1.multipleSuccessfulSolvers
+            multipleSuccessfulSolvers: !callConfig1.multipleSuccessfulSolvers,
+            checkMetacallGasLimit: !callConfig1.checkMetacallGasLimit
         });
     }
 
     function testEncodeCallConfig() public view {
-        string memory expectedBitMapString = "00000000000000101010101010101010";
+        string memory expectedBitMapString = "00000000000010101010101010101010";
         assertEq(
             TestUtils.uint32ToBinaryString(CallBits.encodeCallConfig(callConfig1)),
             expectedBitMapString,
             "callConfig1 incorrect"
         );
 
-        expectedBitMapString = "00000000000011010101010101010101";
+        expectedBitMapString = "00000000000101010101010101010101";
         assertEq(
             TestUtils.uint32ToBinaryString(CallBits.encodeCallConfig(callConfig2)),
             expectedBitMapString,
@@ -99,7 +101,8 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.trustedOpHash, false, "trustedOpHash 1 incorrect");
         assertEq(decodedCallConfig.invertBidValue, true, "invertBidValue 1 incorrect");
         assertEq(decodedCallConfig.exPostBids, false, "exPostBids 1 incorrect");
-        assertEq(decodedCallConfig.multipleSuccessfulSolvers, false, "multipleSuccessfulSolvers 1 incorrect");
+        assertEq(decodedCallConfig.multipleSuccessfulSolvers, true, "multipleSuccessfulSolvers 1 incorrect");
+        assertEq(decodedCallConfig.checkMetacallGasLimit, false, "checkMetacallGasLimit 1 incorrect");
 
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
         decodedCallConfig = encodedCallConfig.decodeCallConfig();
@@ -122,7 +125,8 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.trustedOpHash, true, "trustedOpHash 2 incorrect");
         assertEq(decodedCallConfig.invertBidValue, false, "invertBidValue 2 incorrect");
         assertEq(decodedCallConfig.exPostBids, true, "exPostBids 2 incorrect");
-        assertEq(decodedCallConfig.multipleSuccessfulSolvers, true, "multipleSuccessfulSolvers 2 incorrect");
+        assertEq(decodedCallConfig.multipleSuccessfulSolvers, false, "multipleSuccessfulSolvers 2 incorrect");
+        assertEq(decodedCallConfig.checkMetacallGasLimit, true, "checkMetacallGasLimit 2 incorrect");
     }
 
     function testConfigParameters() public view {
@@ -146,7 +150,8 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.allowsTrustedOpHash(), false, "allowsTrustedOpHash 1 incorrect");
         assertEq(encodedCallConfig.invertsBidValue(), true, "invertsBidValue 1 incorrect");
         assertEq(encodedCallConfig.exPostBids(), false, "exPostBids 1 incorrect");
-        assertEq(encodedCallConfig.multipleSuccessfulSolvers(), false, "multipleSuccessfulSolverss 1 incorrect");
+        assertEq(encodedCallConfig.multipleSuccessfulSolvers(), true, "multipleSuccessfulSolverss 1 incorrect");
+        assertEq(encodedCallConfig.checkMetacallGasLimit(), false, "checkMetacallGasLimit 1 incorrect");
 
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
         assertEq(encodedCallConfig.needsSequentialUserNonces(), true, "needsSequentialUserNonces 2 incorrect");
@@ -168,6 +173,7 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.allowsTrustedOpHash(), true, "allowsTrustedOpHash 2 incorrect");
         assertEq(encodedCallConfig.invertsBidValue(), false, "invertsBidValue 2 incorrect");
         assertEq(encodedCallConfig.exPostBids(), true, "exPostBids 2 incorrect");
-        assertEq(encodedCallConfig.multipleSuccessfulSolvers(), true, "multipleSuccessfulSolvers 2 incorrect");
+        assertEq(encodedCallConfig.multipleSuccessfulSolvers(), false, "multipleSuccessfulSolvers 2 incorrect");
+        assertEq(encodedCallConfig.checkMetacallGasLimit(), true, "checkMetacallGasLimit 2 incorrect");
     }
 }

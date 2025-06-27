@@ -3,7 +3,6 @@ pragma solidity 0.8.28;
 
 import "../types/SolverOperation.sol";
 import "../types/UserOperation.sol";
-import "../types/ConfigTypes.sol";
 import { AtlasErrors } from "../types/AtlasErrors.sol";
 
 abstract contract DAppControlTemplate {

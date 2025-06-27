@@ -27,11 +27,11 @@ contract AtlasConstants {
     uint256 internal constant _GRACEFUL_RETURN_GAS_OFFSET = 40_000;
 
     // Gas Accounting constants
-    uint256 internal constant _CALLDATA_LENGTH_PREMIUM_HALVED = GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED;
-    // Half of the upper gas cost per byte of calldata (16 gas). Multiplied by msg.data.length. Equivalent to
-    // `msg.data.length / 2 * 16` because 2 hex chars per byte.
+    uint256 internal constant _GAS_PER_CALLDATA_BYTE = GasAccLib._GAS_PER_CALLDATA_BYTE;
+    // Calldata bytes charged at half the upper rate of 16 gas per byte (i.e. charged at 8 gas per byte), for both zero
+    // and non-zero bytes of calldata.
     uint256 internal constant _BASE_TX_GAS_USED = 21_000;
-    uint256 internal constant _SOLVER_OP_BASE_CALLDATA = GasAccLib._SOLVER_OP_BASE_CALLDATA; // SolverOperation calldata
+    uint256 internal constant _SOLVER_OP_STATIC_LENGTH = GasAccLib._SOLVER_OP_STATIC_LENGTH; // SolverOperation calldata
         // length excluding solverOp.data
     uint256 internal constant _BUNDLER_FAULT_OFFSET = 4500; // Extra gas to write off if solverOp failure is bundler
         // fault in `_handleSolverFailAccounting()`. Value is worst-case gas measured for bundler fault.

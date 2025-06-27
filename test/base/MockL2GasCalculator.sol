@@ -8,11 +8,11 @@ import { IL2GasCalculator } from "../../src/contracts/interfaces/IL2GasCalculato
 contract MockL2GasCalculator is IL2GasCalculator {
     // Should return 5x the default calldata gas
     function getCalldataGas(uint256 calldataLength) external view returns (uint256 calldataGas) {
-        return calldataLength * GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED * 5;
+        return calldataLength * GasAccLib._GAS_PER_CALLDATA_BYTE * 5;
     }
 
     // Should return 5x the default initial gas used
     function initialGasUsed(uint256 calldataLength) external view returns (uint256 gasUsed) {
-        return calldataLength * GasAccLib._CALLDATA_LENGTH_PREMIUM_HALVED * 5;
+        return calldataLength * GasAccLib._GAS_PER_CALLDATA_BYTE * 5;
     }
 }

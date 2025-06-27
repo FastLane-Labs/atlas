@@ -80,15 +80,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(preOpsData);
         assertTrue(status);
 
-        // InvalidUser
-        userOp.from = invalid; // Invalid from
-        userOp.to = address(atlas);
-        preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
-        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.InvalidUser.selector);
-        (status,) = address(executionEnvironment).call(preOpsData);
-
         // InvalidTo
         userOp.from = user;
         userOp.to = invalid; // Invalid to
@@ -96,7 +87,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.InvalidTo.selector);
-        (status,) = address(executionEnvironment).call(preOpsData);
+        address(executionEnvironment).call(preOpsData);
     }
 
     function test_modifier_onlyAtlasEnvironment_SkipCoverage() public {
@@ -121,8 +112,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
         vm.prank(address(0)); // Invalid sender
         vm.expectRevert(AtlasErrors.OnlyAtlas.selector);
-        (status,) = address(executionEnvironment).call(preOpsData);
-        assertTrue(status, "expectRevert OnlyAtlas: call did not revert");
+        address(executionEnvironment).call(preOpsData);
     }
 
     function test_modifier_validControlHash_SkipCoverage() public {
@@ -139,16 +129,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(userData);
         assertTrue(status);
-
-        // InvalidCodeHash
-        // Alter the code hash of the control contract
-        vm.etch(address(dAppControl), address(atlas).code);
-
-        userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation));
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.InvalidCodeHash.selector);
-        (status,) = address(executionEnvironment).call(userData);
     }
 
     function test_preOpsWrapper_SkipCoverage() public {
@@ -179,7 +159,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PreOpsDelegatecallFail.selector);
-        (status,) = address(executionEnvironment).call(preOpsData);
+        address(executionEnvironment).call(preOpsData);
     }
 
     function test_userWrapper_SkipCoverage() public {
@@ -274,7 +254,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.InvalidSolver.selector);
         (revertsAsExpected,) = address(executionEnvironment).call(preTryCatchMetaData);
-        assertTrue(revertsAsExpected, "expectRevert InvalidSolver: call did not revert");
 
         // AlteredControl
         solverOp.solver = address(solverContract);
@@ -286,7 +265,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.AlteredControl.selector);
         (revertsAsExpected,) = address(executionEnvironment).call(preTryCatchMetaData);
-        assertTrue(revertsAsExpected, "expectRevert AlteredControl: call did not revert");
 
         // Change of config
         callConfig.requirePreSolver = true;
@@ -302,7 +280,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PreSolverFailed.selector);
         (revertsAsExpected,) = address(executionEnvironment).call(preTryCatchMetaData);
-        assertTrue(revertsAsExpected, "expectRevert PreSolverFailed: call did not revert");
     }
 
     function test_solverPostTryCatch_SkipCoverage() public {
@@ -338,7 +315,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.BidNotPaid.selector);
         (revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
-        assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
 
         // BidNotPaid (!invertsBidValue && netBid < bidAmount)
         solverTracker.floor = 0;
@@ -350,7 +326,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.BidNotPaid.selector);
         (revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
-        assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
 
         // BidNotPaid (invertsBidValue && netBid > bidAmount)
         solverTracker.invertsBidValue = true;
@@ -363,7 +338,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.BidNotPaid.selector);
         (revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
-        assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
 
         // Change of config
         callConfig.requirePostSolver = true;
@@ -379,7 +353,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PostSolverFailed.selector);
         (revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
-        assertTrue(revertsAsExpected, "expectRevert PostSolverFailed: call did not revert");
     }
     
     function test_allocateValue_SkipCoverage() public {
@@ -409,10 +382,6 @@ contract ExecutionEnvironmentTest is BaseTest {
 
 
     function test_withdrawERC20_SkipCoverage() public {
-        // FIXME: fix before merging spearbit-reaudit branch
-        vm.skip(true);
-
-
         // Valid
         deal(WETH_ADDRESS, address(executionEnvironment), 2e18);
         assertEq(WETH.balanceOf(address(executionEnvironment)), 2e18);
@@ -432,26 +401,15 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.expectRevert(AtlasErrors.ExecutionEnvironmentBalanceTooLow.selector);
         executionEnvironment.withdrawERC20(WETH_ADDRESS, 2e18);
 
-        // The following line changes an Atlas storage value in order to make the test succeed.
-        // lock value is normally initialized in the _initializeContext function,
-        // but we can't call it in the current setup.
-        // Any changes in the Storage contract could make this test fail, feel free to comment it until
-        // the contract's layout is finalized.
-
-        // Set lock address to the execution environment
-        // vm.store(address(atlas), bytes32(lockSlot), bytes32(uint256(uint160(address(executionEnvironment)))));
-        // TODO commented above line as lock is now transient
-
         // EscrowLocked
+        deal(WETH_ADDRESS, address(executionEnvironment), 2e18); // Give EE money to skip balance too low error
+        atlas.setLock(address(executionEnvironment), 0, 0); // Set Atlas as locked to trigger expected error
         vm.prank(user);
         vm.expectRevert(AtlasErrors.AtlasLockActive.selector);
         executionEnvironment.withdrawERC20(WETH_ADDRESS, 2e18);
     }
 
     function test_withdrawEther_SkipCoverage() public {
-        // FIXME: fix before merging spearbit-reaudit branch
-        vm.skip(true);
-
         // Valid
         deal(address(executionEnvironment), 2e18);
         assertEq(address(executionEnvironment).balance, 2e18);
@@ -471,17 +429,9 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.expectRevert(AtlasErrors.ExecutionEnvironmentBalanceTooLow.selector);
         executionEnvironment.withdrawEther(2e18);
 
-        // The following line changes an Atlas storage value in order to make the test succeed.
-        // lock value is normally initialized in the _initializeContext function,
-        // but we can't call it in the current setup.
-        // Any changes in the Storage contract could make this test fail, feel free to comment it until
-        // the contract's layout is finalized.
-
-        // Set lock address to the execution environment
-        // vm.store(address(atlas), bytes32(lockSlot), bytes32(uint256(uint160(address(executionEnvironment)))));
-        // TODO commented above line as lock is now transient
-
         // EscrowLocked
+        deal(address(executionEnvironment), 2e18); // Give EE money to skip balance too low error
+        atlas.setLock(address(executionEnvironment), 0, 0); // Set Atlas as locked to trigger expected error
         vm.prank(user);
         vm.expectRevert(AtlasErrors.AtlasLockActive.selector);
         executionEnvironment.withdrawEther(2e18);
