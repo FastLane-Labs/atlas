@@ -20,7 +20,7 @@ import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 import { GasAccLib, GasLedger } from "../libraries/GasAccLib.sol";
 
-/// @title Arbitrum Atlas V1.6.2
+/// @title Atlas V1.6.2
 /// @author FastLane Labs
 /// @notice The Execution Abstraction protocol.
 contract Atlas is Escrow, Factory {
