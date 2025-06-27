@@ -88,7 +88,7 @@ contract Simulator is AtlasErrors, AtlasConstants {
 
         // metacallCalldataGas is first item in return tuple
         metacallCalldataGas = GasAccLib.calldataGas(
-            solverDataLenSum + (_SOLVER_OP_BASE_CALLDATA * solverOpsLen), l2GasCalculator
+            solverDataLenSum + (_SOLVER_OP_STATIC_LENGTH * solverOpsLen), l2GasCalculator
         ) + GasAccLib.metacallCalldataGas(nonSolverCalldataLength, l2GasCalculator);
 
         // metacallExecutionGas is second item in return tuple
@@ -136,7 +136,7 @@ contract Simulator is AtlasErrors, AtlasConstants {
             // In normal bid mode, solvers each pay for their own solverOp calldata gas, and the winning solver pays for
             // the other non-solver calldata gas as well. In this calculation, there's only 1 solverOp so no need to
             // subtract calldata of other solverOps as they aren't any.
-            uint256 metacallCalldataLength = (_SOLVER_OP_BASE_CALLDATA + solverOp.data.length)
+            uint256 metacallCalldataLength = (_SOLVER_OP_STATIC_LENGTH + solverOp.data.length)
                 + (USER_OP_STATIC_LENGTH + userOp.data.length) + DAPP_OP_LENGTH + _EXTRA_CALLDATA_LENGTH;
 
             uint256 metacallCalldataGas =
