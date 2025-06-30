@@ -92,8 +92,8 @@ contract Simulator is AtlasErrors, AtlasConstants {
         ) + GasAccLib.metacallCalldataGas(nonSolverCalldataLength, l2GasCalculator);
 
         // metacallExecutionGas is second item in return tuple
-        metacallExecutionGas =
-            _BASE_TX_GAS_USED + _FIXED_GAS_OFFSET + userOp.gas + dConfig.dappGasLimit + allSolversExecutionGas;
+        metacallExecutionGas = _BASE_TX_GAS_USED + _PRE_EXECUTE_METACALL_GAS + _FIXED_GAS_OFFSET + userOp.gas
+            + dConfig.dappGasLimit + allSolversExecutionGas;
 
         // If exPostBids = true, add extra execution gas to account for bid-finding.
         if (dConfig.callConfig.exPostBids()) {
@@ -142,8 +142,8 @@ contract Simulator is AtlasErrors, AtlasConstants {
             uint256 metacallCalldataGas =
                 GasAccLib.metacallCalldataGas(metacallCalldataLength, IAtlas(atlas).L2_GAS_CALCULATOR());
 
-            uint256 metacallExecutionGas =
-                _BASE_TX_GAS_USED + _FIXED_GAS_OFFSET + userOp.gas + userOp.dappGasLimit + solverOp.gas;
+            uint256 metacallExecutionGas = _BASE_TX_GAS_USED + _PRE_EXECUTE_METACALL_GAS + _FIXED_GAS_OFFSET
+                + userOp.gas + userOp.dappGasLimit + solverOp.gas;
 
             totalGas = metacallExecutionGas;
 

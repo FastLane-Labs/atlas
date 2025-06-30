@@ -31,6 +31,8 @@ contract AtlasConstants {
     // Calldata bytes charged at half the upper rate of 16 gas per byte (i.e. charged at 8 gas per byte), for both zero
     // and non-zero bytes of calldata.
     uint256 internal constant _BASE_TX_GAS_USED = 21_000;
+    uint256 internal constant _PRE_EXECUTE_METACALL_GAS = 75_000; // Approx gas used from start of metacall to the
+        // `execute()` function call. For gas limit estimation purposes.
     uint256 internal constant _FIXED_GAS_OFFSET = 150_000; // in gas units
     uint256 internal constant _SOLVER_OP_STATIC_LENGTH = GasAccLib._SOLVER_OP_STATIC_LENGTH; // SolverOperation calldata
         // length excluding solverOp.data
