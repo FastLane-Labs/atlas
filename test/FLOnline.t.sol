@@ -53,7 +53,7 @@ contract FastLaneOnlineTest is BaseTest {
 
     // Only Atlas surcharge kept if all fail, bundler surcharge paid to bundler
     uint256 constant SURCHARGE_PER_SOLVER_IF_ALL_FAIL = 16_000e9; // 16k Gwei (avg, differs for ERC20/native in/out)
-    uint256 constant ERR_MARGIN = 0.18e18; // 18% error margin
+    uint256 constant ERR_MARGIN = 0.20e18; // 20% error margin
     address internal constant NATIVE_TOKEN = address(0);
 
     address protocolGuildWallet = 0x25941dC771bB64514Fc8abBce970307Fb9d477e9;

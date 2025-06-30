@@ -33,7 +33,8 @@ contract AtlasConstants {
     uint256 internal constant _BASE_TX_GAS_USED = 21_000;
     uint256 internal constant _PRE_EXECUTE_METACALL_GAS = 75_000; // Approx gas used from start of metacall to the
         // `execute()` function call. For gas limit estimation purposes.
-    uint256 internal constant _FIXED_GAS_OFFSET = 150_000; // in gas units
+    uint256 internal constant _POST_SETTLE_METACALL_GAS = 70_000; // Approx gas used from the gasleft() measurement
+        // taken at the start of `_settle()`. For full metacall gas reimbursement purposes.
     uint256 internal constant _SOLVER_OP_STATIC_LENGTH = GasAccLib._SOLVER_OP_STATIC_LENGTH; // SolverOperation calldata
         // length excluding solverOp.data
     uint256 internal constant _BUNDLER_FAULT_OFFSET = 4500; // Extra gas to write off if solverOp failure is bundler
