@@ -31,7 +31,6 @@ contract StorageTest is BaseTest {
         assertEq(atlas.decimals(), 18, "decimals set incorrectly");
 
         assertEq(atlas.SCALE(), DEFAULT_SCALE, "SCALE set incorrectly");
-        assertEq(atlas.FIXED_GAS_OFFSET(), DEFAULT_FIXED_GAS_OFFSET, "FIXED_GAS_OFFSET set incorrectly");
     }
 
     // View Functions for internal storage variables
