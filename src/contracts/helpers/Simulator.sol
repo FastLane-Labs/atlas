@@ -93,11 +93,12 @@ contract Simulator is AtlasErrors, AtlasConstants {
 
         // metacallExecutionGas is second item in return tuple
         metacallExecutionGas = _BASE_TX_GAS_USED + _PRE_EXECUTE_METACALL_GAS + _POST_SETTLE_METACALL_GAS + userOp.gas
-            + dConfig.dappGasLimit + allSolversExecutionGas;
+            + dConfig.dappGasLimit + allSolversExecutionGas + (_EXECUTE_SOLVER_OVERHEAD * solverOpsLen);
 
         // If exPostBids = true, add extra execution gas to account for bid-finding.
         if (dConfig.callConfig.exPostBids()) {
-            metacallExecutionGas += (solverOpsLen * _BID_FIND_OVERHEAD) + allSolversExecutionGas;
+            metacallExecutionGas +=
+                solverOpsLen * (_BID_FIND_OVERHEAD + _EXECUTE_SOLVER_OVERHEAD) + allSolversExecutionGas;
         }
     }
 
