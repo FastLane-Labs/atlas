@@ -25,7 +25,7 @@ contract Simulator is AtlasErrors, AtlasConstants {
     using GasAccLib for SolverOperation[];
 
     // The approx gas used between the minGasLeft check and the Atlas metacall() from this Simulator contract.
-    uint256 internal constant _ERROR_CATCHER_GAS_BUFFER = 10_000;
+    uint256 internal constant _ERROR_CATCHER_GAS_BUFFER = 15_000;
     // The approx gas used between the `simUserOperation()` or `simSolverCall()` entrypoint functions in this Simulator
     // contract, and the minGasLeft check.
     uint256 internal constant _SIM_ENTRYPOINT_GAS_BUFFER = 50_000;
