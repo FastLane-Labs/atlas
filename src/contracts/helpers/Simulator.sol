@@ -258,12 +258,15 @@ contract Simulator is AtlasErrors, AtlasConstants {
         uint256 minGasLeft = adjMetacallExecutionGas * _MIN_GAS_SCALING_FACTOR / _SCALE + _ERROR_CATCHER_GAS_BUFFER;
         uint256 gasLeft = gasleft();
 
+        // NOTE: Set gas limit to the max supported by your RPC's `eth_call` when calling Simulator from an offchain
+        // source if you experience the revert below. Only the expected execution gas will be forwarded to Atlas.
+
         if (gasLeft < minGasLeft) {
             revert InsufficientGasForMetacallSimulation(
                 gasLeft, // The gas left at this point that was insufficient to pass the check
                 metacallExecutionGas + metacallCalldataGas, // Suggested gas limit for a real metacall
-                _SIM_ENTRYPOINT_GAS_BUFFER + _BASE_TX_GAS_USED + minGasLeft + metacallCalldataGas // Suggested gas limit
-                    // for a sim call
+                _SIM_ENTRYPOINT_GAS_BUFFER + _BASE_TX_GAS_USED + minGasLeft + metacallCalldataGas // Suggested min gas
+                    // limit for a sim call.
             );
         }
 
