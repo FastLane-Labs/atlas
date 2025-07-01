@@ -11,6 +11,9 @@ interface IGasPriceOracle {
     function getL1FeeUpperBound(uint256 _unsignedTxSize) external view returns (uint256);
 }
 
+// NOTE: This implementation does not support the Operator Fee introduced in the Isthmus upgrade. A larger refactor of
+// Atlas would be required to support it. See https://docs.optimism.io/stack/transactions/fees#operator-fee
+
 contract BaseGasCalculator is IL2GasCalculator, Ownable {
     uint256 internal constant _GAS_PER_CALLDATA_BYTE = 8;
     uint256 internal constant _BASE_TX_GAS_USED = 21_000;
