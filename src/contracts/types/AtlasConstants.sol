@@ -31,8 +31,8 @@ contract AtlasConstants {
     // Calldata bytes charged at half the upper rate of 16 gas per byte (i.e. charged at 8 gas per byte), for both zero
     // and non-zero bytes of calldata.
     uint256 internal constant _BASE_TX_GAS_USED = 21_000;
-    uint256 internal constant _PRE_EXECUTE_METACALL_GAS = 75_000; // Approx gas used from start of metacall to the
-        // `execute()` function call. For gas limit estimation purposes.
+    uint256 internal constant _PRE_EXECUTE_METACALL_GAS = 150_000; // Approx gas used from start of metacall to the
+        // `execute()` function call, including EE deployment cost. For gas limit estimation purposes.
     uint256 internal constant _POST_SETTLE_METACALL_GAS = 70_000; // Approx gas used from the gasleft() measurement
         // taken at the start of `_settle()`. For full metacall gas reimbursement purposes.
     uint256 internal constant _EXECUTE_SOLVER_OVERHEAD = 45_000; // Approx upper bound gas used by each
