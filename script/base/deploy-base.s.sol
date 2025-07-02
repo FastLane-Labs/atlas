@@ -69,6 +69,10 @@ contract DeployBaseScript is Script {
             return "BERACHAIN";
         } else if (chainId == 80_069) {
             return "BERACHAIN BEPOLIA";
+        } else if (chainId == 130) {
+            return "UNICHAIN";
+        } else if (chainId == 1301) {
+            return "UNICHAIN SEPOLIA";
         } else {
             revert(string.concat("Error: Chain ID not recognized: ", vm.toString(chainId)));
         }
