@@ -748,7 +748,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         // approx gas used for 1 loop when validation fails due to bundler fault and calldata gas is written off.
         uint256 loopGasBundlerFault = 7_000; // cheaper because no `_assign()` operation
         // approx gas used for 1 loop when validation passes (solver to pay calldata gas) `_assign()` charges just bonded successfully
-        uint256 loopGasSolverFault = 13_350;
+        uint256 loopGasSolverFault = 13_650;
         // approx gas used for 1 loop when validation passes (solver to pay calldata gas) with deficit in `_assign()`
         uint256 loopGasSolverFaultDeficit = loopGasSolverFault + 3_200; // about 3200 gas more than usual `_assign()` 
 

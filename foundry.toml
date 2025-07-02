@@ -1,6 +1,6 @@
 [profile.default]
   bytecode_hash = "none"
-  optimizer_runs = 50
+  optimizer_runs = 20
   timeout = 30000
   block_gas_limit = 300000000
   gas_limit = 3000000000

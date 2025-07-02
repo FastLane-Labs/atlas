@@ -11,9 +11,8 @@ import { EscrowBits } from "../libraries/EscrowBits.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 import { AccountingMath } from "../libraries/AccountingMath.sol";
 import { GasAccLib, GasLedger, BorrowsLedger } from "../libraries/GasAccLib.sol";
+import { SafeBlockNumber } from "../libraries/SafeBlockNumber.sol";
 import { SolverOperation } from "../types/SolverOperation.sol";
-import { DAppConfig } from "../types/ConfigTypes.sol";
-import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
@@ -270,7 +269,7 @@ abstract contract GasAccounting is SafetyLocks {
         S_bondedTotalSupply -= amount;
 
         // update lastAccessedBlock since bonded balance is decreasing
-        accountData.lastAccessedBlock = uint32(block.number);
+        accountData.lastAccessedBlock = uint32(SafeBlockNumber.get());
         // NOTE: accountData changes must be persisted to storage separately
     }
 

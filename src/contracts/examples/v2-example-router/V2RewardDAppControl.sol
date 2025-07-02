@@ -61,7 +61,8 @@ contract V2RewardDAppControl is DAppControl {
                 trustedOpHash: true,
                 invertBidValue: false,
                 exPostBids: true,
-                multipleSuccessfulSolvers: false
+                multipleSuccessfulSolvers: false,
+                checkMetacallGasLimit: true
             })
         )
     {

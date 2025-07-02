@@ -10,8 +10,9 @@ import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 import { AccountingMath } from "../libraries/AccountingMath.sol";
 import { CallVerification } from "../libraries/CallVerification.sol";
-import { AtlasConstants } from "../types/AtlasConstants.sol";
+import { SafeBlockNumber } from "../libraries/SafeBlockNumber.sol";
 
+import { AtlasConstants } from "../types/AtlasConstants.sol";
 import "../types/UserOperation.sol";
 import "../types/SolverOperation.sol";
 import "../types/DAppOperation.sol";
@@ -87,13 +88,13 @@ contract Sorter is AtlasConstants {
 
         // Calldata gas a winning solver would pay for: non-solverOp calldata + their own solverOp calldata
         uint256 calldataGas = (
-            USER_OP_STATIC_LENGTH + DAPP_OP_LENGTH + _SOLVER_OP_BASE_CALLDATA + _EXTRA_CALLDATA_LENGTH
+            USER_OP_STATIC_LENGTH + DAPP_OP_LENGTH + _SOLVER_OP_STATIC_LENGTH + _EXTRA_CALLDATA_LENGTH
                 + userOp.data.length + solverOp.data.length
-        ) * _CALLDATA_LENGTH_PREMIUM_HALVED;
+        ) * _GAS_PER_CALLDATA_BYTE;
 
         // Execution gas a winning solver would pay for
-        uint256 executionGas =
-            _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + solverOpGasLimit + userOp.gas + dConfig.dappGasLimit;
+        uint256 executionGas = _BASE_TX_GAS_USED + _PRE_EXECUTE_METACALL_GAS + _POST_SETTLE_METACALL_GAS
+            + solverOpGasLimit + userOp.gas + dConfig.dappGasLimit;
 
         uint256 maxSolverCost = (solverOp.maxFeePerGas * (executionGas + calldataGas)).withSurcharge(totalSurchargeRate);
 
@@ -108,7 +109,7 @@ contract Sorter is AtlasConstants {
 
         // Solvers can only do one tx per block - this prevents double counting bonded balances
         uint256 solverLastActiveBlock = ATLAS.accountLastActiveBlock(solverOp.from);
-        if (solverLastActiveBlock >= block.number) {
+        if (solverLastActiveBlock >= SafeBlockNumber.get()) {
             return false;
         }
 
@@ -128,7 +129,7 @@ contract Sorter is AtlasConstants {
         }
 
         // solverOp.deadline must be in the future
-        if (solverOp.deadline != 0 && block.number > solverOp.deadline) {
+        if (solverOp.deadline != 0 && SafeBlockNumber.get() > solverOp.deadline) {
             return false;
         }
 

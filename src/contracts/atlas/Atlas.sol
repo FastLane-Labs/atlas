@@ -19,10 +19,8 @@ import "../types/ValidCalls.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 import { GasAccLib, GasLedger } from "../libraries/GasAccLib.sol";
-import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
-import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
-/// @title Atlas V1.6
+/// @title Atlas V1.6.2
 /// @author FastLane Labs
 /// @notice The Execution Abstraction protocol.
 contract Atlas is Escrow, Factory {
@@ -67,7 +65,8 @@ contract Atlas is Escrow, Factory {
         // is deducted from this _gasMarker, resulting in actual execution gas used + calldata gas costs + buffer.
         // The calldata component is added below, only if exPostBids = false.
         uint256 _gasLeft = gasleft();
-        uint256 _gasMarker = _gasLeft + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET; // This part is only execution gas.
+        uint256 _gasMarker = _gasLeft + _BASE_TX_GAS_USED + _POST_SETTLE_METACALL_GAS; // This part is only execution
+            // gas.
 
         DAppConfig memory _dConfig;
         bool _isSimulation = msg.sender == SIMULATOR;

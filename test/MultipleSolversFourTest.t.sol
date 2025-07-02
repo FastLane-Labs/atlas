@@ -628,7 +628,8 @@ contract MultipleSolversDAppControl is DAppControl {
                 trustedOpHash: false,
                 invertBidValue: false,
                 exPostBids: false,
-                multipleSuccessfulSolvers: true
+                multipleSuccessfulSolvers: true,
+                checkMetacallGasLimit: true
             })
         )
     {}

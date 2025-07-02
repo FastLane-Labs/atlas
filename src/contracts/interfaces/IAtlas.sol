@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 import "../types/SolverOperation.sol";
 import "../types/UserOperation.sol";
 import "../types/DAppOperation.sol";
-import "../types/LockTypes.sol";
 
 interface IAtlas {
     // Atlas.sol

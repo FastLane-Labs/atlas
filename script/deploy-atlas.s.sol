@@ -15,9 +15,10 @@ import { Sorter } from "../src/contracts/helpers/Sorter.sol";
 import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironment.sol";
 
 contract DeployAtlasScript is DeployBaseScript {
-    uint256 ESCROW_DURATION = 64;
+    uint256 ESCROW_DURATION = 128; // 32 seconds at 250ms block times on Arbitrum
     uint256 ATLAS_SURCHARGE_RATE; // Set below
-    uint256 BUNDLER_SURCHARGE_RATE; // Set below
+    // address L2_GAS_CALCULATOR = 0xf5DF545113DeE4DF10f8149090Aa737dDC05070a; // Arbitrum Sepolia Temp L2GasCalculator
+    address L2_GAS_CALCULATOR = 0x870584178A64f409B00De32816D56756772E6cb4; // Arbitrum One Temp L2GasCalculator
 
     function run() external {
         console.log("\n=== DEPLOYING Atlas ===\n");
@@ -27,7 +28,7 @@ contract DeployAtlasScript is DeployBaseScript {
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
-        (ATLAS_SURCHARGE_RATE, BUNDLER_SURCHARGE_RATE) = _getSurchargeRates();
+        (ATLAS_SURCHARGE_RATE,) = _getSurchargeRates();
 
         // Computes the addresses at which AtlasVerification will be deployed
         address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
@@ -59,9 +60,9 @@ contract DeployAtlasScript is DeployBaseScript {
             simulator: expectedSimulatorAddr,
             factoryLib: address(factoryLib),
             initialSurchargeRecipient: deployer,
-            l2GasCalculator: address(0)
+            l2GasCalculator: L2_GAS_CALCULATOR
         });
-        atlasVerification = new AtlasVerification({ atlas: expectedAtlasAddr, l2GasCalculator: address(0) });
+        atlasVerification = new AtlasVerification({ atlas: expectedAtlasAddr, l2GasCalculator: L2_GAS_CALCULATOR });
 
         simulator = new Simulator();
         simulator.setAtlas(address(atlas));
@@ -141,6 +142,15 @@ contract DeployAtlasScript is DeployBaseScript {
             console.log("ERROR: ESCROW_DURATION was set to 0");
             error = true;
         }
+        // Check if L2GasCalculator is set to same addr in all deployed contracts
+        if (L2_GAS_CALCULATOR != atlas.L2_GAS_CALCULATOR()) {
+            console.log("ERROR: L2_GAS_CALCULATOR address not set correctly in Atlas");
+            error = true;
+        }
+        if (L2_GAS_CALCULATOR != atlasVerification.L2_GAS_CALCULATOR()) {
+            console.log("ERROR: L2_GAS_CALCULATOR address not set correctly in AtlasVerification");
+            error = true;
+        }
 
         if (error) {
             console.log("ERROR: One or more addresses are incorrect. Exiting.");
@@ -161,6 +171,7 @@ contract DeployAtlasScript is DeployBaseScript {
         console.log("| AtlasVerification     | ", address(atlasVerification), " |");
         console.log("| Simulator             | ", address(simulator), " |");
         console.log("| Sorter                | ", address(sorter), " |");
+        console.log("| L2GasCalculator       | ", address(L2_GAS_CALCULATOR), " |");
         console.log("------------------------------------------------------------------------");
         console.log("\n");
         console.log("You can find a list of contract addresses from the latest deployment in deployments.json");

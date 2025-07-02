@@ -26,6 +26,7 @@ contract CallConfigBuilder is Test {
     bool invertBidValue;
     bool exPostBids;
     bool multipleSuccessfulSolvers;
+    bool checkMetacallGasLimit;
 
     function withUserNoncesSequential(bool _sequential) public returns (CallConfigBuilder) {
         userNoncesSequential = _sequential;
@@ -122,6 +123,16 @@ contract CallConfigBuilder is Test {
         return this;
     }
 
+    function withMultipleSuccessfulSolvers(bool _multipleSuccessfulSolvers) public returns (CallConfigBuilder) {
+        multipleSuccessfulSolvers = _multipleSuccessfulSolvers;
+        return this;
+    }
+
+    function withCheckMetacallGasLimit(bool _checkMetacallGasLimit) public returns (CallConfigBuilder) {
+        checkMetacallGasLimit = _checkMetacallGasLimit;
+        return this;
+    }
+
     function build() public view returns (CallConfig memory) {
         return CallConfig(
             userNoncesSequential,
@@ -143,7 +154,8 @@ contract CallConfigBuilder is Test {
             trustedOpHash,
             invertBidValue,
             exPostBids,
-            multipleSuccessfulSolvers
+            multipleSuccessfulSolvers,
+            checkMetacallGasLimit
         );
     }
 }

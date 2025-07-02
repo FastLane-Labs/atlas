@@ -6,10 +6,8 @@ import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import { AtlETH } from "./AtlETH.sol";
 import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
-import { IAtlas } from "../interfaces/IAtlas.sol";
 import { ISolverContract } from "../interfaces/ISolverContract.sol";
 import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
-import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
 import { SafeCall } from "../libraries/SafeCall/SafeCall.sol";
 import { EscrowBits } from "../libraries/EscrowBits.sol";
@@ -17,6 +15,7 @@ import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 import { AccountingMath } from "../libraries/AccountingMath.sol";
 import { GasAccLib, GasLedger } from "../libraries/GasAccLib.sol";
+import { SafeBlockNumber } from "../libraries/SafeBlockNumber.sol";
 import { DAppConfig } from "../types/ConfigTypes.sol";
 import "../types/SolverOperation.sol";
 import "../types/UserOperation.sol";
@@ -212,7 +211,7 @@ abstract contract Escrow is AtlETH {
                 // First successful solver call that paid what it bid
                 if (_result.executionSuccessful()) {
                     // Logic done above `_handleSolverFailAccounting()` is to charge solver for gas used here
-                    ctx.solverOutcome = uint24(_result);
+                    ctx.solverOutcome = _result.toUint24();
 
                     emit SolverTxResult(
                         solverOp.solver,
@@ -247,7 +246,7 @@ abstract contract Escrow is AtlETH {
         }
 
         // If we reach this point, the solver call did not execute successfully.
-        ctx.solverOutcome = uint24(_result);
+        ctx.solverOutcome = _result.toUint24();
 
         emit SolverTxResult(
             solverOp.solver,
@@ -402,7 +401,7 @@ abstract contract Escrow is AtlETH {
         view
         returns (uint256 result)
     {
-        if (solverOp.deadline != 0 && block.number > solverOp.deadline) {
+        if (solverOp.deadline != 0 && SafeBlockNumber.get() > solverOp.deadline) {
             result |= (
                 1
                     << uint256(
@@ -416,7 +415,7 @@ abstract contract Escrow is AtlETH {
 
         uint256 lastAccessedBlock = S_accessData[solverOp.from].lastAccessedBlock;
 
-        if (lastAccessedBlock >= block.number) {
+        if (lastAccessedBlock >= SafeBlockNumber.get()) {
             result |= 1 << uint256(SolverOutcome.PerBlockLimit);
         }
     }

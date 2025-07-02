@@ -13,6 +13,7 @@ import "../../types/UserOperation.sol";
 import "../../types/SolverOperation.sol";
 import "../../types/LockTypes.sol";
 import "../../types/EscrowTypes.sol";
+import { SafeBlockNumber } from "../../libraries/SafeBlockNumber.sol";
 
 // Interface Import
 import { IAtlasVerification } from "../../interfaces/IAtlasVerification.sol";
@@ -101,7 +102,7 @@ contract SolverGateway is OuterHelpers {
         // NOTE: Anyone can call this on behalf of the solver
         // NOTE: the solverOp deadline cannot be before the userOp deadline, therefore if the
         // solverOp deadline is passed then we know the userOp deadline is passed.
-        if (solverOp.deadline >= block.number) {
+        if (solverOp.deadline >= SafeBlockNumber.get()) {
             revert SolverGateway_RefundCongestionBuyIns_DeadlineNotPassed();
         }
 
