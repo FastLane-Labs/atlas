@@ -26,7 +26,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
     // Gas Accounting public constants
     uint256 public constant SCALE = AccountingMath._SCALE;
-    uint256 public constant FIXED_GAS_OFFSET = AccountingMath._FIXED_GAS_OFFSET;
 
     // Transient storage slots
     uint256 internal transient t_lock; // contains activeAddress, callConfig, and phase
