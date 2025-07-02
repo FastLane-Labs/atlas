@@ -5,8 +5,6 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ArbGasInfo } from "nitro-contracts/src/precompiles/ArbGasInfo.sol";
 import { IL2GasCalculator } from "src/contracts/interfaces/IL2GasCalculator.sol";
 
-// TODO Remove this when Arbitrum calldata gas calculation is calibrated
-// Temporary struct to hold all calldata calibration variables in a single slot.
 // Gas Per L2 Calldata Byte = calldataLength * perL1CalldataByte * (M / SCALE) + C
 struct CalibrationVars {
     uint128 M; // Coefficient for calldata length
