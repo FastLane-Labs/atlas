@@ -10,12 +10,14 @@ library SafeBlockNumber {
     uint256 internal constant ARBITRUM_ONE_CHAIN_ID = 42_161;
     uint256 internal constant ARBITRUM_NOVA_CHAIN_ID = 42_170;
     uint256 internal constant ARBITRUM_SEPOLIA_CHAIN_ID = 421_614;
+    uint256 internal constant PLUME_CHAIN_ID = 98_866;
+    uint256 internal constant PLUME_TESTNET_CHAIN_ID = 98_867;
 
     function get() internal view returns (uint256) {
         uint256 chainId = block.chainid;
         if (
             chainId == ARBITRUM_ONE_CHAIN_ID || chainId == ARBITRUM_NOVA_CHAIN_ID
-                || chainId == ARBITRUM_SEPOLIA_CHAIN_ID
+                || chainId == ARBITRUM_SEPOLIA_CHAIN_ID || chainId == PLUME_CHAIN_ID || chainId == PLUME_TESTNET_CHAIN_ID
         ) {
             // Arbitrum One or Nova chain
             return ARB_SYS.arbBlockNumber();

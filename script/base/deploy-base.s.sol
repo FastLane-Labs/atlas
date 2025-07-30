@@ -73,6 +73,10 @@ contract DeployBaseScript is Script {
             return "UNICHAIN";
         } else if (chainId == 1301) {
             return "UNICHAIN SEPOLIA";
+        } else if (chainId == 98_866) {
+            return "PLUME";
+        } else if (chainId == 98_867) {
+            return "PLUME TESTNET";
         } else {
             revert(string.concat("Error: Chain ID not recognized: ", vm.toString(chainId)));
         }
