@@ -37,6 +37,7 @@ contract V4DAppControl is DAppControl {
     bytes4 public constant SWAP = IPoolManager.swap.selector;
     address public immutable hook;
     address public immutable v4Singleton;
+    bool public immutable IS_ARBITRUM_STACK;
 
     // Map to track when "Non Adversarial" flow is allowed.
     // NOTE: This hook is meant to be used for multiple pairs
@@ -80,6 +81,7 @@ contract V4DAppControl is DAppControl {
     {
         hook = address(this);
         v4Singleton = _v4Singleton;
+        IS_ARBITRUM_STACK = SafeBlockNumber.isArbitrumStack();
     }
 
     /////////////////////////////////////////////////////////
@@ -188,7 +190,7 @@ contract V4DAppControl is DAppControl {
             abi.encodePacked(
                 IPoolManager.Currency.unwrap(key.currency0),
                 IPoolManager.Currency.unwrap(key.currency1),
-                SafeBlockNumber.get()
+                SafeBlockNumber.get(IS_ARBITRUM_STACK)
             )
         );
 

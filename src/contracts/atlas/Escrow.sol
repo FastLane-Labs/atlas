@@ -401,7 +401,7 @@ abstract contract Escrow is AtlETH {
         view
         returns (uint256 result)
     {
-        if (solverOp.deadline != 0 && SafeBlockNumber.get() > solverOp.deadline) {
+        if (solverOp.deadline != 0 && SafeBlockNumber.get(IS_ARBITRUM_STACK) > solverOp.deadline) {
             result |= (
                 1
                     << uint256(
@@ -415,7 +415,7 @@ abstract contract Escrow is AtlETH {
 
         uint256 lastAccessedBlock = S_accessData[solverOp.from].lastAccessedBlock;
 
-        if (lastAccessedBlock >= SafeBlockNumber.get()) {
+        if (lastAccessedBlock >= SafeBlockNumber.get(IS_ARBITRUM_STACK)) {
             result |= 1 << uint256(SolverOutcome.PerBlockLimit);
         }
     }

@@ -104,7 +104,7 @@ contract UniV4Hook is V4DAppControl {
                 abi.encodePacked(
                     IPoolManager.Currency.unwrap(key.currency0),
                     IPoolManager.Currency.unwrap(key.currency1),
-                    SafeBlockNumber.get()
+                    SafeBlockNumber.get(IS_ARBITRUM_STACK)
                 )
             );
 

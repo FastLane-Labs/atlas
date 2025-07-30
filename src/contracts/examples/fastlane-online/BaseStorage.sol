@@ -2,8 +2,9 @@
 pragma solidity 0.8.28;
 
 import "../../types/SolverOperation.sol";
-
 import { Reputation } from "./FastLaneTypes.sol";
+
+import { SafeBlockNumber } from "../../libraries/SafeBlockNumber.sol";
 
 contract BaseStorage {
     error FLOnline_NotUnlocked();
@@ -18,6 +19,7 @@ contract BaseStorage {
     uint256 internal constant _CONGESTION_BASE = 100_000;
     bytes32 private constant _USER_LOCK_SLOT = keccak256("FLO_USER_LOCK");
     bytes32 private constant _WINNING_SOLVER_SLOT = keccak256("FLO_WINNING_SOLVER");
+    bool public immutable IS_ARBITRUM_STACK;
 
     uint256 internal S_rake;
 
@@ -35,6 +37,10 @@ contract BaseStorage {
 
     //     SolverFrom  Reputation
     mapping(address => Reputation) internal S_solverReputations;
+
+    constructor() {
+        IS_ARBITRUM_STACK = SafeBlockNumber.isArbitrumStack();
+    }
 
     //////////////////////////////////////////////
     /////          VIEW FUNCTIONS           //////

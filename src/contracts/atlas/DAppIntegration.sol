@@ -1,6 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.28;
 
+import { SafeBlockNumber } from "../libraries/SafeBlockNumber.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { IAtlas } from "../interfaces/IAtlas.sol";
 import { CallBits } from "../libraries/CallBits.sol";
@@ -15,6 +16,7 @@ contract DAppIntegration {
 
     address public immutable ATLAS;
     address public immutable L2_GAS_CALCULATOR;
+    bool public immutable IS_ARBITRUM_STACK;
 
     // map for tracking which accounts are approved for a given dApp
     // keccak256(governance, signor)  => enabled
@@ -27,6 +29,7 @@ contract DAppIntegration {
     constructor(address atlas, address l2GasCalculator) {
         ATLAS = atlas;
         L2_GAS_CALCULATOR = l2GasCalculator;
+        IS_ARBITRUM_STACK = SafeBlockNumber.isArbitrumStack();
     }
 
     // ---------------------------------------------------- //

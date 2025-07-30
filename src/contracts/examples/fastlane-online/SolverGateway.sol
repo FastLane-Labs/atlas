@@ -102,7 +102,7 @@ contract SolverGateway is OuterHelpers {
         // NOTE: Anyone can call this on behalf of the solver
         // NOTE: the solverOp deadline cannot be before the userOp deadline, therefore if the
         // solverOp deadline is passed then we know the userOp deadline is passed.
-        if (solverOp.deadline >= SafeBlockNumber.get()) {
+        if (solverOp.deadline >= SafeBlockNumber.get(IS_ARBITRUM_STACK)) {
             revert SolverGateway_RefundCongestionBuyIns_DeadlineNotPassed();
         }
 
