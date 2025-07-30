@@ -130,13 +130,13 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             }
 
             // Check if past user's deadline
-            if (userOp.deadline != 0 && SafeBlockNumber.get() > userOp.deadline) {
+            if (userOp.deadline != 0 && SafeBlockNumber.get(IS_ARBITRUM_STACK) > userOp.deadline) {
                 return
                     (allSolversGasLimit, allSolversCalldataGas, bidFindOverhead, ValidCallsResult.UserDeadlineReached);
             }
 
             // Check if past dapp's deadline
-            if (dAppOp.deadline != 0 && SafeBlockNumber.get() > dAppOp.deadline) {
+            if (dAppOp.deadline != 0 && SafeBlockNumber.get(IS_ARBITRUM_STACK) > dAppOp.deadline) {
                 return
                     (allSolversGasLimit, allSolversCalldataGas, bidFindOverhead, ValidCallsResult.DAppDeadlineReached);
             }

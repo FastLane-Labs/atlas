@@ -269,7 +269,7 @@ abstract contract GasAccounting is SafetyLocks {
         S_bondedTotalSupply -= amount;
 
         // update lastAccessedBlock since bonded balance is decreasing
-        accountData.lastAccessedBlock = uint32(SafeBlockNumber.get());
+        accountData.lastAccessedBlock = uint32(SafeBlockNumber.get(IS_ARBITRUM_STACK));
         // NOTE: accountData changes must be persisted to storage separately
     }
 

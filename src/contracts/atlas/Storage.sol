@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import "../types/EscrowTypes.sol";
 import "../libraries/AccountingMath.sol";
+import { SafeBlockNumber } from "../libraries/SafeBlockNumber.sol";
 
 import { AtlasEvents } from "../types/AtlasEvents.sol";
 import { AtlasErrors } from "../types/AtlasErrors.sol";
@@ -17,6 +18,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     address public immutable SIMULATOR;
     address public immutable L2_GAS_CALCULATOR;
     uint256 public immutable ESCROW_DURATION;
+    bool internal immutable IS_ARBITRUM_STACK; // True if on an Arbitrum stack chain, otherwise false
 
     // AtlETH public constants
     // These constants double as interface functions for the ERC20 standard, hence the lowercase naming convention.
@@ -66,6 +68,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         SIMULATOR = simulator;
         L2_GAS_CALCULATOR = l2GasCalculator;
         ESCROW_DURATION = escrowDuration;
+        IS_ARBITRUM_STACK = SafeBlockNumber.isArbitrumStack();
 
         // Check Atlas gas surcharge fits in 24 bits
         if(atlasSurchargeRate > type(uint24).max) {

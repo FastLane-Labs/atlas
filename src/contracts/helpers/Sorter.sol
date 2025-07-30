@@ -25,6 +25,7 @@ contract Sorter is AtlasConstants {
 
     IAtlas public immutable ATLAS;
     IAtlasVerification public immutable VERIFICATION;
+    bool public immutable IS_ARBITRUM_STACK;
 
     struct SortingData {
         uint256 amount;
@@ -34,6 +35,7 @@ contract Sorter is AtlasConstants {
     constructor(address _atlas) {
         ATLAS = IAtlas(_atlas);
         VERIFICATION = IAtlasVerification(ATLAS.VERIFICATION());
+        IS_ARBITRUM_STACK = SafeBlockNumber.isArbitrumStack();
     }
 
     function sortBids(
@@ -109,7 +111,7 @@ contract Sorter is AtlasConstants {
 
         // Solvers can only do one tx per block - this prevents double counting bonded balances
         uint256 solverLastActiveBlock = ATLAS.accountLastActiveBlock(solverOp.from);
-        if (solverLastActiveBlock >= SafeBlockNumber.get()) {
+        if (solverLastActiveBlock >= SafeBlockNumber.get(IS_ARBITRUM_STACK)) {
             return false;
         }
 
@@ -129,7 +131,7 @@ contract Sorter is AtlasConstants {
         }
 
         // solverOp.deadline must be in the future
-        if (solverOp.deadline != 0 && SafeBlockNumber.get() > solverOp.deadline) {
+        if (solverOp.deadline != 0 && SafeBlockNumber.get(IS_ARBITRUM_STACK) > solverOp.deadline) {
             return false;
         }
 

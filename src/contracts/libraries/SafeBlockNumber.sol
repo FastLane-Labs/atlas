@@ -7,22 +7,24 @@ library SafeBlockNumber {
     // https://arbiscan.io/address/0x0000000000000000000000000000000000000064
     ArbSys internal constant ARB_SYS = ArbSys(address(0x0000000000000000000000000000000000000064));
 
-    uint256 internal constant ARBITRUM_ONE_CHAIN_ID = 42_161;
-    uint256 internal constant ARBITRUM_NOVA_CHAIN_ID = 42_170;
-    uint256 internal constant ARBITRUM_SEPOLIA_CHAIN_ID = 421_614;
-    uint256 internal constant PLUME_CHAIN_ID = 98_866;
-    uint256 internal constant PLUME_TESTNET_CHAIN_ID = 98_867;
-
-    function get() internal view returns (uint256) {
-        uint256 chainId = block.chainid;
-        if (
-            chainId == ARBITRUM_ONE_CHAIN_ID || chainId == ARBITRUM_NOVA_CHAIN_ID
-                || chainId == ARBITRUM_SEPOLIA_CHAIN_ID || chainId == PLUME_CHAIN_ID || chainId == PLUME_TESTNET_CHAIN_ID
-        ) {
-            // Arbitrum One or Nova chain
+    function get(bool useArbSys) internal view returns (uint256) {
+        if (useArbSys) {
             return ARB_SYS.arbBlockNumber();
         } else {
             return block.number;
         }
+    }
+
+    // TODO this still bloats Atlas contract size even when just used in constructor. Will need to pass in true/false as
+    // a constructor arg
+    function isArbitrumStack() internal view returns (bool) {
+        uint256 chainId = block.chainid;
+        return (
+            chainId == 42_161 // Arbitrum One
+                || chainId == 42_170 // Arbitrum Nova
+                || chainId == 421_614 // Arbitrum Sepolia
+                || chainId == 98_866 // Plume
+                || chainId == 98_867
+        ); // Plume Testnet
     }
 }
