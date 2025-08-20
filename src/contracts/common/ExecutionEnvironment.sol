@@ -50,7 +50,13 @@ contract ExecutionEnvironment is Base {
         bool _success;
         (_success, _preOpsData) = _control().delegatecall(_preOpsData);
 
-        if (!_success) revert AtlasErrors.PreOpsDelegatecallFail();
+        if (!_success) {
+            // Preserve Atlas selector while appending DApp revert payload
+            bytes memory _err = abi.encodePacked(AtlasErrors.PreOpsDelegatecallFail.selector, _preOpsData);
+            assembly {
+                revert(add(_err, 32), mload(_err))
+            }
+        }
 
         _preOpsData = abi.decode(_preOpsData, (bytes));
         return _preOpsData;
@@ -77,11 +83,21 @@ contract ExecutionEnvironment is Base {
 
         if (_config().needsDelegateUser()) {
             (_success, returnData) = userOp.dapp.delegatecall(_data);
-            if (!_success) revert AtlasErrors.UserWrapperDelegatecallFail();
+            if (!_success) {
+                bytes memory _err = abi.encodePacked(AtlasErrors.UserWrapperDelegatecallFail.selector, returnData);
+                assembly {
+                    revert(add(_err, 32), mload(_err))
+                }
+            }
         } else {
             // regular user call - executed at regular destination and not performed locally
             (_success, returnData) = userOp.dapp.call{ value: userOp.value }(_data);
-            if (!_success) revert AtlasErrors.UserWrapperCallFail();
+            if (!_success) {
+                bytes memory _err2 = abi.encodePacked(AtlasErrors.UserWrapperCallFail.selector, returnData);
+                assembly {
+                    revert(add(_err2, 32), mload(_err2))
+                }
+            }
         }
     }
 
@@ -127,9 +143,15 @@ contract ExecutionEnvironment is Base {
             bool _success;
 
             bytes memory _data = _forward(abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)));
-            (_success,) = _control().delegatecall(_data);
+            bytes memory _ret;
+            (_success, _ret) = _control().delegatecall(_data);
 
-            if (!_success) revert AtlasErrors.PreSolverFailed();
+            if (!_success) {
+                bytes memory _err = abi.encodePacked(AtlasErrors.PreSolverFailed.selector, _ret);
+                assembly {
+                    revert(add(_err, 32), mload(_err))
+                }
+            }
         }
 
         // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
@@ -172,9 +194,15 @@ contract ExecutionEnvironment is Base {
             bool _success;
 
             bytes memory _data = _forward(abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)));
-            (_success,) = _control().delegatecall(_data);
+            bytes memory _ret;
+            (_success, _ret) = _control().delegatecall(_data);
 
-            if (!_success) revert AtlasErrors.PostSolverFailed();
+            if (!_success) {
+                bytes memory _err = abi.encodePacked(AtlasErrors.PostSolverFailed.selector, _ret);
+                assembly {
+                    revert(add(_err, 32), mload(_err))
+                }
+            }
         }
 
         // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
@@ -223,8 +251,13 @@ contract ExecutionEnvironment is Base {
         allocateData =
             _forward(abi.encodeCall(IDAppControl.allocateValueCall, (solved, bidToken, bidAmount, allocateData)));
 
-        (bool _success,) = _control().delegatecall(allocateData);
-        if (!_success) revert AtlasErrors.AllocateValueDelegatecallFail();
+        (bool _success, bytes memory _ret2) = _control().delegatecall(allocateData);
+        if (!_success) {
+            bytes memory _err2 = abi.encodePacked(AtlasErrors.AllocateValueDelegatecallFail.selector, _ret2);
+            assembly {
+                revert(add(_err2, 32), mload(_err2))
+            }
+        }
 
         uint256 _balance = address(this).balance;
         if (_balance > 0) {
@@ -299,8 +332,18 @@ contract ExecutionEnvironment is Base {
         (bool success, bytes memory data) = token.staticcall(abi.encodeCall(IERC20.balanceOf, address(this)));
 
         if (!success) {
-            if (inPreSolver) revert AtlasErrors.PreSolverFailed();
-            revert AtlasErrors.PostSolverFailed();
+            if (inPreSolver) {
+                bytes memory _err = abi.encodePacked(AtlasErrors.PreSolverFailed.selector, data);
+                assembly {
+                    revert(add(_err, 32), mload(_err))
+                }
+            }
+            {
+                bytes memory _err2 = abi.encodePacked(AtlasErrors.PostSolverFailed.selector, data);
+                assembly {
+                    revert(add(_err2, 32), mload(_err2))
+                }
+            }
         }
 
         // If the balanceOf call did not revert, decode result to uint256 and return
