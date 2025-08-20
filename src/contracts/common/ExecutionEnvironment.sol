@@ -332,17 +332,10 @@ contract ExecutionEnvironment is Base {
         (bool success, bytes memory data) = token.staticcall(abi.encodeCall(IERC20.balanceOf, address(this)));
 
         if (!success) {
-            if (inPreSolver) {
-                bytes memory _err = abi.encodePacked(AtlasErrors.PreSolverFailed.selector, data);
-                assembly {
-                    revert(add(_err, 32), mload(_err))
-                }
-            }
-            {
-                bytes memory _err2 = abi.encodePacked(AtlasErrors.PostSolverFailed.selector, data);
-                assembly {
-                    revert(add(_err2, 32), mload(_err2))
-                }
+            bytes4 sel = inPreSolver ? AtlasErrors.PreSolverFailed.selector : AtlasErrors.PostSolverFailed.selector;
+            bytes memory err = abi.encodePacked(sel, data);
+            assembly {
+                revert(add(err, 32), mload(err))
             }
         }
 
