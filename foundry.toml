@@ -28,4 +28,6 @@
   ignore = ["./**/*.t.sol", "src/contracts/atlas/Storage.sol"]
 
 [etherscan]
+  anvil-hardhat = { key = "dummy", chain = 31337, url = "http://localhost:8545" }
   berachain = { key = "${BERASCAN_API_KEY}", chain = 80094, url = "https://api.berascan.com/api" }
+  hyperliquid = { key = "${HYPERLIQUID_API_KEY}", chain = 999, url = "https://api.hyperliquid.xyz/api" }
