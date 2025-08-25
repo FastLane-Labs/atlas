@@ -81,8 +81,13 @@ abstract contract Escrow is AtlETH {
             }
         }
 
-        if (ctx.isSimulation) revert PreOpsSimFail();
-        revert PreOpsFail();
+        // Append underlying app error data to Atlas error (selector stays first 4 bytes)
+        bytes memory _err = ctx.isSimulation
+            ? abi.encodePacked(PreOpsSimFail.selector, _data)
+            : abi.encodePacked(PreOpsFail.selector, _data);
+        assembly {
+            revert(add(_err, 32), mload(_err))
+        }
     }
 
     /// @notice Executes the user operation logic defined in the Execution Environment.
@@ -123,9 +128,13 @@ abstract contract Escrow is AtlETH {
             }
         }
 
-        // revert for failed
-        if (ctx.isSimulation) revert UserOpSimFail();
-        revert UserOpFail();
+        // revert for failed - include app revert data after Atlas error selector
+        bytes memory _err = ctx.isSimulation
+            ? abi.encodePacked(UserOpSimFail.selector, _data)
+            : abi.encodePacked(UserOpFail.selector, _data);
+        assembly {
+            revert(add(_err, 32), mload(_err))
+        }
     }
 
     /// @notice Checks if the trusted operation hash matches and sets the appropriate error bit if it doesn't.
@@ -288,7 +297,7 @@ abstract contract Escrow is AtlETH {
     {
         uint256 _dappGasWaterMark = gasleft();
 
-        (bool _success,) = ctx.executionEnvironment.call{ gas: ctx.dappGasLeft }(
+        (bool _success, bytes memory _data) = ctx.executionEnvironment.call{ gas: ctx.dappGasLeft }(
             abi.encodePacked(
                 abi.encodeCall(
                     IExecutionEnvironment.allocateValue, (ctx.solverSuccessful, dConfig.bidToken, bidAmount, returnData)
@@ -299,10 +308,14 @@ abstract contract Escrow is AtlETH {
 
         _updateDAppGasLeft(ctx, _dappGasWaterMark);
 
-        // Revert if allocateValue failed at any point.
+        // Revert if allocateValue failed at any point. Include app revert data after Atlas error selector
         if (!_success) {
-            if (ctx.isSimulation) revert AllocateValueSimFail();
-            revert AllocateValueFail();
+            bytes memory _err = ctx.isSimulation
+                ? abi.encodePacked(AllocateValueSimFail.selector, _data)
+                : abi.encodePacked(AllocateValueFail.selector, _data);
+            assembly {
+                revert(add(_err, 32), mload(_err))
+            }
         }
     }
 

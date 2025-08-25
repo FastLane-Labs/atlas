@@ -444,9 +444,9 @@ contract Atlas is Escrow, Factory {
                 _errorSwitch == PreOpsSimFail.selector || _errorSwitch == UserOpSimFail.selector
                     || _errorSwitch == AllocateValueSimFail.selector
             ) {
+                // Bubble full revert payload (first 4 bytes remain Atlas error selector)
                 assembly {
-                    mstore(0, _errorSwitch)
-                    revert(0, 4)
+                    revert(add(revertData, 32), mload(revertData))
                 }
             }
         }
@@ -456,9 +456,9 @@ contract Atlas is Escrow, Factory {
         // nonce as used so the userOp can be reused. Otherwise, the whole metacall doesn't revert but the inner
         // execute() does so, no operation changes are persisted.
         if (_errorSwitch == UserNotFulfilled.selector || callConfig.allowsReuseUserOps()) {
+            // Revert with the original payload so app error data after the selector is preserved
             assembly {
-                mstore(0, _errorSwitch)
-                revert(0, 4)
+                revert(add(revertData, 32), mload(revertData))
             }
         }
     }
