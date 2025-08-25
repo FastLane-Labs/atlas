@@ -5,15 +5,16 @@ import "forge-std/Test.sol";
 
 import { DeployBaseScript } from "script/base/deploy-base.s.sol";
 import { BaseGasCalculator } from "src/contracts/gasCalculator/BaseGasCalculator.sol";
+import { ChainConfig } from "src/contracts/libraries/ChainConfig.sol";
 
-// Deploy script for the Base L2GasCalculator - for the Base L2 (or other OP Stack L2s)
-contract DeployBaseGasCalculatorScript is DeployBaseScript {
+// Deploy script for the OP Stack L2GasCalculator - for Optimism, Base, Unichain, and other OP Stack L2s
+contract DeployOPStackGasCalculatorScript is DeployBaseScript {
     // NOTE: Adjust the constructor parameters as needed here:
-    // - BASE_GAS_PRICE_ORACLE: The address of the gas price oracle contract
-    // - BASE_CALLDATA_LENGTH_OFFSET: The offset to be applied to the calldata length (can be negative or positive)
+    // - OP_STACK_GAS_PRICE_ORACLE: The address of the gas price oracle contract (same for all OP Stack chains)
+    // - OP_STACK_CALLDATA_LENGTH_OFFSET: The offset to be applied to the calldata length (can be negative or positive)
     // -----------------------------------------------------------------------------------------------
-    address constant BASE_GAS_PRICE_ORACLE = address(0x420000000000000000000000000000000000000F);
-    int256 constant BASE_CALLDATA_LENGTH_OFFSET = 0; // can be negative or positive
+    address constant OP_STACK_GAS_PRICE_ORACLE = address(0x420000000000000000000000000000000000000F);
+    int256 constant OP_STACK_CALLDATA_LENGTH_OFFSET = 0; // can be negative or positive
     // -----------------------------------------------------------------------------------------------
 
     function run() external {
@@ -26,20 +27,20 @@ contract DeployBaseGasCalculatorScript is DeployBaseScript {
 
         console.log("Deployer address: \t\t", deployer);
 
-        uint256 chainId = block.chainid;
         address deploymentAddr;
 
         vm.startBroadcast(deployerPrivateKey);
 
-        if (chainId == 8453 || chainId == 84_532) {
-            // Base or Base Sepolia
+        // Check if this chain is an OP Stack chain and requires an L2 gas calculator
+        if (ChainConfig.requiresL2GasCalculator(block.chainid)) {
+            // OP Stack chains: Optimism, Base, Unichain (mainnet and testnets)
             BaseGasCalculator gasCalculator = new BaseGasCalculator({
-                gasPriceOracle: BASE_GAS_PRICE_ORACLE,
-                calldataLenOffset: BASE_CALLDATA_LENGTH_OFFSET
+                gasPriceOracle: OP_STACK_GAS_PRICE_ORACLE,
+                calldataLenOffset: OP_STACK_CALLDATA_LENGTH_OFFSET
             });
             deploymentAddr = address(gasCalculator);
         } else {
-            revert("Error: Chain ID not supported");
+            revert("Error: Chain ID not supported for OP Stack gas calculator");
         }
 
         vm.stopBroadcast();
@@ -50,7 +51,7 @@ contract DeployBaseGasCalculatorScript is DeployBaseScript {
         console.log("-------------------------------------------------------------------------------");
         console.log("| Contract                    | Address                                       |");
         console.log("-------------------------------------------------------------------------------");
-        console.log("| L2_GAS_CALCULATOR (Base)    | ", address(deploymentAddr), "  |");
+        console.log("| L2_GAS_CALCULATOR (OP Stack) | ", address(deploymentAddr), "  |");
         console.log("-------------------------------------------------------------------------------");
         console.log("\n");
         console.log("You can find a list of contract addresses from the latest deployment in deployments.json");
