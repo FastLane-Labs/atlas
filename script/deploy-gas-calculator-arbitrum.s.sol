@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 
 import { DeployBaseScript } from "script/base/deploy-base.s.sol";
 import { ArbitrumGasCalculator } from "src/contracts/gasCalculator/ArbitrumGasCalculator.sol";
+import { ChainConfig } from "src/contracts/libraries/ChainConfig.sol";
 
 // Deploy script for the Arbitrum L2GasCalculator
 contract DeployArbGasCalculatorScript is DeployBaseScript {
@@ -18,17 +19,19 @@ contract DeployArbGasCalculatorScript is DeployBaseScript {
 
         console.log("Deployer address: \t\t", deployer);
 
-        uint256 chainId = block.chainid;
         address deploymentAddr;
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // Check if chainId is Arbitrum One or Arbitrum Sepolia
-        if (chainId == 42_161 || chainId == 421_614) {
-            ArbitrumGasCalculator gasCalculator = new ArbitrumGasCalculator();
-            deploymentAddr = address(gasCalculator);
+        // Arbitrum is not supported on main branch
+        if (block.chainid == 42_161 || block.chainid == 421_614) {
+            revert(
+                "Arbitrum deployment not supported on main branch. Please use branch: arbitrum/atlas-v1.6.1 or arbitrum/atlas-v1.7-exp"
+            );
         } else {
-            revert("Error: Chain ID not supported");
+            revert(
+                "Error: This script is only for Arbitrum chains which are not supported on main branch. Please use branch: arbitrum/atlas-v1.6.1 or arbitrum/atlas-v1.7-exp"
+            );
         }
 
         vm.stopBroadcast();
