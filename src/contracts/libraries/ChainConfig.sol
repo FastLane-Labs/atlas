@@ -55,10 +55,14 @@ library ChainConfig {
                 name: "OP MAINNET"
             });
         } else if (chainId == 42_161) {
-            // Arbitrum One - Not supported on main branch
-            revert(
-                "Arbitrum deployment not supported on main branch. Please use branch: arbitrum/atlas-v1.6.1 or arbitrum/atlas-v1.7-exp"
-            );
+            // Arbitrum One
+            return ChainParameters({
+                escrowDuration: 128, // ~250ms * 128 blocks = 32 seconds
+                l2GasCalculator: address(0), // Will be deployed and set
+                atlasSurchargeRate: 1000, // 10%
+                bundlerSurchargeRate: 1000, // 10%
+                name: "ARBITRUM"
+            });
         } else if (chainId == 8453) {
             // Base
             return ChainParameters({
@@ -125,10 +129,14 @@ library ChainConfig {
                 name: "OP SEPOLIA"
             });
         } else if (chainId == 421_614) {
-            // Arbitrum Sepolia - Not supported on main branch
-            revert(
-                "Arbitrum deployment not supported on main branch. Please use branch: arbitrum/atlas-v1.6.1 or arbitrum/atlas-v1.7-exp"
-            );
+            // Arbitrum Sepolia
+            return ChainParameters({
+                escrowDuration: 128, // ~250ms * 128 blocks = 32 seconds
+                l2GasCalculator: address(0), // Will be deployed and set
+                atlasSurchargeRate: 1000, // 10%
+                bundlerSurchargeRate: 1000, // 10%
+                name: "ARBITRUM_SEPOLIA"
+            });
         } else if (chainId == 84_532) {
             // Base Sepolia
             return ChainParameters({
@@ -199,11 +207,11 @@ library ChainConfig {
     /// @param chainId The blockchain chain ID
     /// @return True if the chain requires an L2 gas calculator
     function requiresL2GasCalculator(uint256 chainId) internal pure returns (bool) {
-        // OP Stack chains require L2 gas calculator for proper gas accounting
-        return chainId == 10 || chainId == 11_155_420 // Optimism chains
+        // L2 chains require gas calculator for proper gas accounting
+        return chainId == 42_161 || chainId == 421_614 // Arbitrum chains
+            || chainId == 10 || chainId == 11_155_420 // Optimism chains
             || chainId == 8453 || chainId == 84_532 // Base chains
             || chainId == 130 || chainId == 1301; // Unichain chains
-            // Note: Arbitrum chains (42161, 421614) are not supported on main branch
     }
 
     /// @notice Get chain name by ID (for backwards compatibility)

@@ -23,12 +23,10 @@ A pure Solidity library that stores all chain-specific parameters:
 | Polygon | 137 | 64 blocks | ~2s | Not required |
 | Optimism | 10 | 16 blocks | ~2s | Required (OP Stack) |
 | Base | 8453 | 16 blocks | ~2s | Required (OP Stack) |
-| Arbitrum* | 42161 | - | ~250ms | Not supported on main |
+| Arbitrum | 42161 | 128 blocks | ~250ms | Required (Arbitrum) |
 | Hyperliquid | 999 | 30 blocks | ~1s | Not required |
 | Unichain | 130 | 30 blocks | ~1s | Required (OP Stack) |
 | Berachain | 80094 | 15 blocks | ~5s | Not required |
-
-*Arbitrum requires special handling and is supported on separate branches: `arbitrum/atlas-v1.6.1` or `arbitrum/atlas-v1.7-exp`
 
 #### Testnet Chains
 | Chain | Chain ID | Escrow Duration | Block Time | L2 Gas Calculator |
@@ -37,11 +35,9 @@ A pure Solidity library that stores all chain-specific parameters:
 | Polygon Amoy | 80002 | 64 blocks | ~2s | Not required |
 | OP Sepolia | 11155420 | 16 blocks | ~2s | Required (OP Stack) |
 | Base Sepolia | 84532 | 16 blocks | ~2s | Required (OP Stack) |
-| Arbitrum Sepolia* | 421614 | - | ~250ms | Not supported on main |
+| Arbitrum Sepolia | 421614 | 128 blocks | ~250ms | Required (Arbitrum) |
 | Unichain Sepolia | 1301 | 30 blocks | ~1s | Required (OP Stack) |
 | Berachain Bepolia | 80069 | 15 blocks | ~5s | Not required |
-
-*Arbitrum requires special handling and is supported on separate branches: `arbitrum/atlas-v1.6.1` or `arbitrum/atlas-v1.7-exp`
 
 ## Usage
 
@@ -102,6 +98,9 @@ To add support for a new chain:
 ```solidity
 function requiresL2GasCalculator(uint256 chainId) internal pure returns (bool) {
     return chainId == 42161 || chainId == 421614 || // Arbitrum chains
+           chainId == 10 || chainId == 11155420 ||    // Optimism chains
+           chainId == 8453 || chainId == 84532 ||     // Base chains
+           chainId == 130 || chainId == 1301 ||       // Unichain chains
            chainId == YOUR_CHAIN_ID; // Add your chain if needed
 }
 ```
@@ -123,16 +122,19 @@ L2 Gas Calculator requirements by chain type:
 - **OP Stack chains (Base, Optimism, Unichain)**: Require L2 gas calculator for proper gas accounting
   - **Automatic Deployment**: The Atlas deployment script automatically deploys an L2 gas calculator if one is required but not configured
   - **Manual Deployment** (optional): Can be deployed separately using `script/deploy-gas-calculator-op-stack.s.sol`
-- **Arbitrum**: Not supported on main branch - use branches `arbitrum/atlas-v1.6.1` or `arbitrum/atlas-v1.7-exp`
+- **Arbitrum chains**: Require specialized Arbitrum gas calculator
+  - **Automatic Deployment**: The Atlas deployment script automatically deploys an Arbitrum gas calculator if one is required but not configured
+  - **Manual Deployment** (optional): Can be deployed separately using `script/deploy-gas-calculator-arbitrum.s.sol`
 - **Other chains (Ethereum, Polygon, Hyperliquid, Berachain)**: Standard gas calculation, no L2 calculator needed
 
 ## Arbitrum Deployment
 
-Arbitrum requires special handling due to its unique architecture and is maintained on separate branches:
+Arbitrum is now fully supported on the main branch with automatic L2 gas calculator deployment:
 
-### Available Arbitrum Branches
-- `arbitrum/atlas-v1.6.1` - Stable version for Arbitrum One and Arbitrum Sepolia
-- `arbitrum/atlas-v1.7-exp` - Experimental version with latest features
+### Deployment Process
+1. Arbitrum chains are automatically detected during deployment
+2. An ArbitrumGasCalculator will be deployed if not already configured
+3. The deployment follows the same pattern as other L2 chains
 - `arbitrum/atlas-v1.1` - Legacy version (not recommended for new deployments)
 - `arbitrum/atlas-v1.0` - Legacy version (not recommended for new deployments)
 

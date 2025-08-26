@@ -23,15 +23,13 @@ contract DeployArbGasCalculatorScript is DeployBaseScript {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // Arbitrum is not supported on main branch
+        // Deploy ArbitrumGasCalculator only for Arbitrum chains
         if (block.chainid == 42_161 || block.chainid == 421_614) {
-            revert(
-                "Arbitrum deployment not supported on main branch. Please use branch: arbitrum/atlas-v1.6.1 or arbitrum/atlas-v1.7-exp"
-            );
+            ArbitrumGasCalculator arbitrumGasCalc = new ArbitrumGasCalculator();
+            deploymentAddr = address(arbitrumGasCalc);
+            console.log("Arbitrum Gas Calculator deployed at: ", deploymentAddr);
         } else {
-            revert(
-                "Error: This script is only for Arbitrum chains which are not supported on main branch. Please use branch: arbitrum/atlas-v1.6.1 or arbitrum/atlas-v1.7-exp"
-            );
+            revert("Error: This script is only for Arbitrum chains (42161, 421614)");
         }
 
         vm.stopBroadcast();

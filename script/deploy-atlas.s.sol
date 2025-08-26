@@ -15,6 +15,7 @@ import { Simulator } from "../src/contracts/helpers/Simulator.sol";
 import { Sorter } from "../src/contracts/helpers/Sorter.sol";
 import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironment.sol";
 import { BaseGasCalculator } from "../src/contracts/gasCalculator/BaseGasCalculator.sol";
+import { ArbitrumGasCalculator } from "../src/contracts/gasCalculator/ArbitrumGasCalculator.sol";
 
 contract DeployAtlasScript is DeployBaseScript {
     // OP Stack gas calculator constants
@@ -65,14 +66,26 @@ contract DeployAtlasScript is DeployBaseScript {
 
         // Deploy L2 gas calculator if needed
         if (deployL2GasCalculator) {
-            BaseGasCalculator gasCalculator = new BaseGasCalculator({
-                gasPriceOracle: OP_STACK_GAS_PRICE_ORACLE,
-                calldataLenOffset: OP_STACK_CALLDATA_LENGTH_OFFSET
-            });
-            console.log("L2 Gas Calculator deployed at: ", address(gasCalculator));
+            address deployedGasCalculator;
+
+            // Deploy appropriate gas calculator based on chain
+            if (block.chainid == 42_161 || block.chainid == 421_614) {
+                // Arbitrum chains
+                ArbitrumGasCalculator arbitrumGasCalc = new ArbitrumGasCalculator();
+                deployedGasCalculator = address(arbitrumGasCalc);
+                console.log("Arbitrum Gas Calculator deployed at: ", deployedGasCalculator);
+            } else {
+                // OP Stack chains (Base, Optimism, Unichain)
+                BaseGasCalculator baseGasCalc = new BaseGasCalculator({
+                    gasPriceOracle: OP_STACK_GAS_PRICE_ORACLE,
+                    calldataLenOffset: OP_STACK_CALLDATA_LENGTH_OFFSET
+                });
+                deployedGasCalculator = address(baseGasCalc);
+                console.log("OP Stack Gas Calculator deployed at: ", deployedGasCalculator);
+            }
 
             // Verify the address matches our expectation
-            require(address(gasCalculator) == chainParams.l2GasCalculator, "L2 gas calculator address mismatch");
+            require(deployedGasCalculator == chainParams.l2GasCalculator, "L2 gas calculator address mismatch");
         }
 
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
