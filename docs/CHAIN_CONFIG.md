@@ -19,25 +19,25 @@ A pure Solidity library that stores all chain-specific parameters:
 #### Mainnet Chains
 | Chain | Chain ID | Escrow Duration | Block Time | L2 Gas Calculator |
 |-------|----------|-----------------|------------|-------------------|
-| Ethereum | 1 | 64 blocks | ~12s | Not required |
+| Ethereum | 1 | 10 blocks | ~12s | Not required |
 | Polygon | 137 | 64 blocks | ~2s | Not required |
-| Optimism | 10 | 16 blocks | ~2s | Required (OP Stack) |
-| Base | 8453 | 16 blocks | ~2s | Required (OP Stack) |
+| Optimism | 10 | 150 blocks | ~200ms | Required (OP Stack) |
+| Base | 8453 | 150 blocks | ~200ms | Required (OP Stack) |
 | Arbitrum | 42161 | 128 blocks | ~250ms | Required (Arbitrum) |
 | Hyperliquid | 999 | 30 blocks | ~1s | Not required |
 | Unichain | 130 | 30 blocks | ~1s | Required (OP Stack) |
-| Berachain | 80094 | 15 blocks | ~5s | Not required |
+| Berachain | 80094 | 15 blocks | ~2s | Not required |
 
 #### Testnet Chains
 | Chain | Chain ID | Escrow Duration | Block Time | L2 Gas Calculator |
 |-------|----------|-----------------|------------|-------------------|
-| Sepolia | 11155111 | 64 blocks | ~12s | Not required |
+| Sepolia | 11155111 | 10 blocks | ~12s | Not required |
 | Polygon Amoy | 80002 | 64 blocks | ~2s | Not required |
-| OP Sepolia | 11155420 | 16 blocks | ~2s | Required (OP Stack) |
-| Base Sepolia | 84532 | 16 blocks | ~2s | Required (OP Stack) |
+| OP Sepolia | 11155420 | 150 blocks | ~200ms | Required (OP Stack) |
+| Base Sepolia | 84532 | 150 blocks | ~200ms | Required (OP Stack) |
 | Arbitrum Sepolia | 421614 | 128 blocks | ~250ms | Required (Arbitrum) |
 | Unichain Sepolia | 1301 | 30 blocks | ~1s | Required (OP Stack) |
-| Berachain Bepolia | 80069 | 15 blocks | ~5s | Not required |
+| Berachain Bepolia | 80069 | 15 blocks | ~2s | Not required |
 
 ## Usage
 
@@ -107,14 +107,15 @@ function requiresL2GasCalculator(uint256 chainId) internal pure returns (bool) {
 
 ## Escrow Duration Calculation
 
-Escrow duration is calculated to achieve approximately 30-35 seconds of real time:
+Escrow duration is calculated to achieve approximately 30 seconds of real time:
 
-- **Ethereum/Sepolia**: 64 blocks × 12s = ~768s (adjusted for network conditions)
+- **Ethereum/Sepolia**: 10 blocks × 12s = ~120s
 - **Polygon/Amoy**: 64 blocks × 2s = ~128s (adjusted for faster finality)
-- **OP Stack (Optimism/Base)**: 16 blocks × 2s = ~32s
+- **Optimism/Base**: 150 blocks × 200ms = ~30s (using flashblocks)
 - **Arbitrum**: 128 blocks × 250ms = ~32s
-- **Hyperliquid/Unichain**: 30 blocks × 1s = ~30s
-- **Berachain**: 15 blocks × 5s = ~75s (Cosmos-based consensus)
+- **Hyperliquid**: 30 blocks × 1s = ~30s
+- **Unichain**: 30 blocks × 1s = ~30s
+- **Berachain**: 15 blocks × 2s = ~30s
 
 ## L2 Gas Calculator
 
