@@ -21,7 +21,7 @@ library ChainConfig {
         if (chainId == 1) {
             // Ethereum Mainnet
             return ChainParameters({
-                escrowDuration: 64, // ~13 seconds * 5 blocks
+                escrowDuration: 10, // ~12 seconds * 10 blocks = 120 seconds
                 l2GasCalculator: address(0),
                 atlasSurchargeRate: 1000, // 10%
                 bundlerSurchargeRate: 1000, // 10%
@@ -48,7 +48,7 @@ library ChainConfig {
         } else if (chainId == 10) {
             // Optimism
             return ChainParameters({
-                escrowDuration: 16, // ~2 seconds * 16 blocks = 32 seconds
+                escrowDuration: 30, // ~1 second * 30 blocks = 30 seconds
                 l2GasCalculator: address(0), // Will be deployed and set
                 atlasSurchargeRate: 1000, // 10%
                 bundlerSurchargeRate: 1000, // 10%
@@ -66,7 +66,7 @@ library ChainConfig {
         } else if (chainId == 8453) {
             // Base
             return ChainParameters({
-                escrowDuration: 16, // ~2 seconds * 16 blocks = 32 seconds
+                escrowDuration: 30, // ~1 second * 30 blocks = 30 seconds
                 l2GasCalculator: address(0), // Will be deployed and set
                 atlasSurchargeRate: 1000, // 10%
                 bundlerSurchargeRate: 1000, // 10%
@@ -75,7 +75,7 @@ library ChainConfig {
         } else if (chainId == 999) {
             // Hyperliquid
             return ChainParameters({
-                escrowDuration: 30, // ~1 second blocks * 30 = 30 seconds
+                escrowDuration: 30, // ~1 second * 30 blocks = 30 seconds
                 l2GasCalculator: address(0),
                 atlasSurchargeRate: 1000, // 10%
                 bundlerSurchargeRate: 1000, // 10%
@@ -86,7 +86,7 @@ library ChainConfig {
         else if (chainId == 11_155_111) {
             // Sepolia
             return ChainParameters({
-                escrowDuration: 64,
+                escrowDuration: 10, // ~12 seconds * 10 blocks = 120 seconds
                 l2GasCalculator: address(0),
                 atlasSurchargeRate: 1000, // 10%
                 bundlerSurchargeRate: 1000, // 10%
@@ -122,7 +122,7 @@ library ChainConfig {
         } else if (chainId == 11_155_420) {
             // Optimism Sepolia
             return ChainParameters({
-                escrowDuration: 16, // ~2 seconds * 16 blocks = 32 seconds
+                escrowDuration: 30, // ~1 second * 30 blocks = 30 seconds
                 l2GasCalculator: address(0), // Will be deployed and set
                 atlasSurchargeRate: 1000, // 10%
                 bundlerSurchargeRate: 1000, // 10%
@@ -140,7 +140,7 @@ library ChainConfig {
         } else if (chainId == 84_532) {
             // Base Sepolia
             return ChainParameters({
-                escrowDuration: 16, // ~2 seconds * 16 blocks = 32 seconds
+                escrowDuration: 30, // ~1 second * 30 blocks = 30 seconds
                 l2GasCalculator: address(0), // Will be deployed and set
                 atlasSurchargeRate: 1000, // 10%
                 bundlerSurchargeRate: 1000, // 10%
@@ -149,7 +149,7 @@ library ChainConfig {
         } else if (chainId == 80_094) {
             // Berachain
             return ChainParameters({
-                escrowDuration: 15, // ~5 second blocks * 6 = 30 seconds (Cosmos-based)
+                escrowDuration: 15, // ~2 seconds * 15 blocks = 30 seconds
                 l2GasCalculator: address(0),
                 atlasSurchargeRate: 1000, // 10%
                 bundlerSurchargeRate: 1000, // 10%
@@ -158,7 +158,7 @@ library ChainConfig {
         } else if (chainId == 80_069) {
             // Berachain Bepolia
             return ChainParameters({
-                escrowDuration: 15, // ~5 second blocks * 6 = 30 seconds
+                escrowDuration: 15, // ~2 seconds * 15 blocks = 30 seconds
                 l2GasCalculator: address(0),
                 atlasSurchargeRate: 1000, // 10%
                 bundlerSurchargeRate: 1000, // 10%
@@ -167,7 +167,7 @@ library ChainConfig {
         } else if (chainId == 130) {
             // Unichain
             return ChainParameters({
-                escrowDuration: 30, // ~1 second blocks * 30 = 30 seconds
+                escrowDuration: 30, // ~1 second * 30 blocks = 30 seconds
                 l2GasCalculator: address(0), // Will be deployed and set (OP Stack based)
                 atlasSurchargeRate: 1000, // 10%
                 bundlerSurchargeRate: 1000, // 10%
@@ -176,7 +176,7 @@ library ChainConfig {
         } else if (chainId == 1301) {
             // Unichain Sepolia
             return ChainParameters({
-                escrowDuration: 30, // ~1 second blocks * 30 = 30 seconds
+                escrowDuration: 30, // ~1 second * 30 blocks = 30 seconds
                 l2GasCalculator: address(0), // Will be deployed and set (OP Stack based)
                 atlasSurchargeRate: 1000, // 10%
                 bundlerSurchargeRate: 1000, // 10%
