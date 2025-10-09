@@ -462,9 +462,8 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             }
         }
 
-        // Make sure the signer is currently enabled by dapp owner. Only need to check if msgSender != dAppOp.from (i.e.
-        // _bypassSignature == false), because msgSender checked above.
-        if (!_skipDAppOpChecks && !_bypassSignature && !_isDAppSignatory(dAppOp.control, dAppOp.from)) {
+        // Make sure the signer is currently enabled by dapp owner.
+        if (!_skipDAppOpChecks && !_isDAppSignatory(dAppOp.control, dAppOp.from)) {
             return ValidCallsResult.DAppNotEnabled;
         }
 
