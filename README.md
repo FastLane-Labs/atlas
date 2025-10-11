@@ -38,7 +38,9 @@ The auctioneer is tasked with signing a **DAppOperation** that includes a **Call
 
 Note that any bundler who tampers with the order of the SolverOperations will cause the transaction to revert, thereby blocking any gas reimbursement from Atlas.
 
-Note that input from the User is only required for step 2; all other steps have no impact on UX. 
+Note that input from the User is only required for step 2; all other steps have no impact on UX.
+
+Note that the bundler should be able to receive ETH without reverting, as they may receive a refund of the msg.value sent with the `metacall()` if the config dictates that `metacall()` should return false instead of reverting, or if `gasRefundBeneficiary` is set to `address(0)`, in which case gas refunds are sent to the bundler.
 
 
 ### Atlas Transaction Structure
