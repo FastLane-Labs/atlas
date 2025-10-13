@@ -5,6 +5,7 @@ import { ArbSys } from "nitro-contracts/src/precompiles/ArbSys.sol";
 
 library SafeBlockNumber {
     // https://arbiscan.io/address/0x0000000000000000000000000000000000000064
+    // https://github.com/OffchainLabs/nitro/blob/9270a057fa8b30fb960872d74f7632aae8f5efbe/precompiles/ArbSys.go#L35
     ArbSys internal constant ARB_SYS = ArbSys(address(0x0000000000000000000000000000000000000064));
 
     uint256 internal constant ARBITRUM_ONE_CHAIN_ID = 42_161;
