@@ -77,6 +77,8 @@ contract DeployBaseScript is Script {
             return "PLUME";
         } else if (chainId == 98_867) {
             return "PLUME TESTNET";
+        } else if (chainId == 999) {
+            return "HYPERLIQUID";
         } else {
             revert(string.concat("Error: Chain ID not recognized: ", vm.toString(chainId)));
         }
@@ -109,7 +111,12 @@ contract DeployBaseScript is Script {
         // console.log("Getting", fullKey, "from deployments.json");
 
         // NOTE: Use fullKey method above for safety
-        return json.readAddress(fullKey);
+        // Try to parse the address, return address(0) if empty or invalid
+        try vm.parseJsonAddress(json, fullKey) returns (address addr) {
+            return addr;
+        } catch {
+            return address(0);
+        }
     }
 
     function _writeAddressToDeploymentsJson(string memory key, address addr) internal {
