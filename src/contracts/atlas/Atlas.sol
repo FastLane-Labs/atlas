@@ -20,7 +20,7 @@ import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 import { GasAccLib, GasLedger } from "../libraries/GasAccLib.sol";
 
-/// @title Atlas V1.6.2
+/// @title Atlas V1.6.4
 /// @author FastLane Labs
 /// @notice The Execution Abstraction protocol.
 contract Atlas is Escrow, Factory {
@@ -45,7 +45,7 @@ contract Atlas is Escrow, Factory {
 
     /// @notice metacall is the entrypoint function for the Atlas transactions.
     /// @dev Any ETH sent as msg.value with a metacall should be considered a potential subsidy for the winning solver's
-    /// gas repayment.
+    /// gas repayment. NOTE: The msg.sender (bundler) should be able to receive ETH without reverting.
     /// @param userOp The UserOperation struct containing the user's transaction data.
     /// @param solverOps The SolverOperation array containing the solvers' transaction data.
     /// @param dAppOp The DAppOperation struct containing the DApp's transaction data.
@@ -65,8 +65,7 @@ contract Atlas is Escrow, Factory {
         // is deducted from this _gasMarker, resulting in actual execution gas used + calldata gas costs + buffer.
         // The calldata component is added below, only if exPostBids = false.
         uint256 _gasLeft = gasleft();
-        uint256 _gasMarker = _gasLeft + _BASE_TX_GAS_USED + _POST_SETTLE_METACALL_GAS; // This part is only execution
-            // gas.
+        uint256 _gasMarker = _gasLeft + _BASE_TX_GAS_USED + _POST_SETTLE_METACALL_GAS; // This is only execution gas.
 
         DAppConfig memory _dConfig;
         bool _isSimulation = msg.sender == SIMULATOR;
@@ -106,6 +105,8 @@ contract Atlas is Escrow, Factory {
 
             // Gracefully return for results that need nonces to be stored and prevent replay attacks
             if (uint8(_validCallsResult) >= _GRACEFUL_RETURN_THRESHOLD && !_dConfig.callConfig.allowsReuseUserOps()) {
+                // Refund the bundler if they sent any msg.value, then return false and end early.
+                if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
                 return false;
             }
 

@@ -1,13 +1,4 @@
 {
-  "lib/openzeppelin-contracts": {
-    "branch": {
-      "name": "release-v5.0",
-      "rev": "dbb6104ce834628e473d2173bbc9d47f81a9eec3"
-    }
-  },
-  "lib/solady": {
-    "rev": "42af395e631fcc9d640eddf11c57c6f1ca3f9103"
-  },
   "lib/forge-std": {
     "branch": {
       "name": "master",
@@ -16,5 +7,14 @@
   },
   "lib/nitro-contracts": {
     "rev": "fbbcef09c95f69decabaced3da683f987902f3e2"
+  },
+  "lib/openzeppelin-contracts": {
+    "branch": {
+      "name": "release-v5.0",
+      "rev": "dbb6104ce834628e473d2173bbc9d47f81a9eec3"
+    }
+  },
+  "lib/solady": {
+    "rev": "42af395e631fcc9d640eddf11c57c6f1ca3f9103"
   }
 }

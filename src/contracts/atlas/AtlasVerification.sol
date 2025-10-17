@@ -36,7 +36,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         address atlas,
         address l2GasCalculator
     )
-        EIP712("AtlasVerification", "1.6.2")
+        EIP712("AtlasVerification", "1.6.4")
         DAppIntegration(atlas, l2GasCalculator)
     { }
 
@@ -377,7 +377,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     /// @return A boolean indicating if the signature is valid.
     function _verifySolverSignature(SolverOperation calldata solverOp) internal view returns (bool) {
         (address _signer,,) = _hashTypedDataV4(_getSolverOpHash(solverOp)).tryRecover(solverOp.signature);
-        return _signer == solverOp.from;
+        return _signer == solverOp.from && _signer != address(0);
     }
 
     /// @notice The _getSolverOpHash internal function returns the hash of a SolverOperation struct.
@@ -462,9 +462,8 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             }
         }
 
-        // Make sure the signer is currently enabled by dapp owner. Only need to check if msgSender != dAppOp.from (i.e.
-        // _bypassSignature == false), because msgSender checked above.
-        if (!_skipDAppOpChecks && !_bypassSignature && !_isDAppSignatory(dAppOp.control, dAppOp.from)) {
+        // Make sure the signer is currently enabled by dapp owner.
+        if (!_skipDAppOpChecks && !_isDAppSignatory(dAppOp.control, dAppOp.from)) {
             return ValidCallsResult.DAppNotEnabled;
         }
 
@@ -495,7 +494,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     /// @return A boolean indicating if the signature is valid.
     function _verifyDAppSignature(DAppOperation calldata dAppOp) internal view returns (bool) {
         (address _signer,,) = _hashTypedDataV4(_getDAppOpHash(dAppOp)).tryRecover(dAppOp.signature);
-        return _signer == dAppOp.from;
+        return _signer == dAppOp.from && _signer != address(0);
     }
 
     /// @notice Generates the hash of a DAppOperation struct.
