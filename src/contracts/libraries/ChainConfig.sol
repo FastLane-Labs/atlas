@@ -75,7 +75,7 @@ library ChainConfig {
         } else if (chainId == 999) {
             // Hyperliquid
             return ChainParameters({
-                escrowDuration: 30, // ~1 second * 30 blocks = 30 seconds
+                escrowDuration: 429, // ~0.07 seconds * 429 blocks = 30 seconds (HyperCore L1)
                 l2GasCalculator: address(0),
                 atlasSurchargeRate: 1000, // 10%
                 bundlerSurchargeRate: 1000, // 10%
