@@ -63,6 +63,15 @@ library ChainConfig {
                 bundlerSurchargeRate: 1000, // 10%
                 name: "ARBITRUM"
             });
+        } else if (chainId == 98_866) {
+            // Plume (Arbitrum Orbit)
+            return ChainParameters({
+                escrowDuration: 128, // ~250ms * 128 blocks = 32 seconds
+                l2GasCalculator: address(0), // Will be deployed and set
+                atlasSurchargeRate: 1000, // 10%
+                bundlerSurchargeRate: 1000, // 10%
+                name: "PLUME"
+            });
         } else if (chainId == 8453) {
             // Base
             return ChainParameters({
@@ -137,6 +146,15 @@ library ChainConfig {
                 bundlerSurchargeRate: 1000, // 10%
                 name: "ARBITRUM_SEPOLIA"
             });
+        } else if (chainId == 98_867) {
+            // Plume Testnet (Arbitrum Orbit)
+            return ChainParameters({
+                escrowDuration: 128, // ~250ms * 128 blocks = 32 seconds
+                l2GasCalculator: address(0), // Will be deployed and set
+                atlasSurchargeRate: 1000, // 10%
+                bundlerSurchargeRate: 1000, // 10%
+                name: "PLUME TESTNET"
+            });
         } else if (chainId == 84_532) {
             // Base Sepolia
             return ChainParameters({
@@ -209,6 +227,7 @@ library ChainConfig {
     function requiresL2GasCalculator(uint256 chainId) internal pure returns (bool) {
         // L2 chains require gas calculator for proper gas accounting
         return chainId == 42_161 || chainId == 421_614 // Arbitrum chains
+            || chainId == 98_866 || chainId == 98_867 // Plume (Arbitrum Orbit)
             || chainId == 10 || chainId == 11_155_420 // Optimism chains
             || chainId == 8453 || chainId == 84_532 // Base chains
             || chainId == 130 || chainId == 1301; // Unichain chains
