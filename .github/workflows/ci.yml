@@ -17,6 +17,8 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.3.5
 
       - name: Check formatting
         run: forge fmt --check
@@ -33,6 +35,8 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.3.5
 
       - name: Install dependencies
         run: forge install
@@ -76,6 +80,8 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.3.5
 
       - name: Install dependencies
         run: forge install

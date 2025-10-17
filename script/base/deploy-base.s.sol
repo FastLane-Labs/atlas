@@ -16,6 +16,7 @@ import { Sorter } from "../../src/contracts/helpers/Sorter.sol";
 import { SimpleRFQSolver } from "../../test/SwapIntent.t.sol";
 
 import { Utilities } from "../../src/contracts/helpers/Utilities.sol";
+import { ChainConfig } from "../../src/contracts/libraries/ChainConfig.sol";
 
 contract DeployBaseScript is Script {
     using stdJson for string;
@@ -35,66 +36,16 @@ contract DeployBaseScript is Script {
 
     // Uses block.chainid to determine current chain to update deployments.json
     function _getDeployChain() internal view returns (string memory) {
-        uint256 chainId = block.chainid;
-
-        if (chainId == 31_337) {
-            return "LOCAL";
-        } else if (chainId == 1) {
-            return "MAINNET";
-        } else if (chainId == 11_155_111) {
-            return "SEPOLIA";
-        } else if (chainId == 17_000) {
-            return "HOLESKY";
-        } else if (chainId == 137) {
-            return "POLYGON";
-        } else if (chainId == 80_002) {
-            return "AMOY";
-        } else if (chainId == 56) {
-            return "BSC";
-        } else if (chainId == 97) {
-            return "BSC TESTNET";
-        } else if (chainId == 10) {
-            return "OP MAINNET";
-        } else if (chainId == 11_155_420) {
-            return "OP SEPOLIA";
-        } else if (chainId == 42_161) {
-            return "ARBITRUM";
-        } else if (chainId == 421_614) {
-            return "ARBITRUM_SEPOLIA";
-        } else if (chainId == 8453) {
-            return "BASE";
-        } else if (chainId == 84_532) {
-            return "BASE SEPOLIA";
-        } else if (chainId == 80_094) {
-            return "BERACHAIN";
-        } else if (chainId == 80_069) {
-            return "BERACHAIN BEPOLIA";
-        } else if (chainId == 130) {
-            return "UNICHAIN";
-        } else if (chainId == 1301) {
-            return "UNICHAIN SEPOLIA";
-        } else if (chainId == 98_866) {
-            return "PLUME";
-        } else if (chainId == 98_867) {
-            return "PLUME TESTNET";
-        } else if (chainId == 999) {
-            return "HYPERLIQUID";
-        } else {
-            revert(string.concat("Error: Chain ID not recognized: ", vm.toString(chainId)));
-        }
+        return ChainConfig.getChainName(block.chainid);
     }
 
     function _getSurchargeRates() internal view returns (uint256 atlasSurchargeRate, uint256 bundlerSurchargeRate) {
-        uint256 chainId = block.chainid;
-        if (chainId == 137 || chainId == 80_002) {
-            // POLYGON and AMOY
-            atlasSurchargeRate = 500; // 5%
-            bundlerSurchargeRate = 2000; // 20%
-        } else {
-            // Default - for all other chains
-            atlasSurchargeRate = 1000; // 10%
-            bundlerSurchargeRate = 1000; // 10%
-        }
+        ChainConfig.ChainParameters memory params = ChainConfig.getChainParameters(block.chainid);
+        return (params.atlasSurchargeRate, params.bundlerSurchargeRate);
+    }
+
+    function _getChainConfig() internal view returns (ChainConfig.ChainParameters memory) {
+        return ChainConfig.getChainParameters(block.chainid);
     }
 
     // NOTE: When handling JSON with StdJson, prefix keys with '.' e.g. '.ATLAS'
