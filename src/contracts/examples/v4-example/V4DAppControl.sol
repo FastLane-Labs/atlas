@@ -175,7 +175,11 @@ contract V4DAppControl is DAppControl {
         }
         require(!initialized, "ERR-H09 AlreadyInitialized");
 
-        IPoolManager.PoolKey memory key; // todo: finish
+        (bytes memory returnData) = abi.decode(data, (bytes));
+
+        PreOpsReturn memory preOpsReturn = abi.decode(returnData, (PreOpsReturn));
+
+        IPoolManager.PoolKey memory key = preOpsReturn.poolKey;
 
         if (bidToken == IPoolManager.Currency.unwrap(key.currency0)) {
             IPoolManager(v4Singleton).donate(key, bidAmount, 0);
@@ -195,10 +199,6 @@ contract V4DAppControl is DAppControl {
         sequenceLock[sequenceKey] = true;
 
         // NOTE: The code below was previously in the postOps hook
-
-        (bytes memory returnData) = abi.decode(data, (bytes));
-
-        PreOpsReturn memory preOpsReturn = abi.decode(returnData, (PreOpsReturn));
 
         V4DAppControl(hook).releaseLock(preOpsReturn.poolKey);
 
