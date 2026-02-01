@@ -29,7 +29,6 @@ interface IAtlas {
         address control
     )
         external
-        view
         returns (address executionEnvironment, uint32 callConfig, bool exists);
 
     // AtlETH.sol
@@ -48,7 +47,7 @@ interface IAtlas {
     function withdrawSurcharge() external;
     function transferSurchargeRecipient(address newRecipient) external;
     function becomeSurchargeRecipient() external;
-    function setSurchargeRates(uint128 newAtlasRate, uint128 newBundlerRate) external;
+    function setAtlasSurchargeRate(uint256 newAtlasRate) external;
 
     // Permit69.sol
     function transferUserERC20(
@@ -70,7 +69,7 @@ interface IAtlas {
 
     // GasAccounting.sol
     function contribute() external payable;
-    function borrow(uint256 amount) external payable;
+    function borrow(uint256 amount) external;
     function shortfall() external view returns (uint256 gasLiability, uint256 borrowLiability);
     function reconcile(uint256 maxApprovedGasSpend) external payable returns (uint256 owed);
 
@@ -98,7 +97,6 @@ interface IAtlas {
         );
     function solverOpHashes(bytes32 opHash) external view returns (bool);
     function lock() external view returns (address activeEnvironment, uint32 callConfig, uint8 phase);
-    function solverLock() external view returns (uint256);
     function cumulativeSurcharge() external view returns (uint256);
     function surchargeRecipient() external view returns (address);
     function pendingSurchargeRecipient() external view returns (address);
