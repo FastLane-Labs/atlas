@@ -313,7 +313,7 @@ contract SimulatorTest is BaseTest {
     function test_simSolverCall_success_validSolverOutcome_SkipCoverage() public {
         vm.startPrank(solverOneEOA);
         DummySolver solver = new DummySolver(WETH_ADDRESS, address(atlas));
-        atlas.bond(1e18);
+        atlas.commit(1e18);
         vm.stopPrank();
 
         UserOperation memory userOp = validUserOperation().build();
@@ -335,7 +335,7 @@ contract SimulatorTest is BaseTest {
     function test_simSolverCall_success_validSolverOutcome_UserOpValue_SkipCoverage() public {
         vm.startPrank(solverOneEOA);
         DummySolver solver = new DummySolver(WETH_ADDRESS, address(atlas));
-        atlas.bond(1e18);
+        atlas.commit(1e18);
         vm.stopPrank();
 
         UserOperation memory userOp = validUserOperation()
@@ -359,7 +359,7 @@ contract SimulatorTest is BaseTest {
     function test_simSolverCall_fail_bubblesUpSolverOutcomeResult_SkipCoverage() public {
         vm.startPrank(solverOneEOA);
         DummySolver solver = new DummySolver(WETH_ADDRESS, address(atlas));
-        // atlas.bond(1e18); - DO NOT BOND - Triggers InsufficientEscrow error
+        // atlas.commit(1e18); - DO NOT BOND - Triggers InsufficientEscrow error
         vm.stopPrank();
 
         
@@ -382,7 +382,7 @@ contract SimulatorTest is BaseTest {
     function test_simSolverCalls_success_validSolverOutcome_SkipCoverage() public {
         vm.startPrank(solverOneEOA);
         DummySolver solver = new DummySolver(WETH_ADDRESS, address(atlas));
-        atlas.bond(1e18);
+        atlas.commit(1e18);
         vm.stopPrank();
 
         UserOperation memory userOp = validUserOperation().build();
@@ -404,7 +404,7 @@ contract SimulatorTest is BaseTest {
     function test_simSolverCalls_success_validSolverOutcome_UserOpValue_SkipCoverage() public {
         vm.startPrank(solverOneEOA);
         DummySolver solver = new DummySolver(WETH_ADDRESS, address(atlas));
-        atlas.bond(1e18);
+        atlas.commit(1e18);
         vm.stopPrank();
 
         UserOperation memory userOp = validUserOperation()
@@ -441,7 +441,7 @@ contract SimulatorTest is BaseTest {
     function test_simSolverCalls_fail_bubblesUpSolverOutcomeResult_SkipCoverage() public {
         vm.startPrank(solverOneEOA);
         DummySolver solver = new DummySolver(WETH_ADDRESS, address(atlas));
-        // atlas.bond(1e18); - DO NOT BOND - Triggers InsufficientEscrow error
+        // atlas.commit(1e18); - DO NOT BOND - Triggers InsufficientEscrow error
         vm.stopPrank();
 
         UserOperation memory userOp = validUserOperation().build();

@@ -50,14 +50,14 @@ contract MultipleSolversTest is BaseTest, AtlasErrors {
             address(WETH_ADDRESS), address(atlas));
         vm.deal(address(solver1), 10 * solverBidAmount);
         vm.prank(solverOneEOA);
-        atlas.depositAndBond{value: 5 ether}(5 ether);
+        atlas.depositAndCommit{value: 5 ether}(5 ether);
 
         vm.prank(solverTwoEOA);
         solver2 = new MockSolver(
             address(WETH_ADDRESS), address(atlas));
         vm.deal(address(solver2), 10 * solverBidAmount);
         vm.prank(solverTwoEOA);
-        atlas.depositAndBond{value: 5 ether}(5 ether);
+        atlas.depositAndCommit{value: 5 ether}(5 ether);
     }
 
     function buildUserOperation(uint256 signerPK) internal view returns (UserOperation memory) {

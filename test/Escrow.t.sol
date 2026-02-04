@@ -118,7 +118,7 @@ contract EscrowTest is BaseTest {
 
         vm.startPrank(solverOneEOA);
         dummySolver = new DummySolver(address(atlas));
-        atlas.depositAndBond{ value: 1 ether }(1 ether);
+        atlas.depositAndCommit{ value: 1 ether }(1 ether);
         vm.stopPrank();
 
         deal(address(dummySolver), defaultBidAmount);
@@ -323,7 +323,7 @@ contract EscrowTest is BaseTest {
 
     function test_executeSolverOperation_validateSolverOperation_perBlockLimit_SkipCoverage() public {
         vm.prank(solverOneEOA);
-        atlas.unbond(1); // This will set the solver's lastAccessedBlock to the current block
+        atlas.requestUncommit(1); // This will set the solver's lastAccessedBlock to the current block
 
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
         executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.PerBlockLimit), false);
@@ -334,7 +334,7 @@ contract EscrowTest is BaseTest {
         vm.txGasPrice(10e18); // Set a gas price that will cause the solver to run out of escrow
         uint256 solverGasLimit = 1_000_000;
         uint256 maxSolverGasCost = solverGasLimit * tx.gasprice;
-        assertTrue(maxSolverGasCost > atlas.balanceOfBonded(solverOneEOA), "maxSolverGasCost must be greater than solver bonded AtlETH to trigger InsufficientEscrow");
+        assertTrue(maxSolverGasCost > atlas.balanceOfCommitted(solverOneEOA), "maxSolverGasCost must be greater than solver bonded AtlETH to trigger InsufficientEscrow");
 
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
         solverOps[0] = validSolverOperation(userOp)

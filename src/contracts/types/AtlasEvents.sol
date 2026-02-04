@@ -12,9 +12,9 @@ contract AtlasEvents {
     );
 
     // AtlETH
-    event Bond(address indexed owner, uint256 amount);
-    event Unbond(address indexed owner, uint256 amount, uint256 earliestAvailable);
-    event Redeem(address indexed owner, uint256 amount);
+    event Commit(address indexed owner, uint256 amount);
+    event UncommitRequested(address indexed owner, uint256 amount, uint256 earliestAvailable);
+    event UncommitCompleted(address indexed owner, uint256 amount);
     event Mint(address indexed to, uint256 amount);
     event Burn(address indexed from, uint256 amount);
 

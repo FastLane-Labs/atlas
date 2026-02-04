@@ -112,7 +112,7 @@ contract SolverOperationBuilder is Test {
         return this;
     }
 
-    function depositAndBondAtlEth(
+    function depositAndCommitAtlEth(
         address from,
         address atlas,
         uint256 amount
@@ -121,13 +121,13 @@ contract SolverOperationBuilder is Test {
         returns (SolverOperationBuilder)
     {
         vm.prank(from);
-        IAtlas(atlas).depositAndBond{ value: amount }(amount);
+        IAtlas(atlas).depositAndCommit{ value: amount }(amount);
         return this;
     }
 
-    function depositAndBondAtlEth(address atlas, uint256 amount) public returns (SolverOperationBuilder) {
+    function depositAndCommitAtlEth(address atlas, uint256 amount) public returns (SolverOperationBuilder) {
         vm.prank(solverOperation.from);
-        IAtlas(atlas).depositAndBond{ value: amount }(amount);
+        IAtlas(atlas).depositAndCommit{ value: amount }(amount);
         return this;
     }
 

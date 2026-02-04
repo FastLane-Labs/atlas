@@ -51,7 +51,7 @@ contract StorageTest is BaseTest {
 
         vm.deal(userEOA, depositAmount);
         vm.prank(userEOA);
-        atlas.depositAndBond{ value: depositAmount }(depositAmount);
+        atlas.depositAndCommit{ value: depositAmount }(depositAmount);
 
         assertEq(atlas.bondedTotalSupply(), depositAmount, "bondedTotalSupply did not increase correctly");
     }
@@ -74,7 +74,7 @@ contract StorageTest is BaseTest {
 
         vm.deal(userEOA, depositAmount);
         vm.prank(userEOA);
-        atlas.depositAndBond{ value: depositAmount }(depositAmount);
+        atlas.depositAndCommit{ value: depositAmount }(depositAmount);
 
         (bonded, lastAccessedBlock, auctionWins, auctionFails, totalGasValueUsed) = atlas.accessData(userEOA);
 
@@ -85,7 +85,7 @@ contract StorageTest is BaseTest {
         assertEq(totalGasValueUsed, 0, "user totalGasValueUsed should still be 0");
 
         vm.prank(userEOA);
-        atlas.unbond(depositAmount);
+        atlas.requestUncommit(depositAmount);
 
         (bonded, lastAccessedBlock, auctionWins, auctionFails, totalGasValueUsed) = atlas.accessData(userEOA);
 

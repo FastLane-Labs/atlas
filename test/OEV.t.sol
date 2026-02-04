@@ -111,7 +111,7 @@ contract OEVTest is BaseTest {
         vm.startPrank(solverOneEOA);
         LiquidationOEVSolver liquidationSolver = new LiquidationOEVSolver(WETH_ADDRESS, address(atlas));
         atlas.deposit{ value: 1e18 }();
-        atlas.bond(1e18);
+        atlas.commit(1e18);
         vm.stopPrank();
 
         assertTrue(chainlinkDAppControl.isChainlinkWrapper(address(chainlinkAtlasWrapper)), "Wrapper should be registered on DAppControl - otherwise will revert in allocateValue");

@@ -115,7 +115,7 @@ contract OEVTest is BaseTest {
         vm.startPrank(solverOneEOA);
         LiquidationOEVSolver liquidationSolver = new LiquidationOEVSolver(WETH_ADDRESS, address(atlas));
         atlas.deposit{ value: 1e18 }();
-        atlas.bond(1e18);
+        atlas.commit(1e18);
         vm.stopPrank();
 
         (bytes memory report, bytes32[] memory rs, bytes32[] memory ss, bytes32 rawVs)

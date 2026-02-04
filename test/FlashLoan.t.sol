@@ -54,7 +54,7 @@ contract FlashLoanTest is BaseTest {
         vm.startPrank(solverOneEOA);
         SimpleSolver solver = new SimpleSolver(WETH_ADDRESS, address(atlas));
         deal(WETH_ADDRESS, address(solver), 1e18); // 1 WETH to solver to pay bid
-        atlas.bond(1 ether); // gas for solver to pay
+        atlas.commit(1 ether); // gas for solver to pay
         vm.stopPrank();
 
         vm.startPrank(userEOA);
@@ -228,10 +228,10 @@ contract FlashLoanTest is BaseTest {
 
         userBefore.eth = address(userEOA).balance;
         userBefore.atlETH = atlas.balanceOf(userEOA);
-        userBefore.bonded = atlas.balanceOfBonded(userEOA);
+        userBefore.bonded = atlas.balanceOfCommitted(userEOA);
 
         assertEq(solverStartingTotal, 1e18, "solver incorrect starting WETH");
-        solverStartingTotal += (atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
+        solverStartingTotal += (atlas.balanceOf(solverOneEOA) + atlas.balanceOfCommitted(solverOneEOA));
 
         assertEq(atlasStartingETH, 104e18, "atlas incorrect starting ETH"); // 4e from solvers + 100e user deposit
 
@@ -259,14 +259,14 @@ contract FlashLoanTest is BaseTest {
 
         {
             console.log("solverStartingTotal:  ", solverStartingTotal);
-            console.log("solverEndingTotal  :  ", WETH.balanceOf(address(solver)) + atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
-            solverStartingTotal -= (WETH.balanceOf(address(solver)) + atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
+            console.log("solverEndingTotal  :  ", WETH.balanceOf(address(solver)) + atlas.balanceOf(solverOneEOA) + atlas.balanceOfCommitted(solverOneEOA));
+            solverStartingTotal -= (WETH.balanceOf(address(solver)) + atlas.balanceOf(solverOneEOA) + atlas.balanceOfCommitted(solverOneEOA));
             console.log("solverDeltaTotal   :  ", solverStartingTotal);
         }
 
         userAfter.eth = address(userEOA).balance;
         userAfter.atlETH = atlas.balanceOf(userEOA);
-        userAfter.bonded = atlas.balanceOfBonded(userEOA);
+        userAfter.bonded = atlas.balanceOfCommitted(userEOA);
 
         {
             console.log("userStartingTotal  :", userBefore.eth + userBefore.atlETH + userBefore.bonded);

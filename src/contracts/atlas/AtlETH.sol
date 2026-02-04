@@ -32,17 +32,17 @@ abstract contract AtlETH is Permit69 {
         return uint256(s_balanceOf[account].balance);
     }
 
-    /// @notice Returns the bonded AtlETH balance of the specified account.
-    /// @param account The address for which to query the bonded AtlETH balance.
-    /// @return The bonded AtlETH balance of the specified account.
-    function balanceOfBonded(address account) external view returns (uint256) {
+    /// @notice Returns the committed AtlETH balance of the specified account.
+    /// @param account The address for which to query the committed AtlETH balance.
+    /// @return The committed AtlETH balance of the specified account.
+    function balanceOfCommitted(address account) external view returns (uint256) {
         return uint256(S_accessData[account].bonded);
     }
 
-    /// @notice Returns the unbonding AtlETH balance of the specified account.
-    /// @param account The address for which to query the unbonding AtlETH balance.
-    /// @return The unbonding AtlETH balance of the specified account.
-    function balanceOfUnbonding(address account) external view returns (uint256) {
+    /// @notice Returns the uncommitting AtlETH balance of the specified account.
+    /// @param account The address for which to query the uncommitting AtlETH balance.
+    /// @return The uncommitting AtlETH balance of the specified account.
+    function balanceOfUncommitting(address account) external view returns (uint256) {
         return uint256(s_balanceOf[account].unbonding);
     }
 
@@ -53,10 +53,10 @@ abstract contract AtlETH is Permit69 {
         return uint256(S_accessData[account].lastAccessedBlock);
     }
 
-    /// @notice Returns the block number at which the unbonding process of the specified account will be completed.
-    /// @param account The address for which to query the completion block of unbonding.
-    /// @return The block number at which the unbonding process of the specified account will be completed.
-    function unbondingCompleteBlock(address account) external view returns (uint256) {
+    /// @notice Returns the block number at which the uncommitting process of the specified account will be completed.
+    /// @param account The address for which to query the completion block of uncommitting.
+    /// @return The block number at which the uncommitting process of the specified account will be completed.
+    function uncommitCompleteBlock(address account) external view returns (uint256) {
         uint256 _lastAccessedBlock = uint256(S_accessData[account].lastAccessedBlock);
         if (_lastAccessedBlock == 0) return 0;
         return _lastAccessedBlock + ESCROW_DURATION;
@@ -132,43 +132,43 @@ abstract contract AtlETH is Permit69 {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    EXTERNAL BOND/UNBOND LOGIC
+                    EXTERNAL COMMIT/UNCOMMIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Puts a "hold" on a solver's AtlETH, enabling it to be used in Atlas transactions.
-    /// @dev This function locks the specified amount of AtlETH tokens for the sender, making them bonded.
-    /// Bonded AtlETH tokens must first be unbonded before they can be transferred or withdrawn.
-    /// @param amount The amount of AtlETH tokens to bond.
-    function bond(uint256 amount) external {
-        _bond(msg.sender, amount);
+    /// @dev This function locks the specified amount of AtlETH tokens for the sender, making them committed.
+    /// Committed AtlETH tokens must first be uncommitted before they can be transferred or withdrawn.
+    /// @param amount The amount of AtlETH tokens to commit.
+    function commit(uint256 amount) external {
+        _commit(msg.sender, amount);
     }
 
-    /// @notice Deposits the caller's ETH and mints AtlETH, then bonds a specified amount of that AtlETH.
-    /// @param amountToBond The amount of AtlETH tokens to bond after the deposit.
-    function depositAndBond(uint256 amountToBond) external payable {
+    /// @notice Deposits the caller's ETH and mints AtlETH, then commits a specified amount of that AtlETH.
+    /// @param amountToCommit The amount of AtlETH tokens to commit after the deposit.
+    function depositAndCommit(uint256 amountToCommit) external payable {
         _mint(msg.sender, msg.value);
-        _bond(msg.sender, amountToBond);
+        _commit(msg.sender, amountToCommit);
     }
 
-    /// @notice Starts the unbonding wait time for the specified amount of AtlETH tokens.
-    /// @dev This function initiates the unbonding process for the specified amount of AtlETH tokens
-    /// held by the sender. Unbonding AtlETH tokens can still be used by solvers while the unbonding
+    /// @notice Starts the uncommitting wait time for the specified amount of AtlETH tokens.
+    /// @dev This function initiates the uncommitting process for the specified amount of AtlETH tokens
+    /// held by the sender. Uncommitting AtlETH tokens can still be used by solvers while the uncommitting
     /// process is ongoing, but adjustments may be made at withdrawal to ensure solvency.
-    /// @param amount The amount of AtlETH tokens to unbond.
-    function unbond(uint256 amount) external {
+    /// @param amount The amount of AtlETH tokens to request uncommit for.
+    function requestUncommit(uint256 amount) external {
         _checkIfUnlocked();
-        _unbond(msg.sender, amount);
+        _requestUncommit(msg.sender, amount);
     }
 
     /// @notice Redeems the specified amount of AtlETH tokens for withdrawal.
-    /// @param amount The amount of AtlETH tokens to redeem for withdrawal.
-    function redeem(uint256 amount) external {
+    /// @param amount The amount of AtlETH tokens to complete uncommit for.
+    function completeUncommit(uint256 amount) external {
         _checkIfUnlocked();
-        _redeem(msg.sender, amount);
+        _completeUncommit(msg.sender, amount);
     }
 
     /*//////////////////////////////////////////////////////////////
-                    INTERNAL BOND/UNBOND LOGIC
+                    INTERNAL COMMIT/UNCOMMIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Puts a hold on a solver's AtlETH tokens, enabling them to be used in Atlas transactions.
@@ -177,7 +177,7 @@ abstract contract AtlETH is Permit69 {
     /// and added to the bonded balance. The total supply and bonded total supply are updated accordingly.
     /// @param owner The address of the account to put a hold on AtlETH tokens for.
     /// @param amount The amount of AtlETH tokens to put a hold on.
-    function _bond(address owner, uint256 amount) internal {
+    function _commit(address owner, uint256 amount) internal {
         uint112 _amt = SafeCast.toUint112(amount);
 
         s_balanceOf[owner].balance -= _amt;
@@ -186,16 +186,16 @@ abstract contract AtlETH is Permit69 {
         S_accessData[owner].bonded += _amt;
         S_bondedTotalSupply += amount;
 
-        emit Bond(owner, amount);
+        emit Commit(owner, amount);
     }
 
-    /// @notice Starts the unbonding wait time for a specified amount of AtlETH tokens.
-    /// @dev This internal function starts the unbonding wait time for a specified amount of AtlETH tokens.
+    /// @notice Starts the uncommitting wait time for a specified amount of AtlETH tokens.
+    /// @dev This internal function starts the uncommitting wait time for a specified amount of AtlETH tokens.
     /// The specified amount of AtlETH tokens is deducted from the owner's bonded balance and added to the
     /// unbonding balance. The last accessed block for the owner is updated to the current block number.
-    /// @param owner The address of the account to start the unbonding wait time for.
-    /// @param amount The amount of AtlETH tokens to start the unbonding wait time for.
-    function _unbond(address owner, uint256 amount) internal {
+    /// @param owner The address of the account to start the uncommitting wait time for.
+    /// @param amount The amount of AtlETH tokens to start the uncommitting wait time for.
+    function _requestUncommit(address owner, uint256 amount) internal {
         uint112 _amt = SafeCast.toUint112(amount);
 
         // totalSupply and totalBondedSupply are unaffected; continue to count the
@@ -209,17 +209,17 @@ abstract contract AtlETH is Permit69 {
 
         s_balanceOf[owner].unbonding += _amt;
 
-        emit Unbond(owner, amount, SafeBlockNumber.get() + ESCROW_DURATION + 1);
+        emit UncommitRequested(owner, amount, SafeBlockNumber.get() + ESCROW_DURATION + 1);
     }
 
     /// @notice Redeems the specified amount of AtlETH tokens for withdrawal.
     /// @dev This function allows the owner to redeem a specified amount of AtlETH tokens
-    /// for withdrawal. If the unbonding process is active for the specified account, the
+    /// for withdrawal. If the uncommitting process is active for the specified account, the
     /// function will revert. Otherwise, the specified amount of AtlETH tokens will be added
     /// back to the account's balance, and the total supply will be updated accordingly.
     /// @param owner The address of the account redeeming AtlETH tokens for withdrawal.
     /// @param amount The amount of AtlETH tokens to redeem for withdrawal.
-    function _redeem(address owner, uint256 amount) internal {
+    function _completeUncommit(address owner, uint256 amount) internal {
         if (SafeBlockNumber.get() <= uint256(S_accessData[owner].lastAccessedBlock) + ESCROW_DURATION) {
             revert EscrowLockActive();
         }
@@ -234,7 +234,7 @@ abstract contract AtlETH is Permit69 {
         s_bData.balance += _amt;
         S_totalSupply += amount;
 
-        emit Redeem(owner, amount);
+        emit UncommitCompleted(owner, amount);
     }
 
     /// @notice Allows the current surcharge recipient to withdraw the accumulated surcharge. NOTE: If the only ETH in
