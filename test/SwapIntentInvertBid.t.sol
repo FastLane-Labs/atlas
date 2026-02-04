@@ -179,7 +179,7 @@ contract SwapIntentTest is BaseTest {
         SimpleRFQSolverInvertBid rfqSolver =
             new SimpleRFQSolverInvertBid(WETH_ADDRESS, address(atlas), solverBidRetreivalRequired);
         atlas.deposit{ value: 1e18 }();
-        atlas.bond(1 ether);
+        atlas.commit(1 ether);
         vm.stopPrank();
 
         deal(DAI_ADDRESS, address(rfqSolver), swapIntent.amountUserBuys);

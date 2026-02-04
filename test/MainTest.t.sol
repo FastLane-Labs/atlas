@@ -96,10 +96,10 @@ contract MainTest is BaseTest {
         console.log("solverOne    WETH:", WETH.balanceOf(address(solverOne)));
 
         vm.prank(address(solverOneEOA));
-        atlas.bond(1 ether);
+        atlas.commit(1 ether);
 
         vm.prank(address(solverTwoEOA));
-        atlas.bond(1 ether);
+        atlas.commit(1 ether);
 
         // First SolverOperation
         solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
@@ -384,7 +384,7 @@ contract MainTest is BaseTest {
         bytes32 s;
 
         vm.prank(solverOneEOA);
-        atlas.bond(1 ether);
+        atlas.commit(1 ether);
 
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         // User does not sign their own operation when bundling
@@ -455,10 +455,10 @@ contract MainTest is BaseTest {
         // Success case
 
         vm.prank(address(solverOneEOA));
-        atlas.bond(1 ether);
+        atlas.commit(1 ether);
 
         vm.prank(address(solverTwoEOA));
-        atlas.bond(1 ether);
+        atlas.commit(1 ether);
 
         bytes memory solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
         solverOps[0] = helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), 2e17, 0);
@@ -508,7 +508,7 @@ contract MainTest is BaseTest {
         address beneficiary = makeAddr("beneficiary");
 
         vm.prank(solverOneEOA);
-        atlas.bond(1 ether);
+        atlas.commit(1 ether);
 
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         // User does not sign their own operation when bundling
@@ -524,7 +524,7 @@ contract MainTest is BaseTest {
         dAppOp.signature = abi.encodePacked(r, s, v);
         uint256 gasLim = _gasLim(userOp, solverOps);
 
-        uint256 bondedBalanceBefore = atlas.balanceOfBonded(beneficiary);
+        uint256 bondedBalanceBefore = atlas.balanceOfCommitted(beneficiary);
 
         console.log("Beneficiary's balance before metacall", beneficiary.balance);
         console.log("Beneficiary's AtlETH bonded balance before metacall", bondedBalanceBefore);
@@ -537,7 +537,7 @@ contract MainTest is BaseTest {
         atlas.metacall{gas: gasLim}(userOp, solverOps, dAppOp, beneficiary);
         vm.stopPrank();
 
-        uint256 bondedBalanceAfter = atlas.balanceOfBonded(beneficiary);
+        uint256 bondedBalanceAfter = atlas.balanceOfCommitted(beneficiary);
 
         console.log("Beneficiary's balance after metacall", beneficiary.balance);
         console.log("Beneficiary's AtlETH bonded balance after metacall", bondedBalanceAfter);
@@ -561,7 +561,7 @@ contract MainTest is BaseTest {
     //     address beneficiary = makeAddr("beneficiary");
 
     //     vm.prank(solverOneEOA);
-    //     atlas.bond(1 ether);
+    //     atlas.commit(1 ether);
 
     //     UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
     //     // User does not sign their own operation when bundling
@@ -577,7 +577,7 @@ contract MainTest is BaseTest {
     //     dAppOp.signature = abi.encodePacked(r, s, v);
     //     uint256 gasLim = _gasLim(userOp, solverOps);
 
-    //     uint256 bondedBalanceBefore = atlas.balanceOfBonded(beneficiary);
+    //     uint256 bondedBalanceBefore = atlas.balanceOfCommitted(beneficiary);
 
     //     console.log("Beneficiary's balance before metacall", beneficiary.balance);
     //     console.log("Beneficiary's AtlETH bonded balance before metacall", bondedBalanceBefore);
@@ -590,7 +590,7 @@ contract MainTest is BaseTest {
     //     atlas.metacall{gas: gasLim}(userOp, solverOps, dAppOp, beneficiary);
     //     vm.stopPrank();
 
-    //     uint256 bondedBalanceAfter = atlas.balanceOfBonded(beneficiary);
+    //     uint256 bondedBalanceAfter = atlas.balanceOfCommitted(beneficiary);
     //     console.log("Beneficiary's balance after metacall", beneficiary.balance);
     //     console.log("Beneficiary's AtlETH bonded balance after metacall", bondedBalanceAfter);
 

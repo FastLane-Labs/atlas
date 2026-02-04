@@ -46,13 +46,13 @@ contract MultipleSolversLockStateTest is BaseTest, AtlasErrors, AtlasConstants {
         solver1 = new MockSolver(address(WETH_ADDRESS), address(atlas));
         vm.deal(address(solver1), 10 * solverBidAmount);
         vm.prank(solverOneEOA);
-        atlas.depositAndBond{value: 5 ether}(5 ether);
+        atlas.depositAndCommit{value: 5 ether}(5 ether);
 
         vm.prank(solverTwoEOA);
         solver2 = new MockSolver(address(WETH_ADDRESS), address(atlas));
         vm.deal(address(solver2), 10 * solverBidAmount);
         vm.prank(solverTwoEOA);
-        atlas.depositAndBond{value: 5 ether}(5 ether);
+        atlas.depositAndCommit{value: 5 ether}(5 ether);
     }
 
     // Helper function to convert uint256 to binary string, focusing on relevant bits

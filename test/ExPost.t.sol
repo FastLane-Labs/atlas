@@ -95,10 +95,10 @@ contract ExPostTest is BaseTest {
         console.log("solverOneXP  WETH:", WETH.balanceOf(address(solverOneXP)));
 
         vm.prank(address(solverOneEOA));
-        atlas.bond(1 ether);
+        atlas.commit(1 ether);
 
         vm.prank(address(solverTwoEOA));
-        atlas.bond(1 ether);
+        atlas.commit(1 ether);
 
         // First SolverOperation
         solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
@@ -317,7 +317,7 @@ contract ExPostTest is BaseTest {
             deal(TOKEN_ONE, address(solverXPs[i]), 10e24);
             vm.startPrank(address(solverEOAs[i]));
             atlas.deposit{ value: 1e18 }();
-            atlas.bond(1 ether);
+            atlas.commit(1 ether);
             vm.stopPrank();
         }
         uint8 v;

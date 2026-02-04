@@ -455,14 +455,14 @@ contract TrebleSwapTest is BaseTest {
     {
         vm.startPrank(solverEOA);
         // Make sure solver has 1 AtlETH bonded in Atlas
-        uint256 bonded = atlas.balanceOfBonded(solverEOA);
+        uint256 bonded = atlas.balanceOfCommitted(solverEOA);
         if (bonded < 1e18) {
             uint256 atlETHBalance = atlas.balanceOf(solverEOA);
             if (atlETHBalance < 1e18) {
                 deal(solverEOA, 1e18 - atlETHBalance);
                 atlas.deposit{ value: 1e18 - atlETHBalance }();
             }
-            atlas.bond(1e18 - bonded);
+            atlas.commit(1e18 - bonded);
         }
 
         // Deploy solver contract

@@ -34,16 +34,16 @@ interface IAtlas {
 
     // AtlETH.sol
     function balanceOf(address account) external view returns (uint256);
-    function balanceOfBonded(address account) external view returns (uint256);
-    function balanceOfUnbonding(address account) external view returns (uint256);
+    function balanceOfCommitted(address account) external view returns (uint256);
+    function balanceOfUncommitting(address account) external view returns (uint256);
     function accountLastActiveBlock(address account) external view returns (uint256);
-    function unbondingCompleteBlock(address account) external view returns (uint256);
+    function uncommitCompleteBlock(address account) external view returns (uint256);
     function deposit() external payable;
     function withdraw(uint256 amount) external;
-    function bond(uint256 amount) external;
-    function depositAndBond(uint256 amountToBond) external payable;
-    function unbond(uint256 amount) external;
-    function redeem(uint256 amount) external;
+    function commit(uint256 amount) external;
+    function depositAndCommit(uint256 amountToCommit) external payable;
+    function requestUncommit(uint256 amount) external;
+    function completeUncommit(uint256 amount) external;
 
     function withdrawSurcharge() external;
     function transferSurchargeRecipient(address newRecipient) external;

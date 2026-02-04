@@ -107,7 +107,7 @@ contract SorterTest is BaseTest {
 
     function test_sorter_singleOpValid() public {
         SolverOperation[] memory solverOps = new SolverOperation[](1);
-        solverOps[0] = validSolverOperation(solverOnePK, 10).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[0] = validSolverOperation(solverOnePK, 10).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
 
         SolverOperation[] memory sortedOps = sorter.sortBids(userOp, solverOps);
         validateSortedOps(sortedOps, 1);
@@ -115,12 +115,12 @@ contract SorterTest is BaseTest {
 
     function test_sorter_allOpsValid_evenNumber() public {
         SolverOperation[] memory solverOps = new SolverOperation[](6);
-        solverOps[0] = validSolverOperation(solverOnePK, 190).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
-        solverOps[1] = validSolverOperation(solverTwoPK, 130).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
-        solverOps[2] = validSolverOperation(solverThreePK, 110).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
-        solverOps[3] = validSolverOperation(solverFourPK, 150).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
-        solverOps[4] = validSolverOperation(solverFivePK, 140).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
-        solverOps[5] = validSolverOperation(solverSixPK, 180).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[0] = validSolverOperation(solverOnePK, 190).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[1] = validSolverOperation(solverTwoPK, 130).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[2] = validSolverOperation(solverThreePK, 110).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[3] = validSolverOperation(solverFourPK, 150).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[4] = validSolverOperation(solverFivePK, 140).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[5] = validSolverOperation(solverSixPK, 180).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
 
         SolverOperation[] memory sortedOps = sorter.sortBids(userOp, solverOps);
         validateSortedOps(sortedOps, 6);
@@ -128,13 +128,13 @@ contract SorterTest is BaseTest {
 
     function test_sorter_allOpsValid_OddNumber() public {
         SolverOperation[] memory solverOps = new SolverOperation[](7);
-        solverOps[0] = validSolverOperation(solverOnePK, 200).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
-        solverOps[1] = validSolverOperation(solverTwoPK, 250).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
-        solverOps[2] = validSolverOperation(solverThreePK, 210).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
-        solverOps[3] = validSolverOperation(solverFourPK, 220).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
-        solverOps[4] = validSolverOperation(solverFivePK, 270).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
-        solverOps[5] = validSolverOperation(solverSixPK, 280).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
-        solverOps[6] = validSolverOperation(solverSevenPK, 230).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[0] = validSolverOperation(solverOnePK, 200).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[1] = validSolverOperation(solverTwoPK, 250).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[2] = validSolverOperation(solverThreePK, 210).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[3] = validSolverOperation(solverFourPK, 220).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[4] = validSolverOperation(solverFivePK, 270).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[5] = validSolverOperation(solverSixPK, 280).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[6] = validSolverOperation(solverSevenPK, 230).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
 
         SolverOperation[] memory sortedOps = sorter.sortBids(userOp, solverOps);
         validateSortedOps(sortedOps, 7);
@@ -142,12 +142,12 @@ contract SorterTest is BaseTest {
 
     function test_sorter_mixedOpsValidity_1() public {
         SolverOperation[] memory solverOps = new SolverOperation[](7);
-        solverOps[0] = validSolverOperation(solverOnePK, 310).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[0] = validSolverOperation(solverOnePK, 310).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
         solverOps[1] = validSolverOperation(solverTwoPK, 350).build(); // No AtlEth bonded
-        solverOps[2] = validSolverOperation(solverThreePK, 380).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[2] = validSolverOperation(solverThreePK, 380).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
         solverOps[3] = validSolverOperation(solverFourPK, 300).build(); // No AtlEth bonded
-        solverOps[4] = validSolverOperation(solverFivePK, 340).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
-        solverOps[5] = validSolverOperation(solverSixPK, 390).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[4] = validSolverOperation(solverFivePK, 340).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[5] = validSolverOperation(solverSixPK, 390).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
         solverOps[6] = validSolverOperation(solverSevenPK, 320).build(); // No AtlEth bonded
 
         SolverOperation[] memory sortedOps = sorter.sortBids(userOp, solverOps);
@@ -157,33 +157,33 @@ contract SorterTest is BaseTest {
     function test_sorter_mixedOpsValidity_2() public {
         SolverOperation[] memory solverOps = new SolverOperation[](7);
         solverOps[0] = validSolverOperation(solverOnePK, 450)
-            .depositAndBondAtlEth(address(atlas), atlEthToBond)
+            .depositAndCommitAtlEth(address(atlas), atlEthToBond)
             .withUserOpHash("invalid") // Invalid userOpHash
             .signAndBuild(address(atlasVerification), solverOnePK);
 
         solverOps[1] = validSolverOperation(solverTwoPK, 480).build(); // No AtlEth bonded
 
         // This is the only valid solverOp
-        solverOps[2] = validSolverOperation(solverThreePK, 420).depositAndBondAtlEth(address(atlas), atlEthToBond).build();
+        solverOps[2] = validSolverOperation(solverThreePK, 420).depositAndCommitAtlEth(address(atlas), atlEthToBond).build();
 
         solverOps[3] = validSolverOperation(solverFourPK, 410)
-            .depositAndBondAtlEth(address(atlas), atlEthToBond)
+            .depositAndCommitAtlEth(address(atlas), atlEthToBond)
             .withBidToken(address(1)) // Invalid bidToken
             .signAndBuild(address(atlasVerification), solverFourPK);
 
         vm.startPrank(solverFiveEOA);
-        atlas.depositAndBond{value: atlEthToBond}(atlEthToBond);
-        atlas.unbond(1); // This will set the solver's lastAccessedBlock to the current block
+        atlas.depositAndCommit{value: atlEthToBond}(atlEthToBond);
+        atlas.requestUncommit(1); // This will set the solver's lastAccessedBlock to the current block
         vm.stopPrank();
         solverOps[4] = validSolverOperation(solverFivePK, 490).build();
 
         solverOps[5] = validSolverOperation(solverSixPK, 440)
-            .depositAndBondAtlEth(address(atlas), atlEthToBond)
+            .depositAndCommitAtlEth(address(atlas), atlEthToBond)
             .withControl(address(0)) // Invalid dAppControl
             .signAndBuild(address(atlasVerification), solverSixPK);
 
         solverOps[6] = validSolverOperation(solverSevenPK, 460)
-            .depositAndBondAtlEth(address(atlas), atlEthToBond)
+            .depositAndCommitAtlEth(address(atlas), atlEthToBond)
             .withMaxFeePerGas(userOp.maxFeePerGas - 1) // Invalid maxFeePerGas
             .signAndBuild(address(atlasVerification), solverSevenPK);
 

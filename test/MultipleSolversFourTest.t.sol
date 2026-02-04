@@ -56,28 +56,28 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
             address(WETH_ADDRESS), address(atlas));
         vm.deal(address(solver1), 10 * solverBidAmount);
         vm.prank(solverOneEOA);
-        atlas.depositAndBond{value: 5 ether}(5 ether);
+        atlas.depositAndCommit{value: 5 ether}(5 ether);
 
         vm.prank(solverTwoEOA);
         solver2 = new MockSolver(
             address(WETH_ADDRESS), address(atlas));
         vm.deal(address(solver2), 10 * solverBidAmount);
         vm.prank(solverTwoEOA);
-        atlas.depositAndBond{value: 5 ether}(5 ether);
+        atlas.depositAndCommit{value: 5 ether}(5 ether);
 
         vm.prank(solverThreeEOA);
         solver3 = new MockSolver(
             address(WETH_ADDRESS), address(atlas));
         vm.deal(address(solver3), 10 * solverBidAmount);
         vm.prank(solverThreeEOA);
-        atlas.depositAndBond{value: 5 ether}(5 ether);
+        atlas.depositAndCommit{value: 5 ether}(5 ether);
 
         vm.prank(solverFourEOA);
         solver4 = new MockSolver(
             address(WETH_ADDRESS), address(atlas));
         vm.deal(address(solver4), 10 * solverBidAmount);
         vm.prank(solverFourEOA);
-        atlas.depositAndBond{value: 5 ether}(5 ether);
+        atlas.depositAndCommit{value: 5 ether}(5 ether);
     }
 
     function buildUserOperation(uint256 signerPK) internal view returns (UserOperation memory) {
@@ -462,10 +462,10 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         uint256 bundlerBalanceBefore = address(bundler).balance;
 
         // Track initial balances
-        uint256 solver1InitialBalance = atlas.balanceOfBonded(address(solverOneEOA));
-        uint256 solver2InitialBalance = atlas.balanceOfBonded(address(solverTwoEOA));
-        uint256 solver3InitialBalance = atlas.balanceOfBonded(address(solverThreeEOA));
-        uint256 solver4InitialBalance = atlas.balanceOfBonded(address(solverFourEOA));
+        uint256 solver1InitialBalance = atlas.balanceOfCommitted(address(solverOneEOA));
+        uint256 solver2InitialBalance = atlas.balanceOfCommitted(address(solverTwoEOA));
+        uint256 solver3InitialBalance = atlas.balanceOfCommitted(address(solverThreeEOA));
+        uint256 solver4InitialBalance = atlas.balanceOfCommitted(address(solverFourEOA));
 
         vm.prank(bundler);
         bool auctionWon = atlas.metacall{gas: metacallGasLimit}(userOp, solverOps, dappOp, address(0));
@@ -483,10 +483,10 @@ contract MultipleSolversFourTest is BaseTest, AtlasErrors {
         assertEq(solver4.counter(), (!solver4BidPattern.isReverting && !solver4BidPattern.isRevertingBundlerFault) ? 1 : 0, "solver4 counter should be 1 if not reverted");
 
         // Track final bonded balances and calculate gas payments
-        uint256 solver1FinalBalance = atlas.balanceOfBonded(address(solverOneEOA));
-        uint256 solver2FinalBalance = atlas.balanceOfBonded(address(solverTwoEOA));
-        uint256 solver3FinalBalance = atlas.balanceOfBonded(address(solverThreeEOA));
-        uint256 solver4FinalBalance = atlas.balanceOfBonded(address(solverFourEOA));
+        uint256 solver1FinalBalance = atlas.balanceOfCommitted(address(solverOneEOA));
+        uint256 solver2FinalBalance = atlas.balanceOfCommitted(address(solverTwoEOA));
+        uint256 solver3FinalBalance = atlas.balanceOfCommitted(address(solverThreeEOA));
+        uint256 solver4FinalBalance = atlas.balanceOfCommitted(address(solverFourEOA));
 
         uint256 solver1GasPayment = solver1InitialBalance - solver1FinalBalance;
         uint256 solver2GasPayment = solver2InitialBalance - solver2FinalBalance;

@@ -60,8 +60,8 @@ contract AtlETHTest is BaseTest {
         // Test withdraw 2x AtlETH balance - should revert with custom error
         vm.revertTo(snapshot);
         vm.startPrank(solverTwoEOA);
-        atlas.bond(1e18);
-        atlas.unbond(1e18);
+        atlas.commit(1e18);
+        atlas.requestUncommit(1e18);
         vm.expectRevert(abi.encodeWithSelector(AtlasErrors.InsufficientBalanceForDeduction.selector, 0, 2e18));
         atlas.withdraw(solverTwoAtlETH * 2);
         vm.stopPrank();
@@ -69,127 +69,127 @@ contract AtlETHTest is BaseTest {
         // Test withdraw after unbonding and waiting the escrow duration
         vm.revertTo(snapshot);
         vm.startPrank(solverTwoEOA);
-        atlas.bond(1e18);
-        atlas.unbond(1e18);
+        atlas.commit(1e18);
+        atlas.requestUncommit(1e18);
         vm.stopPrank();
 
-        assertEq(atlas.balanceOfUnbonding(solverTwoEOA), 1e18, "unbonding atleth should be 1 ETH");
+        assertEq(atlas.balanceOfUncommitting(solverTwoEOA), 1e18, "unbonding atleth should be 1 ETH");
         vm.roll(block.number + atlas.ESCROW_DURATION() + 1);
-        assertEq(atlas.balanceOfUnbonding(solverTwoEOA), 1e18, "unbonding atleth should still be 1 ETH");
+        assertEq(atlas.balanceOfUncommitting(solverTwoEOA), 1e18, "unbonding atleth should still be 1 ETH");
         solverEthBalanceBefore = address(solverTwoEOA).balance;
 
         vm.prank(solverTwoEOA);
         atlas.withdraw(solverTwoAtlETH);
 
         assertEq(atlas.balanceOf(solverTwoEOA), 0, "solverTwo's atlETH balance should be 0");
-        assertEq(atlas.balanceOfUnbonding(solverTwoEOA), 0, "unbonding atleth should be 0");
+        assertEq(atlas.balanceOfUncommitting(solverTwoEOA), 0, "unbonding atleth should be 0");
         assertEq(address(solverTwoEOA).balance, solverEthBalanceBefore + 1e18, "solverTwo's ETH balance should be 1 ETH more");
     }
 
     function test_atleth_bond() public {
         assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
-        assertEq(atlas.balanceOfBonded(solverOneEOA), 0, "solverOne's bonded atlETH should be 0");
+        assertEq(atlas.balanceOfCommitted(solverOneEOA), 0, "solverOne's bonded atlETH should be 0");
         assertEq(atlas.bondedTotalSupply(), 0, "total bonded atlETH supply should be 0");
 
         vm.prank(solverOneEOA);
         vm.expectRevert(); // Underflow error
-        atlas.bond(2e18);
+        atlas.commit(2e18);
 
         vm.prank(solverOneEOA);
         vm.expectEmit(true, true, false, true);
-        emit AtlasEvents.Bond(solverOneEOA, 1e18);
-        atlas.bond(1e18);
+        emit AtlasEvents.Commit(solverOneEOA, 1e18);
+        atlas.commit(1e18);
 
         assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
-        assertEq(atlas.balanceOfBonded(solverOneEOA), 1e18, "solverOne's bonded atlETH should be 1 ETH");
+        assertEq(atlas.balanceOfCommitted(solverOneEOA), 1e18, "solverOne's bonded atlETH should be 1 ETH");
         assertEq(atlas.bondedTotalSupply(), 1e18, "total bonded atlETH supply should be 1 ETH");
     }
 
-    function test_atleth_depositAndBond() public {
+    function test_atleth_depositAndCommit() public {
         assertEq(atlas.balanceOf(userEOA), 0, "user's atlETH balance should be 0");
-        assertEq(atlas.balanceOfBonded(userEOA), 0, "user's bonded atlETH should be 0");
+        assertEq(atlas.balanceOfCommitted(userEOA), 0, "user's bonded atlETH should be 0");
         assertEq(atlas.bondedTotalSupply(), 0, "total bonded atlETH supply should be 0");
 
         deal(userEOA, 1e18);
 
         vm.prank(userEOA);
         vm.expectRevert(); // Underflow error
-        atlas.depositAndBond{ value: 1e18 }(2e18);
+        atlas.depositAndCommit{ value: 1e18 }(2e18);
 
         vm.prank(userEOA);
         vm.expectEmit(true, true, false, true);
         emit AtlasEvents.Mint(userEOA, 1e18);
         vm.expectEmit(true, true, false, true);
-        emit AtlasEvents.Bond(userEOA, 1e18);
-        atlas.depositAndBond{ value: 1e18 }(1e18);
+        emit AtlasEvents.Commit(userEOA, 1e18);
+        atlas.depositAndCommit{ value: 1e18 }(1e18);
 
         assertEq(atlas.balanceOf(userEOA), 0, "user's atlETH balance should still be 0");
-        assertEq(atlas.balanceOfBonded(userEOA), 1e18, "user's bonded atlETH should be 1 ETH");
+        assertEq(atlas.balanceOfCommitted(userEOA), 1e18, "user's bonded atlETH should be 1 ETH");
         assertEq(atlas.bondedTotalSupply(), 1e18, "total bonded atlETH supply should be 1 ETH");
     }
 
     function test_atleth_unbond() public {
         vm.startPrank(solverOneEOA);
-        atlas.bond(1e18);
+        atlas.commit(1e18);
 
         assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
-        assertEq(atlas.balanceOfBonded(solverOneEOA), 1e18, "solverOne's bonded atlETH should be 1 ETH");
-        assertEq(atlas.balanceOfUnbonding(solverOneEOA), 0, "solverOne's unbonding atlETH should be 0");
+        assertEq(atlas.balanceOfCommitted(solverOneEOA), 1e18, "solverOne's bonded atlETH should be 1 ETH");
+        assertEq(atlas.balanceOfUncommitting(solverOneEOA), 0, "solverOne's unbonding atlETH should be 0");
         assertEq(atlas.accountLastActiveBlock(solverOneEOA), 0, "solverOne's last active block should be 0");
         assertEq(atlas.bondedTotalSupply(), 1e18, "total bonded atlETH supply should be 1 ETH");
 
         // unbond should be blocked during metacall
         atlas.setLock(address(solverOneEOA), 0, 0);
         vm.expectRevert(AtlasErrors.InvalidLockState.selector);
-        atlas.unbond(1e18);
+        atlas.requestUncommit(1e18);
         atlas.clearTransientStorage();
 
         // Reverts if unbonding more than bonded balance
         vm.expectRevert(); // Underflow error
-        atlas.unbond(2e18);
+        atlas.requestUncommit(2e18);
 
         vm.expectEmit(true, true, false, true);
-        emit AtlasEvents.Unbond(solverOneEOA, 1e18, block.number + atlas.ESCROW_DURATION() + 1);
-        atlas.unbond(1e18);
+        emit AtlasEvents.UncommitRequested(solverOneEOA, 1e18, block.number + atlas.ESCROW_DURATION() + 1);
+        atlas.requestUncommit(1e18);
 
         // NOTE: On unbonding, individual account bonded balances decrease, but total bonded supply remains the same
         assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
-        assertEq(atlas.balanceOfBonded(solverOneEOA), 0, "solverOne's bonded atlETH should be 1 ETH");
-        assertEq(atlas.balanceOfUnbonding(solverOneEOA), 1e18, "solverOne's unbonding atlETH should be 1 ETH");
+        assertEq(atlas.balanceOfCommitted(solverOneEOA), 0, "solverOne's bonded atlETH should be 1 ETH");
+        assertEq(atlas.balanceOfUncommitting(solverOneEOA), 1e18, "solverOne's unbonding atlETH should be 1 ETH");
         assertEq(atlas.accountLastActiveBlock(solverOneEOA), block.number, "solverOne's last active block should be the current block");
         assertEq(atlas.bondedTotalSupply(), 1e18, "total bonded atlETH supply should be 1e18");
     }
 
     function test_atleth_redeem() public {
         vm.startPrank(solverOneEOA);
-        atlas.bond(1e18);
-        atlas.unbond(1e18);
+        atlas.commit(1e18);
+        atlas.requestUncommit(1e18);
 
         uint256 solverEthBefore = address(solverOneEOA).balance;
         uint256 totalSupplyBefore = atlas.totalSupply();
         assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
-        assertEq(atlas.balanceOfUnbonding(solverOneEOA), 1e18, "solverOne's unbonding atlETH should be 1 ETH");
+        assertEq(atlas.balanceOfUncommitting(solverOneEOA), 1e18, "solverOne's unbonding atlETH should be 1 ETH");
         assertEq(atlas.bondedTotalSupply(), 1e18, "total bonded atlETH supply should be 1 ETH");
 
         // redeem should be blocked during metacall
         atlas.setLock(address(solverOneEOA), 0, 0);
         vm.expectRevert(AtlasErrors.InvalidLockState.selector);
-        atlas.redeem(1e18);
+        atlas.completeUncommit(1e18);
         atlas.clearTransientStorage();
 
         vm.expectRevert(AtlasErrors.EscrowLockActive.selector);
-        atlas.redeem(1e18);
+        atlas.completeUncommit(1e18);
 
         vm.roll(block.number + atlas.ESCROW_DURATION() + 1);
 
         vm.expectEmit(true, true, false, true);
-        emit AtlasEvents.Redeem(solverOneEOA, 1e18);
-        atlas.redeem(1e18);
+        emit AtlasEvents.UncommitCompleted(solverOneEOA, 1e18);
+        atlas.completeUncommit(1e18);
 
         assertEq(address(solverOneEOA).balance, solverEthBefore, "solverOne's ETH balance should be the same");
         assertEq(atlas.totalSupply(), totalSupplyBefore + 1e18, "total atlETH supply should be 1 ETH more");
         assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
-        assertEq(atlas.balanceOfUnbonding(solverOneEOA), 0, "solverOne's unbonding atlETH should be 0");
+        assertEq(atlas.balanceOfUncommitting(solverOneEOA), 0, "solverOne's unbonding atlETH should be 0");
         assertEq(atlas.bondedTotalSupply(), 0, "total bonded atlETH supply should be 0");
     }
 
@@ -206,47 +206,47 @@ contract AtlETHTest is BaseTest {
         assertEq(atlas.balanceOf(userEOA), 1e18, "user's atlETH balance should now be 1 ETH");
     }
 
-    function test_atleth_balanceOfBonded() public {
-        assertEq(atlas.balanceOfBonded(solverOneEOA), 0, "solverOne's bonded atlETH starts at 0");
+    function test_atleth_balanceOfCommitted() public {
+        assertEq(atlas.balanceOfCommitted(solverOneEOA), 0, "solverOne's bonded atlETH starts at 0");
         assertEq(atlas.bondedTotalSupply(), 0, "total bonded atlETH supply should be 0");
 
         vm.prank(solverOneEOA);
-        atlas.bond(1e18);
+        atlas.commit(1e18);
 
-        assertEq(atlas.balanceOfBonded(solverOneEOA), 1e18, "solverOne's bonded atlETH should be 1 ETH");
+        assertEq(atlas.balanceOfCommitted(solverOneEOA), 1e18, "solverOne's bonded atlETH should be 1 ETH");
         assertEq(atlas.bondedTotalSupply(), 1e18, "total bonded atlETH supply should be 1 ETH");
     }
 
-    function test_atleth_balanceOfUnbonding() public {
-        assertEq(atlas.balanceOfUnbonding(solverOneEOA), 0, "solverOne's unbonding atlETH starts at 0");
+    function test_atleth_balanceOfUncommitting() public {
+        assertEq(atlas.balanceOfUncommitting(solverOneEOA), 0, "solverOne's unbonding atlETH starts at 0");
 
         vm.startPrank(solverOneEOA);
-        atlas.bond(1e18);
-        atlas.unbond(1e18);
+        atlas.commit(1e18);
+        atlas.requestUncommit(1e18);
         vm.stopPrank();
 
-        assertEq(atlas.balanceOfUnbonding(solverOneEOA), 1e18, "solverOne's unbonding atlETH should be 1 ETH"); 
+        assertEq(atlas.balanceOfUncommitting(solverOneEOA), 1e18, "solverOne's unbonding atlETH should be 1 ETH"); 
     }
 
     function test_atleth_accountLastActiveBlock() public {
         assertEq(atlas.accountLastActiveBlock(solverOneEOA), 0, "solverOne's last active block should be 0");
 
         vm.startPrank(solverOneEOA);
-        atlas.bond(1e18);
-        atlas.unbond(1e18);
+        atlas.commit(1e18);
+        atlas.requestUncommit(1e18);
         vm.stopPrank();
 
         assertEq(atlas.accountLastActiveBlock(solverOneEOA), block.number, "solverOne's last active block should be the current block");
     }
 
-    function test_atleth_unbondingCompleteBlock() public {
-        assertEq(atlas.unbondingCompleteBlock(solverOneEOA), 0, "solverOne's unbonding complete block should be 0");
+    function test_atleth_uncommitCompleteBlock() public {
+        assertEq(atlas.uncommitCompleteBlock(solverOneEOA), 0, "solverOne's unbonding complete block should be 0");
 
         vm.startPrank(solverOneEOA);
-        atlas.bond(1e18);
-        atlas.unbond(1e18);
+        atlas.commit(1e18);
+        atlas.requestUncommit(1e18);
         vm.stopPrank();
 
-        assertEq(atlas.unbondingCompleteBlock(solverOneEOA), block.number + atlas.ESCROW_DURATION(), "solverOne's unbonding complete block should be the current block + 64");
+        assertEq(atlas.uncommitCompleteBlock(solverOneEOA), block.number + atlas.ESCROW_DURATION(), "solverOne's unbonding complete block should be the current block + 64");
     }
 }

@@ -159,7 +159,7 @@ contract AccountingTest is BaseTest {
             abi.encodeCall(HonestRFQSolver.fulfillRFQ, (swapIntent, executionEnvironment));
 
         vm.prank(solverOneEOA);
-        atlas.bond(1 ether);
+        atlas.commit(1 ether);
 
         // Builds the SolverCall
         solverOps[0] = txBuilder.buildSolverOperation({
