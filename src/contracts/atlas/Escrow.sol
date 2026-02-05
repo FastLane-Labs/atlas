@@ -694,7 +694,6 @@ abstract contract Escrow is AtlETH {
         //            Post-Solver Call           //
         // ------------------------------------- //
 
-        _setLockPhase(uint8(ExecutionPhase.PostSolver));
 
         (_success, _data) = ctx.executionEnvironment.call(
             abi.encodePacked(
