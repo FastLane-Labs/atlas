@@ -745,6 +745,4 @@ abstract contract Escrow is AtlETH {
         // No need to SafeCast - will revert above if too large for uint32
         ctx.dappGasLeft -= uint32(_gasUsed);
     }
-
-    receive() external payable { }
 }
