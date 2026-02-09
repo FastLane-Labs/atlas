@@ -746,5 +746,4 @@ abstract contract Escrow is AtlETH {
         ctx.dappGasLeft -= uint32(_gasUsed);
     }
 
-    receive() external payable { }
 }
