@@ -165,7 +165,7 @@ abstract contract GasAccounting is SafetyLocks {
         }
 
         // Store solver's maxApprovedGasSpend for use in the _isBalanceReconciled() check
-        if (maxApprovedGasSpend > 0) {
+        if (maxApprovedGasSpend > 0 && tx.gasprice > 0) {
             // Convert maxApprovedGasSpend from wei (native token) units to gas units
             _gL.maxApprovedGasSpend = (maxApprovedGasSpend / tx.gasprice).toUint40();
             t_gasLedger = _gL.pack();
@@ -493,8 +493,11 @@ abstract contract GasAccounting is SafetyLocks {
             // - Gas (C + E) used by other reached solvers (bundler or solver fault failures)
             // - Gas (C only) used by unreached solvers
             // - Gas (E only) used during the bid-finding or unreached solver calldata charge loops
+            uint256 _unreachedCalldataGas;
+            if (tx.gasprice > 0) _unreachedCalldataGas = unreachedCalldataValuePaid / tx.gasprice;
+
             _winnerGasCharge = gasMarker - gL.writeoffsGas - gL.solverFaultFailureGas
-                - (unreachedCalldataValuePaid / tx.gasprice) - _gasLeft;
+                - _unreachedCalldataGas - _gasLeft;
             uint256 _surchargedGasPaidBySolvers = gL.solverFaultFailureGas + _winnerGasCharge;
 
             // Bundler gets base gas cost + bundler surcharge of (solver fault fails + winning solver charge)

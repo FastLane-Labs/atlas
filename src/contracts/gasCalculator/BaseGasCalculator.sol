@@ -56,8 +56,10 @@ contract BaseGasCalculator is IL2GasCalculator, Ownable {
         calldataLength += uint256(_calldataLenOffset);
 
         // GasPriceOracle returns the upper bound of the L1 fee in wei, so we divide by the gas price to get the gas.
-        uint256 extraGas = IGasPriceOracle(GAS_PRICE_ORACLE).getL1FeeUpperBound(calldataLength) / tx.gasprice;
-        calldataGas += extraGas;
+        if (tx.gasprice > 0) {
+            uint256 extraGas = IGasPriceOracle(GAS_PRICE_ORACLE).getL1FeeUpperBound(calldataLength) / tx.gasprice;
+            calldataGas += extraGas;
+        }
     }
 
     /// @notice Gets the cost of initial gas used for a transaction with a different calldata fee than mainnet
