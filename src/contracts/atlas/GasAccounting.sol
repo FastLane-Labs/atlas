@@ -415,7 +415,7 @@ abstract contract GasAccounting is SafetyLocks {
                 VERIFICATION.verifySolverOp(solverOps[i], userOpHash, maxFeePerGas, bundler, allowsTrustedOpHash);
 
             if (_result.bundlersFault()) {
-                gL.writeoffsGas += _calldataGasCost.divUp(tx.gasprice).toUint40();
+                if (tx.gasprice > 0) gL.writeoffsGas += _calldataGasCost.divUp(tx.gasprice).toUint40();
                 continue;
             }
 
@@ -433,7 +433,7 @@ abstract contract GasAccounting is SafetyLocks {
 
             // Any deficits from the `_assign()` operations are converted to gas units and written off so as not to
             // charge the winning solver for calldata that is not their responsibility, in `_settle()`.
-            if (_deficit > 0) gL.writeoffsGas += _deficit.divUp(tx.gasprice).toUint40();
+            if (_deficit > 0 && tx.gasprice > 0) gL.writeoffsGas += _deficit.divUp(tx.gasprice).toUint40();
         }
 
         // The gas cost of this loop is always paid by the bundler so as not to charge the winning solver for an
